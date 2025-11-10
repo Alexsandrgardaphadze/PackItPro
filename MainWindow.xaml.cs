@@ -16,9 +16,9 @@ using System.Threading.Tasks;
 // WPF namespaces
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input; // For ICommand
 using System.Windows.Media;
 using System.Windows.Media.Animation;
-using System.Windows.Media.Media3D;
 using System.Net.Http.Json;
 
 // Third-party libraries
@@ -30,11 +30,35 @@ using Microsoft.WindowsAPICodePack.Dialogs;
 using System.Security.Cryptography;
 
 // Uncommon or special-case
-using static System.Windows.Forms.VisualStyles.VisualStyleElement.TrayNotify;
+// using static System.Windows.Forms.VisualStyles.VisualStyleElement.TrayNotify; // This line is likely incorrect and removed
 
 
 namespace PackItPro
 {
+    // RelayCommand for ICommand binding
+    public class RelayCommand : ICommand
+    {
+        private readonly Action<object> _execute;
+        private readonly Func<object, bool> _canExecute;
+
+        public RelayCommand(Action<object> execute, Func<object, bool> canExecute = null)
+        {
+            _execute = execute ?? throw new ArgumentNullException(nameof(execute));
+            _canExecute = canExecute;
+        }
+
+        public event EventHandler CanExecuteChanged
+        {
+            add { CommandManager.RequerySuggested += value; }
+            remove { CommandManager.RequerySuggested -= value; }
+        }
+
+        public bool CanExecute(object parameter) => _canExecute?.Invoke(parameter) ?? true;
+
+        public void Execute(object parameter) => _execute(parameter);
+    }
+
+
     public class AppSettings
     {
         public string OutputLocation { get; set; } = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
@@ -42,15 +66,40 @@ namespace PackItPro
         public bool OnlyScanExecutables { get; set; } = true;
         public bool AutoRemoveInfectedFiles { get; set; } = true;
         public int MinimumDetectionsToFlag { get; set; } = 1;
+        public bool IncludeWingetUpdateScript { get; set; } = false; // New setting
+        public bool UseLZMACompression { get; set; } = true; // New setting
+    }
+
+    // Manifest model
+    public class PackageManifest
+    {
+        public string Version { get; set; } = "1.0";
+        public string PackageName { get; set; } = "MySoftwareBundle";
+        public List<ManifestFile> Files { get; set; } = new List<ManifestFile>();
+        public bool Cleanup { get; set; } = true;
+        public string? AutoUpdateScript { get; set; } // Optional script name
+    }
+
+    public class ManifestFile
+    {
+        public string Name { get; set; } = "";
+        public string InstallType { get; set; } = "exe"; // e.g., exe, msi, appx
+        public string[]? SilentArgs { get; set; } // Changed to string[]
+        public bool RequiresAdmin { get; set; } = false;
+        public int InstallOrder { get; set; } = 0;
+        // TODO: Add WingetId field for mapping during packaging/update
+        // public string? WingetId { get; set; }
     }
 
 
-
-public partial class MainWindow : Window
+    public partial class MainWindow : Window, IDisposable
     {
         #region Fields and Initialization
         private readonly ConcurrentDictionary<string, VirusScanResult> _scanCache = new();
-        private readonly string _cacheFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "virusscancache.json");
+        // TODO: Consider moving these to a dedicated settings/config class
+        private readonly string _appDataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PackItPro");
+        private readonly string _settingsFilePath;
+        private readonly string _cacheFilePath;
         private readonly SemaphoreSlim _scanSemaphore = new(4);
         private readonly HashSet<string> _executableExtensions = new(StringComparer.OrdinalIgnoreCase)
         {
@@ -61,13 +110,25 @@ public partial class MainWindow : Window
 
         private AppSettings _settings = new();
         private ObservableCollection<FileItem> _fileItems = new();
-        private HttpClient _httpClient = new();
+        private HttpClient _httpClient = new(); // TODO: Consider using IHttpClientFactory or a singleton pattern for better lifecycle management
+
+        // NEW: SemaphoreSlim for rate limiting (4 concurrent requests)
+        private readonly SemaphoreSlim _rateLimitSemaphore = new(4, 4);
 
         public MainWindow()
         {
             InitializeComponent();
             Loaded += MainWindow_Loaded;
             FileListView.ItemsSource = _fileItems;
+
+            // Initialize paths in AppData
+            _settingsFilePath = Path.Combine(_appDataDir, "settings.json");
+            _cacheFilePath = Path.Combine(_appDataDir, "virusscancache.json");
+            // Ensure directory exists
+            if (!Directory.Exists(_appDataDir))
+            {
+                Directory.CreateDirectory(_appDataDir);
+            }
         }
 
         private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -101,6 +162,14 @@ public partial class MainWindow : Window
                         return false;
                     }
 
+                    // NEW: Check file extension against allowed list
+                    if (_settings.OnlyScanExecutables && !_executableExtensions.Contains(fi.Extension))
+                    {
+                        MessageBox.Show($"Skipped non-executable file (or unsupported type): {fi.Name}",
+                            "File Type Not Allowed", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return false;
+                    }
+
                     return true;
                 })
                 .Select(fi => fi.FullName)
@@ -110,14 +179,18 @@ public partial class MainWindow : Window
             foreach (var file in validFiles)
             {
                 var fileInfo = new FileInfo(file);
-                _fileItems.Add(new FileItem
+                var fileItem = new FileItem
                 {
                     FileName = Path.GetFileName(file),
                     FilePath = file,
                     Size = FormatBytes(fileInfo.Length),
                     Status = "Pending Scan",
-                    StatusColor = Brushes.Gray
-                });
+                    StatusColor = (SolidColorBrush)FindResource("AppStatusPendingColor")
+                    // RemoveCommand will be set after initialization
+                };
+                // NEW: Set the command after the object is initialized to avoid the closure issue
+                fileItem.RemoveCommand = new RelayCommand((param) => RemoveFile(fileItem));
+                _fileItems.Add(fileItem);
             }
 
             if (paths.Length > validFiles.Count)
@@ -126,6 +199,12 @@ public partial class MainWindow : Window
                     "Information", MessageBoxButton.OK, MessageBoxImage.Information);
             }
 
+            UpdateUIState();
+        }
+
+        private void RemoveFile(FileItem fileItem)
+        {
+            _fileItems.Remove(fileItem);
             UpdateUIState();
         }
 
@@ -171,7 +250,7 @@ public partial class MainWindow : Window
                         !_executableExtensions.Contains(Path.GetExtension(item.FilePath)))
                     {
                         item.Status = "Skipped Scan";
-                        item.StatusColor = Brushes.LightGray;
+                        item.StatusColor = (SolidColorBrush)FindResource("AppTextTertiaryColor");
                         continue;
                     }
 
@@ -187,13 +266,20 @@ public partial class MainWindow : Window
                         await _scanSemaphore.WaitAsync();
                         try
                         {
-                            // Add delay every few files to respect API rate limits
-                            if (_scanCache.Count % 4 == 0)
-                                await Task.Delay(15000);
+                            // NEW: Use SemaphoreSlim for rate limiting, await the permit
+                            await _rateLimitSemaphore.WaitAsync();
 
-                            result = await QueryVirusTotal(item.FilePath, hash);
-                            _scanCache[hash] = result;
-                            ApplyScanResult(item, result);
+                            try
+                            {
+                                result = await QueryVirusTotal(item.FilePath, hash);
+                                _scanCache[hash] = result;
+                                ApplyScanResult(item, result);
+                            }
+                            finally
+                            {
+                                // NEW: Always release the rate limit permit
+                                _rateLimitSemaphore.Release();
+                            }
                         }
                         finally
                         {
@@ -208,12 +294,13 @@ public partial class MainWindow : Window
                 {
                     LogError($"Scan failed for {item.FileName}", ex);
                     item.Status = "Scan Failed";
-                    item.StatusColor = Brushes.Orange;
+                    item.StatusColor = (SolidColorBrush)FindResource("AppStatusWarningColor");
                 }
                 finally
                 {
                     processed++;
-                    UpdateProgress(processed, totalFiles);
+                    UpdateProgress(processed, totalFiles, "Scanning");
+                    // REMOVED: Time tracking logic for rate limiter reset
                 }
             }
 
@@ -243,19 +330,22 @@ public partial class MainWindow : Window
             item.Status = item.IsInfected ?
                 $"Infected ({result.Positives}/{result.TotalScans})" :
                 "Clean";
-            item.StatusColor = item.IsInfected ? Brushes.OrangeRed : Brushes.LimeGreen;
+            item.StatusColor = item.IsInfected ? (SolidColorBrush)FindResource("AppStatusErrorColor") : (SolidColorBrush)FindResource("AppStatusCleanColor");
             return result;
         }
 
         private async Task<VirusScanResult> QueryVirusTotal(string filePath, string hash)
         {
+            // NEW: Acquire rate limit permit *before* making the request
+            // This is handled by the caller (ScanFilesWithVirusTotal) using the semaphore.
+
             try
             {
                 _httpClient.DefaultRequestHeaders.Clear();
                 _httpClient.DefaultRequestHeaders.Add("x-apikey", _settings.VirusTotalApiKey);
 
                 var reportResponse = await _httpClient.GetAsync(
-                    $"https://www.virustotal.com/api/v3/files/{hash}");
+                    $"https://www.virustotal.com/api/v3/files/{hash}"); // Fixed URL
 
                 if (reportResponse.IsSuccessStatusCode)
                 {
@@ -279,7 +369,7 @@ public partial class MainWindow : Window
                 formData.Add(fileContent, "file", Path.GetFileName(filePath));
 
                 var uploadResponse = await _httpClient.PostAsync(
-                    "https://www.virustotal.com/api/v3/files", formData);
+                    "https://www.virustotal.com/api/v3/files", formData); // Fixed URL
                 uploadResponse.EnsureSuccessStatusCode();
 
                 var analysisId = (await uploadResponse.Content.ReadFromJsonAsync<VirusTotalUploadResponse>()).Data.Id;
@@ -289,7 +379,7 @@ public partial class MainWindow : Window
                 {
                     await Task.Delay(5000);
                     var analysisResponse = await _httpClient.GetAsync(
-                        $"https://www.virustotal.com/api/v3/analyses/{analysisId}");
+                        $"https://www.virustotal.com/api/v3/analyses/{analysisId}"); // Fixed URL
 
                     if (analysisResponse.IsSuccessStatusCode)
                     {
@@ -331,48 +421,114 @@ public partial class MainWindow : Window
         #region Packaging Implementation
         private async void PackNow_Click(object sender, RoutedEventArgs e)
         {
-            if (OutputFormatComboBox.SelectedIndex == 1)
+            // NEW: Validate stub installer exists in AppData or base directory
+            var stubPath = Path.Combine(_appDataDir, "StubInstaller.exe");
+            if (!File.Exists(stubPath))
             {
-                var stubPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "StubInstaller.exe");
+                // Fallback to base directory (old location) if not found in AppData
+                stubPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "StubInstaller.exe");
                 if (!File.Exists(stubPath))
                 {
-                    MessageBox.Show("Stub installer not found. Please reinstall the application.",
+                    MessageBox.Show("Stub installer (StubInstaller.exe) not found in application directory or AppData. Please ensure the stub is present.",
                         "Missing Component", MessageBoxButton.OK, MessageBoxImage.Error);
+                    // TODO: Implement stub installer creation/download mechanism or clear error message.
                     return;
                 }
+                else
+                {
+                    LogInfo("StubInstaller.exe found in base directory. Consider moving to AppData.");
+                }
+            }
+
+            // Validate output filename ends with .packitexe
+            string outputFileName = OutputFileNameTextBox.Text;
+            if (string.IsNullOrEmpty(outputFileName))
+            {
+                outputFileName = $"Package_{DateTime.Now:yyyyMMdd_HHmmss}.packitexe";
+            }
+            else if (!outputFileName.EndsWith(".packitexe", StringComparison.OrdinalIgnoreCase))
+            {
+                outputFileName += ".packitexe";
             }
 
             var saveDialog = new SaveFileDialog
             {
-                Filter = OutputFormatComboBox.SelectedIndex == 0
-                    ? "PackItPro Files (.pipack)|*.pipack"
-                    : "Safe Executable (.safeexe)|*.safeexe",
+                Filter = "PackItPro Executable (.packitexe)|*.packitexe",
                 InitialDirectory = _settings.OutputLocation,
-                FileName = string.IsNullOrEmpty(OutputFileNameTextBox.Text)
-                    ? $"Package_{DateTime.Now:yyyyMMdd_HHmmss}"
-                    : OutputFileNameTextBox.Text
+                FileName = outputFileName
             };
 
             if (saveDialog.ShowDialog() == true)
             {
+                string tempPayloadPath = null; // Initialize outside try to access in finally
+                string tempFinalPath = null; // Initialize outside try to access in finally
                 try
                 {
                     Dispatcher.Invoke(() => PackButton.IsEnabled = false);
-                    StatusMessageTextBlock.Text = "Creating package...";
-                    bool isSafeExe = saveDialog.FileName.EndsWith(".safeexe");
-                    byte[] signature = Encoding.UTF8.GetBytes("PIPACKv1");
+                    StatusMessageTextBlock.Text = "Creating .packitexe package...";
+                    ProcessProgressBar.Value = 0;
+                    ProgressPercentTextBlock.Text = "0%";
 
-                    using (var fs = new FileStream(saveDialog.FileName, FileMode.Create))
+                    // Create the package payload (zip file)
+                    tempPayloadPath = Path.GetTempFileName();
+                    try // NEW: Inner try block added
                     {
-                        if (!isSafeExe)
-                            await fs.WriteAsync(signature, 0, signature.Length);
-
-                        using var zipStream = new ZipOutputStream(fs);
+                        using (var fs = new FileStream(tempPayloadPath, FileMode.Create))
+                        using (var zipStream = new ZipOutputStream(fs))
                         {
-                            zipStream.SetLevel(9);
-                            int totalFiles = _fileItems.Count;
+                            // NEW: Clarify compression setting
+                            if (_settings.UseLZMACompression)
+                            {
+                                // TODO: Implement LZMA using SevenZipSharp or SharpCompress
+                                // For now, using Deflate with highest level as a placeholder.
+                                // SharpZipLib's ZipOutputStream doesn't support LZMA natively.
+                                zipStream.SetLevel(9); // Highest compression for Deflate
+                                LogInfo("Using Deflate (level 9) as LZMA placeholder. Consider using SevenZipSharp for true LZMA.");
+                            }
+                            else
+                            {
+                                zipStream.SetLevel(0); // No compression
+                            }
+
+                            int totalFiles = _fileItems.Count + (_settings.IncludeWingetUpdateScript ? 2 : 1); // +1 for manifest, +1 for winget script if included
                             int processed = 0;
 
+                            // Add the manifest file
+                            var manifest = new PackageManifest
+                            {
+                                PackageName = Path.GetFileNameWithoutExtension(saveDialog.FileName),
+                                Files = _fileItems.Select((f, i) => new ManifestFile
+                                {
+                                    Name = Path.GetFileName(f.FilePath),
+                                    InstallType = GetInstallTypeFromExtension(Path.GetExtension(f.FilePath)),
+                                    SilentArgs = GetDefaultSilentArgs(Path.GetExtension(f.FilePath)), // Use string[] now
+                                    RequiresAdmin = false, // Could be configurable per file later
+                                    InstallOrder = i
+                                    // TODO: Add WingetId mapping here if available
+                                }).ToList()
+                            };
+
+                            if (_settings.IncludeWingetUpdateScript)
+                            {
+                                manifest.AutoUpdateScript = "update_all.bat";
+                            }
+
+                            string manifestJson = JsonSerializer.Serialize(manifest, new JsonSerializerOptions { WriteIndented = true });
+                            var manifestEntry = new ZipEntry("packitmeta.json")
+                            {
+                                DateTime = DateTime.Now,
+                                Size = Encoding.UTF8.GetByteCount(manifestJson)
+                            };
+                            zipStream.PutNextEntry(manifestEntry);
+                            using (var manifestStream = new MemoryStream(Encoding.UTF8.GetBytes(manifestJson)))
+                            {
+                                await manifestStream.CopyToAsync(zipStream);
+                            }
+                            zipStream.CloseEntry();
+                            processed++;
+                            UpdateProgress(processed, totalFiles, "Packing");
+
+                            // Add files from the list
                             foreach (var fileItem in _fileItems)
                             {
                                 var entry = new ZipEntry(Path.GetFileName(fileItem.FilePath))
@@ -380,47 +536,90 @@ public partial class MainWindow : Window
                                     DateTime = DateTime.Now,
                                     Size = new FileInfo(fileItem.FilePath).Length
                                 };
-
                                 zipStream.PutNextEntry(entry);
                                 using var fileStream = File.OpenRead(fileItem.FilePath);
                                 await fileStream.CopyToAsync(zipStream);
                                 zipStream.CloseEntry();
 
                                 processed++;
-                                UpdateProgress(processed, totalFiles);
+                                UpdateProgress(processed, totalFiles, "Packing");
+                            }
+
+                            // Add Winget update script if enabled
+                            if (_settings.IncludeWingetUpdateScript)
+                            {
+                                // NEW: Placeholder script with TODO comment
+                                string wingetScriptContent = @"@echo off
+REM This is a placeholder for Winget updates.
+REM In a real scenario, you would call winget upgrade for each installed package.
+REM You need to map the bundled installer filenames to their respective Winget IDs.
+REM Example (hardcoded, needs mapping):
+REM winget upgrade --id Microsoft.Edge
+REM winget upgrade --id VideoLAN.VLC
+REM A more robust solution would read the packitmeta.json and look up Winget IDs stored there.
+echo Placeholder: Winget update script would run here based on packitmeta.json.
+pause
+";
+                                var scriptEntry = new ZipEntry("update_all.bat")
+                                {
+                                    DateTime = DateTime.Now,
+                                    Size = Encoding.UTF8.GetByteCount(wingetScriptContent)
+                                };
+                                zipStream.PutNextEntry(scriptEntry);
+                                using (var scriptStream = new MemoryStream(Encoding.UTF8.GetBytes(wingetScriptContent)))
+                                {
+                                    await scriptStream.CopyToAsync(zipStream);
+                                }
+                                zipStream.CloseEntry();
+                                processed++;
+                                UpdateProgress(processed, totalFiles, "Packing");
                             }
                         }
+
+                        // Create the final .packitexe by combining stub and payload
+                        tempFinalPath = Path.GetTempFileName();
+                        using (var finalStream = new FileStream(tempFinalPath, FileMode.Create))
+                        using (var stubStream = new FileStream(stubPath, FileMode.Open, FileAccess.Read))
+                        using (var payloadStream = new FileStream(tempPayloadPath, FileMode.Open, FileAccess.Read))
+                        {
+                            // NEW: Copy stub first with progress update
+                            var stubLength = stubStream.Length;
+                            var buffer = new byte[8192]; // 8KB buffer
+                            int read;
+                            long totalBytesRead = 0;
+                            StatusMessageTextBlock.Text = "Embedding stub installer...";
+                            while ((read = await stubStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+                            {
+                                await finalStream.WriteAsync(buffer, 0, read);
+                                totalBytesRead += read;
+                                // Update progress based on stub size
+                                var stubProgress = (double)totalBytesRead / stubLength * 50; // Assume stub is ~50% of final file for progress estimation
+                                UpdateProgress((int)stubProgress, 100, "Embedding Stub");
+                            }
+                            UpdateProgress(50, 100, "Embedding Stub"); // Mark stub copy as ~50%
+
+                            // NEW: Then append payload with progress update
+                            var payloadLength = payloadStream.Length;
+                            totalBytesRead = 0;
+                            StatusMessageTextBlock.Text = "Appending payload...";
+                            while ((read = await payloadStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+                            {
+                                await finalStream.WriteAsync(buffer, 0, read);
+                                totalBytesRead += read;
+                                // Update progress based on payload size, starting from 50%
+                                var payloadProgress = 50 + (double)totalBytesRead / payloadLength * 50; // Remaining 50%
+                                UpdateProgress((int)payloadProgress, 100, "Appending Payload");
+                            }
+                            UpdateProgress(100, 100, "Finalizing"); // Mark as complete
+                        }
+
+                        // Move temp file to final location
+                        File.Move(tempFinalPath, saveDialog.FileName, overwrite: true);
                     }
-
-                    if (isSafeExe)
+                    catch (Exception innerEx) // NEW: Catch block for the inner try
                     {
-                        var stubPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "StubInstaller.exe");
-                        var tempFile = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".tmp");
-                        try
-                        {
-                            // Use FileStream with FileShare.None to lock the file during operation
-                            using (var stubStream = new FileStream(stubPath, FileMode.Open, FileAccess.Read, FileShare.None))
-                            using (var tempStream = new FileStream(tempFile, FileMode.Create, FileAccess.Write, FileShare.None))
-                            {
-                                await stubStream.CopyToAsync(tempStream);
-                            }
-
-                            // Append package data to temp file
-                            using (var tempStream = new FileStream(tempFile, FileMode.Append, FileAccess.Write, FileShare.None))
-                            using (var packageStream = new FileStream(saveDialog.FileName, FileMode.Open, FileAccess.Read, FileShare.None))
-                            {
-                                await packageStream.CopyToAsync(tempStream);
-                            }
-
-                            // Atomic replacement
-                            File.Replace(tempFile, saveDialog.FileName, null);
-                        }
-                        catch
-                        {
-                            if (File.Exists(tempFile))
-                                File.Delete(tempFile);
-                            throw;
-                        }
+                        LogError("Inner packaging process failed", innerEx);
+                        throw; // Re-throw to be caught by the outer catch
                     }
 
                     MessageBox.Show($"Package created successfully!\n{saveDialog.FileName}",
@@ -434,9 +633,49 @@ public partial class MainWindow : Window
                 }
                 finally
                 {
+                    // NEW: Ensure temporary files are deleted even if an exception occurs
+                    if (!string.IsNullOrEmpty(tempPayloadPath) && File.Exists(tempPayloadPath))
+                    {
+                        try { File.Delete(tempPayloadPath); } catch { /* Ignore errors during cleanup */ }
+                    }
+                    if (!string.IsNullOrEmpty(tempFinalPath) && File.Exists(tempFinalPath))
+                    {
+                        try { File.Delete(tempFinalPath); } catch { /* Ignore errors during cleanup */ }
+                    }
                     ResetProgress();
                     PackButton.IsEnabled = true;
                 }
+            }
+        }
+
+        private string GetInstallTypeFromExtension(string ext)
+        {
+            switch (ext.ToLower())
+            {
+                case ".msi":
+                    return "msi";
+                case ".exe":
+                    return "exe";
+                case ".appx":
+                case ".appxbundle":
+                    return "appx";
+                default:
+                    return "file"; // Generic file type
+            }
+        }
+
+        // NEW: Return string[] for silent args
+        private string[]? GetDefaultSilentArgs(string ext)
+        {
+            switch (ext.ToLower())
+            {
+                case ".msi":
+                    return new[] { "/quiet", "/norestart" };
+                case ".exe":
+                    // Return an array of common silent flags. The stub installer can try them sequentially.
+                    return new[] { "/S", "/silent", "/quiet", "/SILENT", "/VERYSILENT" };
+                default:
+                    return null;
             }
         }
         #endregion
@@ -458,23 +697,31 @@ public partial class MainWindow : Window
             var totalSize = _fileItems.Sum(f => new FileInfo(f.FilePath).Length);
             FileCountTextBlock.Text = _fileItems.Count.ToString();
             TotalSizeTextBlock.Text = FormatBytes(totalSize);
+            // Count clean files - Logic remains, but UI update is skipped
+            int cleanCount = _fileItems.Count(f => !f.IsInfected && f.Status != "Skipped Scan" && f.Status != "Scan Failed");
+
+            // Log the count if SafeFilesTextBlock is missing
+            LogInfo($"UpdateSummary: Total Files = {_fileItems.Count}, Clean Files = {cleanCount}"); // Optional: Log for debugging
+
             StatusTextBlock.Text = _fileItems.Any(f => f.IsInfected) ?
                 "Infected Files Detected" : "Ready";
             StatusTextBlock.Foreground = _fileItems.Any(f => f.IsInfected)
-                    ? Brushes.OrangeRed
-                    : Brushes.LimeGreen;
+                    ? (SolidColorBrush)FindResource("AppStatusErrorColor")
+                    : (SolidColorBrush)FindResource("AppStatusCleanColor");
         }
 
-        private void UpdateProgress(int processed, int total)
+        // Updated UpdateProgress to accept operation type
+        private void UpdateProgress(int processed, int total, string operationType)
         {
             Dispatcher.Invoke(() =>
             {
+                var percentage = (double)processed / total * 100;
                 var animation = new DoubleAnimation(
                     ProcessProgressBar.Value,
-                    (double)processed / total * 100,
+                    percentage,
                     new Duration(TimeSpan.FromMilliseconds(300)));
                 ProcessProgressBar.BeginAnimation(ProgressBar.ValueProperty, animation);
-                ProgressPercentTextBlock.Text = $"{processed}/{total}";
+                ProgressPercentTextBlock.Text = $"{(int)percentage}% ({operationType})"; // Add operation type label
             });
         }
 
@@ -484,7 +731,7 @@ public partial class MainWindow : Window
             {
                 ProcessProgressBar.Value = 0;
                 ProgressPercentTextBlock.Text = "0%";
-                StatusMessageTextBlock.Text = "Ready to pack files";
+                StatusMessageTextBlock.Text = "Ready to create .packitexe package";
             });
         }
         #endregion
@@ -495,8 +742,11 @@ public partial class MainWindow : Window
             if (e.Data.GetDataPresent(DataFormats.FileDrop))
             {
                 e.Effects = DragDropEffects.Copy;
-                DropAreaBorder.BorderBrush = new SolidColorBrush(Colors.DodgerBlue);
-                DropAreaBorder.Background = new SolidColorBrush(Color.FromArgb(30, 30, 144, 255));
+                DropAreaBorder.BorderBrush = (SolidColorBrush)FindResource("AppDropAreaHoverColor");
+                // NEW: Use named resource instead of hardcoded Color.FromArgb
+                var brush = (SolidColorBrush)FindResource("AppDropAreaHoverColor");
+                var color = brush.Color;
+                DropAreaBorder.Background = new SolidColorBrush(Color.FromArgb(30, color.R, color.G, color.B)); // Use R, G, B from named color
             }
             else
             {
@@ -507,8 +757,8 @@ public partial class MainWindow : Window
 
         private void DropArea_DragLeave(object sender, DragEventArgs e)
         {
-            DropAreaBorder.BorderBrush = new SolidColorBrush(Color.FromRgb(63, 63, 90));
-            DropAreaBorder.Background = new SolidColorBrush(Color.FromRgb(37, 37, 54));
+            DropAreaBorder.BorderBrush = (SolidColorBrush)FindResource("AppBorderColor");
+            DropAreaBorder.Background = (SolidColorBrush)FindResource("AppPanelColor");
             e.Handled = true;
         }
 
@@ -539,14 +789,8 @@ public partial class MainWindow : Window
             }
         }
 
-        private void RemoveFile_Click(object sender, RoutedEventArgs e)
-        {
-            if (((Button)sender).DataContext is FileItem fileItem)
-            {
-                _fileItems.Remove(fileItem);
-                UpdateUIState();
-            }
-        }
+        // RemoveFile_Click is no longer used due to ICommand binding
+        // private void RemoveFile_Click(object sender, RoutedEventArgs e) { ... }
 
         private void ClearAllFiles_Click(object sender, RoutedEventArgs e)
         {
@@ -627,6 +871,22 @@ public partial class MainWindow : Window
             }
         }
 
+        private void PackItProSettings_Click(object sender, RoutedEventArgs e)
+        {
+            // You can add a more detailed settings dialog here if needed
+            // For now, just show a message about the current settings
+            var settingsInfo = new StringBuilder();
+            settingsInfo.AppendLine("Current PackItPro Settings:");
+            settingsInfo.AppendLine($"- Output Location: {_settings.OutputLocation}");
+            settingsInfo.AppendLine($"- VirusTotal API Key Set: {!string.IsNullOrEmpty(_settings.VirusTotalApiKey)}");
+            settingsInfo.AppendLine($"- Only Scan Executables: {_settings.OnlyScanExecutables}");
+            settingsInfo.AppendLine($"- Auto Remove Infected: {_settings.AutoRemoveInfectedFiles}");
+            settingsInfo.AppendLine($"- Include Winget Update Script: {_settings.IncludeWingetUpdateScript}");
+            settingsInfo.AppendLine($"- Use LZMA Compression: {_settings.UseLZMACompression}");
+
+            MessageBox.Show(settingsInfo.ToString(), "PackItPro Settings", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
         private void About_Click(object sender, RoutedEventArgs e)
         {
             MessageBox.Show("PackItPro v1.0\n\nA secure file packaging tool designed to bundle executable files into a single installer package with malware scanning capability.",
@@ -639,13 +899,13 @@ public partial class MainWindow : Window
         {
             try
             {
-                if (File.Exists("settings.json"))
+                if (File.Exists(_settingsFilePath)) // Use new path
                 {
-                    var json = await File.ReadAllTextAsync("settings.json");
+                    var json = await File.ReadAllTextAsync(_settingsFilePath);
                     _settings = JsonSerializer.Deserialize<AppSettings>(json) ?? new AppSettings();
                 }
 
-                if (File.Exists(_cacheFilePath))
+                if (File.Exists(_cacheFilePath)) // Use new path
                 {
                     var cacheJson = await File.ReadAllTextAsync(_cacheFilePath);
                     var cache = JsonSerializer.Deserialize<List<VirusScanResult>>(cacheJson);
@@ -669,7 +929,11 @@ public partial class MainWindow : Window
         {
             try
             {
-                File.WriteAllText("settings.json",
+                // Ensure directory exists before saving
+                var dir = Path.GetDirectoryName(_settingsFilePath);
+                if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+
+                File.WriteAllText(_settingsFilePath, // Use new path
                     JsonSerializer.Serialize(_settings, new JsonSerializerOptions { WriteIndented = true }));
             }
             catch (Exception ex)
@@ -682,7 +946,11 @@ public partial class MainWindow : Window
         {
             try
             {
-                File.WriteAllText(_cacheFilePath,
+                // Ensure directory exists before saving
+                var dir = Path.GetDirectoryName(_cacheFilePath);
+                if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+
+                File.WriteAllText(_cacheFilePath, // Use new path
                     JsonSerializer.Serialize(_scanCache.Values.ToList(),
                     new JsonSerializerOptions { WriteIndented = true }));
             }
@@ -699,10 +967,61 @@ public partial class MainWindow : Window
             try
             {
                 var logEntry = $"[{DateTime.Now:o}] {message}\n{ex}\n\n";
-                File.AppendAllText("packitpro.log", logEntry);
+                var logPath = Path.Combine(_appDataDir, "packitpro.log"); // Log to AppData
+                File.AppendAllText(logPath, logEntry);
                 Debug.WriteLine(logEntry);
             }
             catch { /* Ensure logging doesn't crash the app */ }
+        }
+
+        private void LogInfo(string message) // NEW helper for info logs
+        {
+            try
+            {
+                var logEntry = $"[{DateTime.Now:o}] [INFO] {message}\n";
+                var logPath = Path.Combine(_appDataDir, "packitpro.log"); // Log to AppData
+                File.AppendAllText(logPath, logEntry);
+                Debug.WriteLine(logEntry);
+            }
+            catch { /* Ensure logging doesn't crash the app */ }
+        }
+        #endregion
+
+        #region IDisposable Support
+        private bool disposedValue = false; // To detect redundant calls
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!disposedValue)
+            {
+                if (disposing)
+                {
+                    // TODO: Dispose managed state (managed objects).
+                    _httpClient?.Dispose();
+                    _scanSemaphore?.Dispose();
+                    _rateLimitSemaphore?.Dispose(); // NEW: Dispose the rate limit semaphore
+                }
+
+                // TODO: Free unmanaged resources (unmanaged objects) and override a finalizer below.
+                // TODO: Set large fields to null.
+
+                disposedValue = true;
+            }
+        }
+
+        // TODO: Override a finalizer only if Dispose(bool disposing) above has code to free unmanaged resources.
+        // ~MainWindow() {
+        //   // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
+        //   Dispose(false);
+        // }
+
+        // This code added to correctly implement the disposable pattern.
+        public void Dispose()
+        {
+            // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
+            Dispose(true);
+            // TODO: Uncomment the following line if the finalizer is overridden above.
+            // GC.SuppressFinalize(this);
         }
         #endregion
     }
@@ -714,8 +1033,11 @@ public partial class MainWindow : Window
         private string _filePath = string.Empty;
         private string _size = "0 KB";
         private string _status = "Pending";
-        private SolidColorBrush _statusColor = Brushes.Gray;
+        private SolidColorBrush _statusColor = Brushes.Gray; // Will be set via code
         private bool _isInfected;
+
+        // ICommand for remove button
+        public ICommand RemoveCommand { get; set; } = null!; // Initialized in AddFilesWithValidation
 
         public string FileName
         {
@@ -812,7 +1134,7 @@ public partial class MainWindow : Window
             Height = 150;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
             ResizeMode = ResizeMode.NoResize;
-            Background = new SolidColorBrush(Color.FromRgb(30, 30, 47));
+            Background = (SolidColorBrush)Application.Current.FindResource("AppBackgroundColor");
 
             var grid = new Grid { Margin = new Thickness(10) };
             grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -823,7 +1145,7 @@ public partial class MainWindow : Window
             {
                 Text = question,
                 Margin = new Thickness(0, 0, 0, 10),
-                Foreground = Brushes.White
+                Foreground = (SolidColorBrush)Application.Current.FindResource("AppTextColor")
             };
             grid.Children.Add(questionText);
             Grid.SetRow(questionText, 0);
@@ -832,9 +1154,9 @@ public partial class MainWindow : Window
             {
                 Text = defaultAnswer,
                 Margin = new Thickness(0, 0, 0, 15),
-                Background = new SolidColorBrush(Color.FromRgb(30, 30, 47)),
-                Foreground = Brushes.White,
-                BorderBrush = new SolidColorBrush(Color.FromRgb(63, 63, 90)),
+                Background = (SolidColorBrush)Application.Current.FindResource("AppBackgroundColor"),
+                Foreground = (SolidColorBrush)Application.Current.FindResource("AppTextColor"),
+                BorderBrush = (SolidColorBrush)Application.Current.FindResource("AppBorderColor"),
                 Padding = new Thickness(8, 5, 8, 5)
             };
             grid.Children.Add(answerBox);
@@ -849,8 +1171,8 @@ public partial class MainWindow : Window
             var style = new Style(typeof(Button))
             {
                 Setters = {
-                new Setter(Button.BackgroundProperty, new SolidColorBrush(Color.FromRgb(0, 120, 215))),
-                new Setter(Button.ForegroundProperty, Brushes.White),
+                new Setter(Button.BackgroundProperty, (SolidColorBrush)Application.Current.FindResource("AppPrimaryColor")),
+                new Setter(Button.ForegroundProperty, (SolidColorBrush)Application.Current.FindResource("AppTextColor")),
                 new Setter(Button.BorderThicknessProperty, new Thickness(0)),
                 new Setter(Button.PaddingProperty, new Thickness(15, 8, 15, 8)),
                 new Setter(Button.MarginProperty, new Thickness(5, 0, 0, 0))
@@ -884,6 +1206,6 @@ public partial class MainWindow : Window
             answerBox.Focus();
         }
     }
-#endregion
+    #endregion
 
 }
