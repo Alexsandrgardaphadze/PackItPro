@@ -1,4 +1,5 @@
 ﻿// System namespaces
+#nullable enable // NEW: Enable nullable reference types for this file
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -12,7 +13,6 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-
 // WPF namespaces
 using System.Windows;
 using System.Windows.Controls;
@@ -20,44 +20,40 @@ using System.Windows.Input; // For ICommand
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Net.Http.Json;
-
 // Third-party libraries
 using ICSharpCode.SharpZipLib.Zip;
 using Microsoft.Win32;
 using Microsoft.WindowsAPICodePack.Dialogs;
-
 // Needed for cryptographic hashing like SHA256
 using System.Security.Cryptography;
-
 // Uncommon or special-case
 // using static System.Windows.Forms.VisualStyles.VisualStyleElement.TrayNotify; // This line is likely incorrect and removed
-
-
 namespace PackItPro
 {
     // RelayCommand for ICommand binding
     public class RelayCommand : ICommand
     {
-        private readonly Action<object> _execute;
-        private readonly Func<object, bool> _canExecute;
+        private readonly Action<object?> _execute; // NEW: Accept object? as Execute might receive null
+        private readonly Func<object?, bool>? _canExecute; // NEW: Accept and return nullable explicitly
 
-        public RelayCommand(Action<object> execute, Func<object, bool> canExecute = null)
+        public RelayCommand(Action<object?> execute, Func<object?, bool>? canExecute = null) // NEW: Accept nullable explicitly
         {
             _execute = execute ?? throw new ArgumentNullException(nameof(execute));
             _canExecute = canExecute;
         }
 
-        public event EventHandler CanExecuteChanged
+        public event EventHandler? CanExecuteChanged // NEW: Made nullable explicitly
         {
             add { CommandManager.RequerySuggested += value; }
             remove { CommandManager.RequerySuggested -= value; }
         }
 
-        public bool CanExecute(object parameter) => _canExecute?.Invoke(parameter) ?? true;
+        // NEW: Fix parameter nullability to match ICommand
+        public bool CanExecute(object? parameter) => _canExecute?.Invoke(parameter) ?? true;
 
-        public void Execute(object parameter) => _execute(parameter);
+        // NEW: Fix parameter nullability to match ICommand
+        public void Execute(object? parameter) => _execute(parameter);
     }
-
 
     public class AppSettings
     {
@@ -70,7 +66,7 @@ namespace PackItPro
         public bool UseLZMACompression { get; set; } = true; // New setting
     }
 
-    // Manifest model
+    // Manifest model - Updated to include SHA256Checksum
     public class PackageManifest
     {
         public string Version { get; set; } = "1.0";
@@ -78,6 +74,7 @@ namespace PackItPro
         public List<ManifestFile> Files { get; set; } = new List<ManifestFile>();
         public bool Cleanup { get; set; } = true;
         public string? AutoUpdateScript { get; set; } // Optional script name
+        public string? SHA256Checksum { get; set; } // NEW: Add SHA256Checksum for integrity verification
     }
 
     public class ManifestFile
@@ -345,13 +342,14 @@ namespace PackItPro
                 _httpClient.DefaultRequestHeaders.Add("x-apikey", _settings.VirusTotalApiKey);
 
                 var reportResponse = await _httpClient.GetAsync(
-                    $"https://www.virustotal.com/api/v3/files/{hash}"); // Fixed URL
+                    $"https://www.virustotal.com/api/v3/files/{hash}"); // Fixed URL - Ensure hash is appended correctly
 
                 if (reportResponse.IsSuccessStatusCode)
                 {
                     var report = await reportResponse.Content.ReadFromJsonAsync<VirusTotalFileReport>()
                     ?? throw new InvalidDataException("Invalid VirusTotal response");
 
+                    // NEW: Check for null Attributes
                     if (report.Data?.Attributes?.LastAnalysisStats == null)
                         throw new InvalidDataException("Missing analysis data in VirusTotal response");
                     return new VirusScanResult
@@ -368,22 +366,32 @@ namespace PackItPro
                 using var formData = new MultipartFormDataContent();
                 formData.Add(fileContent, "file", Path.GetFileName(filePath));
 
+                // NEW: Fixed URL for file upload (ensure it's the correct endpoint)
                 var uploadResponse = await _httpClient.PostAsync(
-                    "https://www.virustotal.com/api/v3/files", formData); // Fixed URL
+                    "https://www.virustotal.com/api/v3/files", formData); // Ensure this is the correct upload endpoint
                 uploadResponse.EnsureSuccessStatusCode();
 
-                var analysisId = (await uploadResponse.Content.ReadFromJsonAsync<VirusTotalUploadResponse>()).Data.Id;
+                var uploadResult = await uploadResponse.Content.ReadFromJsonAsync<VirusTotalUploadResponse>()
+                               ?? throw new InvalidDataException("Invalid VirusTotal upload response");
+                // NEW: Check for null Data and Id
+                var analysisId = uploadResult.Data?.Id
+                                 ?? throw new InvalidDataException("Missing analysis ID in VirusTotal upload response");
 
                 // Poll for results
                 for (int i = 0; i < 10; i++)
                 {
                     await Task.Delay(5000);
                     var analysisResponse = await _httpClient.GetAsync(
-                        $"https://www.virustotal.com/api/v3/analyses/{analysisId}"); // Fixed URL
+                        $"https://www.virustotal.com/api/v3/analyses/{analysisId}"); // Fixed URL - Ensure analysis ID is appended correctly
 
                     if (analysisResponse.IsSuccessStatusCode)
                     {
-                        var analysis = await analysisResponse.Content.ReadFromJsonAsync<VirusTotalFileReport>();
+                        var analysis = await analysisResponse.Content.ReadFromJsonAsync<VirusTotalFileReport>()
+                                              ?? throw new InvalidDataException("Invalid VirusTotal analysis response");
+                        // NEW: Check for null Attributes again
+                        if (analysis.Data?.Attributes?.LastAnalysisStats == null)
+                            throw new InvalidDataException("Missing analysis data in VirusTotal analysis response");
+
                         return new VirusScanResult
                         {
                             FileHash = hash,
@@ -460,8 +468,9 @@ namespace PackItPro
 
             if (saveDialog.ShowDialog() == true)
             {
-                string tempPayloadPath = null; // Initialize outside try to access in finally
-                string tempFinalPath = null; // Initialize outside try to access in finally
+                // NEW: Initialize with empty string instead of null, handle nullability
+                string? tempPayloadPath = null;
+                string? tempFinalPath = null;
                 try
                 {
                     Dispatcher.Invoke(() => PackButton.IsEnabled = false);
@@ -469,7 +478,69 @@ namespace PackItPro
                     ProcessProgressBar.Value = 0;
                     ProgressPercentTextBlock.Text = "0%";
 
-                    // Create the package payload (zip file)
+                    // NEW: Calculate directory hash for integrity verification (Step 2a)
+                    var tempExtractionDir = Path.Combine(Path.GetTempPath(), "PackItPro_Packaging_" + Guid.NewGuid().ToString());
+                    Directory.CreateDirectory(tempExtractionDir); // Create temp dir for hashing prep
+                    string? calculatedDirHash = null;
+                    try
+                    {
+                        // Copy files to temp dir for hashing calculation
+                        foreach (var fileItem in _fileItems)
+                        {
+                            var destPath = Path.Combine(tempExtractionDir, Path.GetFileName(fileItem.FilePath));
+                            File.Copy(fileItem.FilePath, destPath, overwrite: true);
+                        }
+
+                        // Add manifest to temp dir for hashing calculation
+                        var tempManifest = new PackageManifest
+                        {
+                            PackageName = Path.GetFileNameWithoutExtension(saveDialog.FileName),
+                            Files = _fileItems.Select((f, i) => new ManifestFile
+                            {
+                                Name = Path.GetFileName(f.FilePath),
+                                InstallType = GetInstallTypeFromExtension(Path.GetExtension(f.FilePath)),
+                                SilentArgs = GetDefaultSilentArgs(Path.GetExtension(f.FilePath)),
+                                RequiresAdmin = false,
+                                InstallOrder = i
+                            }).ToList(),
+                            SHA256Checksum = null, // Calculate hash *before* setting this field
+                            AutoUpdateScript = _settings.IncludeWingetUpdateScript ? "update_all.bat" : null
+                        };
+
+                        if (_settings.IncludeWingetUpdateScript)
+                        {
+                            tempManifest.AutoUpdateScript = "update_all.bat";
+                        }
+
+                        string tempManifestJson = JsonSerializer.Serialize(tempManifest, new JsonSerializerOptions { WriteIndented = true });
+                        File.WriteAllText(Path.Combine(tempExtractionDir, "packitmeta.json"), tempManifestJson);
+
+                        // Add Winget script if enabled, to temp dir for hashing calculation
+                        if (_settings.IncludeWingetUpdateScript)
+                        {
+                            string wingetScriptContent = @"@echo off
+REM This is a placeholder for Winget updates.
+echo Placeholder: Winget update script would run here based on packitmeta.json.
+pause
+";
+                            File.WriteAllText(Path.Combine(tempExtractionDir, "update_all.bat"), wingetScriptContent);
+                        }
+
+                        // Calculate the hash of the temp directory contents
+                        calculatedDirHash = Convert.ToBase64String(ComputeDirectoryHash(tempExtractionDir));
+                        LogInfo($"Calculated directory hash for integrity check: {calculatedDirHash}");
+                    }
+                    finally
+                    {
+                        // Clean up the temporary directory used for hash calculation
+                        if (Directory.Exists(tempExtractionDir))
+                        {
+                            Directory.Delete(tempExtractionDir, true);
+                        }
+                    }
+
+
+                    // Create the package payload (zip file) - Now include the calculated hash
                     tempPayloadPath = Path.GetTempFileName();
                     try // NEW: Inner try block added
                     {
@@ -493,7 +564,7 @@ namespace PackItPro
                             int totalFiles = _fileItems.Count + (_settings.IncludeWingetUpdateScript ? 2 : 1); // +1 for manifest, +1 for winget script if included
                             int processed = 0;
 
-                            // Add the manifest file
+                            // Add the manifest file - NOW WITH THE CALCULATED HASH (Step 2b)
                             var manifest = new PackageManifest
                             {
                                 PackageName = Path.GetFileNameWithoutExtension(saveDialog.FileName),
@@ -512,6 +583,9 @@ namespace PackItPro
                             {
                                 manifest.AutoUpdateScript = "update_all.bat";
                             }
+
+                            // NEW: Set the calculated hash in the manifest
+                            manifest.SHA256Checksum = calculatedDirHash;
 
                             string manifestJson = JsonSerializer.Serialize(manifest, new JsonSerializerOptions { WriteIndented = true });
                             var manifestEntry = new ZipEntry("packitmeta.json")
@@ -648,6 +722,51 @@ pause
             }
         }
 
+        // NEW: Helper function to compute directory hash (Step 2a)
+        private static byte[] ComputeDirectoryHash(string directoryPath)
+        {
+            using var sha256 = SHA256.Create();
+            var fileHashes = new List<byte[]>();
+
+            var files = Directory.GetFiles(directoryPath, "*", SearchOption.AllDirectories);
+            Array.Sort(files); // Sort filenames to ensure consistent order
+
+            foreach (var filePath in files)
+            {
+                var fileContentHash = ComputeFileHash(filePath);
+                var relativePath = Path.GetRelativePath(directoryPath, filePath);
+                var pathBytes = Encoding.UTF8.GetBytes(relativePath.ToLowerInvariant());
+
+                using var tempStream = new MemoryStream();
+                tempStream.Write(pathBytes, 0, pathBytes.Length);
+                tempStream.Write(fileContentHash, 0, fileContentHash.Length);
+                tempStream.Position = 0;
+
+                var combinedHash = sha256.ComputeHash(tempStream);
+                fileHashes.Add(combinedHash);
+            }
+
+            fileHashes.Sort((x, y) => Comparer<byte[]>.Default.Compare(x, y));
+
+            using var finalStream = new MemoryStream();
+            foreach (var hash in fileHashes)
+            {
+                finalStream.Write(hash, 0, hash.Length);
+            }
+            finalStream.Position = 0;
+
+            return sha256.ComputeHash(finalStream);
+        }
+
+        // NEW: Helper function to compute file hash
+        private static byte[] ComputeFileHash(string filePath)
+        {
+            using var fileStream = File.OpenRead(filePath);
+            using var sha256 = SHA256.Create();
+            return sha256.ComputeHash(fileStream);
+        }
+
+
         private string GetInstallTypeFromExtension(string ext)
         {
             switch (ext.ToLower())
@@ -699,7 +818,6 @@ pause
             TotalSizeTextBlock.Text = FormatBytes(totalSize);
             // Count clean files - Logic remains, but UI update is skipped
             int cleanCount = _fileItems.Count(f => !f.IsInfected && f.Status != "Skipped Scan" && f.Status != "Scan Failed");
-
             // Log the count if SafeFilesTextBlock is missing
             LogInfo($"UpdateSummary: Total Files = {_fileItems.Count}, Clean Files = {cleanCount}"); // Optional: Log for debugging
 
@@ -929,9 +1047,12 @@ pause
         {
             try
             {
-                // Ensure directory exists before saving
-                var dir = Path.GetDirectoryName(_settingsFilePath);
-                if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+                // NEW: Ensure directory exists before saving - handle potential null from Path.GetDirectoryName
+                var dirPath = Path.GetDirectoryName(_settingsFilePath);
+                if (!string.IsNullOrEmpty(dirPath) && !Directory.Exists(dirPath))
+                {
+                    Directory.CreateDirectory(dirPath);
+                }
 
                 File.WriteAllText(_settingsFilePath, // Use new path
                     JsonSerializer.Serialize(_settings, new JsonSerializerOptions { WriteIndented = true }));
@@ -946,9 +1067,12 @@ pause
         {
             try
             {
-                // Ensure directory exists before saving
-                var dir = Path.GetDirectoryName(_cacheFilePath);
-                if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+                // NEW: Ensure directory exists before saving - handle potential null from Path.GetDirectoryName
+                var dirPath = Path.GetDirectoryName(_cacheFilePath);
+                if (!string.IsNullOrEmpty(dirPath) && !Directory.Exists(dirPath))
+                {
+                    Directory.CreateDirectory(dirPath);
+                }
 
                 File.WriteAllText(_cacheFilePath, // Use new path
                     JsonSerializer.Serialize(_scanCache.Values.ToList(),
@@ -1125,7 +1249,7 @@ pause
     #region Helper Classes
     public class InputDialog : Window
     {
-        public string Answer { get; private set; }
+        public string Answer { get; private set; } = string.Empty; // FIX: Initialize to non-null value
 
         public InputDialog(string title, string question, string defaultAnswer = "")
         {
