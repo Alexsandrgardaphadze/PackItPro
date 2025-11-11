@@ -1,9 +1,11 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.13.35825.156 d17.13
+VisualStudioVersion = 17.13.35825.156
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PackItPro", "PackItPro.csproj", "{FF1289BB-5AB7-41F4-94B5-E49C93A9251A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StubInstaller", "..\StubInstaller\StubInstaller.csproj", "{5C6A7541-164A-415B-9EDE-E5BF7D08F577}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +17,10 @@ Global
 		{FF1289BB-5AB7-41F4-94B5-E49C93A9251A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{FF1289BB-5AB7-41F4-94B5-E49C93A9251A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{FF1289BB-5AB7-41F4-94B5-E49C93A9251A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5C6A7541-164A-415B-9EDE-E5BF7D08F577}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5C6A7541-164A-415B-9EDE-E5BF7D08F577}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5C6A7541-164A-415B-9EDE-E5BF7D08F577}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5C6A7541-164A-415B-9EDE-E5BF7D08F577}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
