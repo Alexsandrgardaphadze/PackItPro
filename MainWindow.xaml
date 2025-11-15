@@ -12,7 +12,7 @@
         MinWidth="800" MinHeight="500">
 
     <Window.Resources>
-        <!-- Tool Tip Style -->
+        <!-- ToolTip Style -->
         <Style TargetType="ToolTip">
             <Setter Property="Background" Value="#353545"/>
             <Setter Property="Foreground" Value="White"/>
@@ -52,6 +52,49 @@
             </Setter>
         </Style>
 
+        <!-- Rounded ProgressBar Style -->
+        <Style x:Key="RoundedProgressBarStyle" TargetType="ProgressBar">
+            <Setter Property="Height" Value="5"/>
+            <!-- Default height -->
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ProgressBar">
+                        <Grid Name="TemplateRoot" SnapsToDevicePixels="True">
+                            <!-- Background Border (Track) with CornerRadius -->
+                            <Border x:Name="ProgressBarTrack" 
+                                    Background="{TemplateBinding Background}" 
+                                    CornerRadius="3" />
+                            <!-- Set CornerRadius here -->
+                            <!-- Foreground Rectangle (Fill) with Clipping -->
+                            <Rectangle x:Name="PART_Track"/>
+                            <Decorator x:Name="PART_Indicator" 
+                                       HorizontalAlignment="Left" 
+                                       VerticalAlignment="Stretch">
+                                <Grid>
+                                    <Border x:Name="Indicator" 
+                                            Background="{TemplateBinding Foreground}" 
+                                            CornerRadius="3"/>
+                                    <!-- Match CornerRadius here -->
+                                </Grid>
+                            </Decorator>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="Orientation" Value="Vertical">
+                                <Setter TargetName="TemplateRoot" Property="LayoutTransform">
+                                    <Setter.Value>
+                                        <RotateTransform Angle="-90"/>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                            <Trigger Property="IsIndeterminate" Value="True">
+                                <Setter TargetName="Indicator" Property="Visibility" Value="Collapsed"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- File Item Style -->
         <Style x:Key="FileItemStyle" TargetType="ListViewItem">
             <Setter Property="Padding" Value="8,6"/>
@@ -68,17 +111,16 @@
                                 Padding="{TemplateBinding Padding}">
                             <Grid>
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <ContentPresenter Grid.Column="1"/>
-                                <Button Grid.Column="2" Content="✕" 
+                                <ContentPresenter Grid.Column="0"/>
+                                <Button Grid.Column="1" Content="✕" 
                                         Foreground="#CCCCCC"
                                         Background="Transparent" 
                                         BorderThickness="0"
                                         Padding="5,0"
-                                        Click="RemoveFile_Click"/>
+                                        Margin="5,0,0,0"/>
                             </Grid>
                         </Border>
                         <ControlTemplate.Triggers>
@@ -94,7 +136,7 @@
             </Setter>
         </Style>
 
-        <!-- Menu Item Style -->
+        <!-- Menu Item Styles -->
         <Style x:Key="MenuItemStyle" TargetType="MenuItem">
             <Setter Property="Background" Value="#252536"/>
             <Setter Property="Foreground" Value="White"/>
@@ -126,7 +168,6 @@
             </Setter>
         </Style>
 
-        <!-- Submenu Item Style -->
         <Style x:Key="SubMenuItemStyle" TargetType="MenuItem">
             <Setter Property="Background" Value="#252536"/>
             <Setter Property="Foreground" Value="White"/>
@@ -223,7 +264,10 @@
                         <Button Content="Browse Files" 
                                 Style="{StaticResource Win11Button}"
                                 Click="BrowseFiles_Click"
-                                Margin="0,15,0,0"/>
+                                Margin="0,15,0,0"
+                                Height="22"
+                                Width="140"
+                                FontSize="16"/>
                         <TextBlock Text="(Maximum 20 files)" 
                                    FontSize="12" 
                                    Foreground="#7F7F8F" 
@@ -257,7 +301,11 @@
                                 <GridViewColumn Header="Status" Width="120" HeaderContainerStyle="{StaticResource GridViewColumnHeaderStyle}">
                                     <GridViewColumn.CellTemplate>
                                         <DataTemplate>
-                                            <TextBlock Text="{Binding Status, Mode=OneWay}" Foreground="{Binding StatusColor, Mode=OneWay}" FontFamily="Consolas"/>
+                                            <Grid>
+                                                <TextBlock Text="{Binding Status, Mode=OneWay}"
+                                                           Foreground="{Binding StatusColor, Mode=OneWay}"
+                                                           FontFamily="Consolas"/>
+                                            </Grid>
                                         </DataTemplate>
                                     </GridViewColumn.CellTemplate>
                                 </GridViewColumn>
@@ -287,109 +335,169 @@
                                  BorderBrush="#3F3F5A"
                                  Padding="8,5" 
                                  Margin="0,0,0,15"
-                                 FontFamily="Consolas"/>
+                                 FontFamily="Consolas"
+                                 Text="MyPackage"/>
 
-                        <TextBlock Text="Output Format:" Foreground="#CCCCCC" Margin="0,0,0,5"/>
-                        <ComboBox x:Name="OutputFormatComboBox" 
-                                  Background="#1E1E2F" 
-                                  Foreground="White"
-                                  Padding="8,5"
-                                  FontFamily="Consolas"
-                                  Margin="0,0,0,15">
-                            <ComboBoxItem Content=".pipack" IsSelected="True">
-                                <ComboBoxItem.ToolTip>
+                        <!-- VirusTotal Scan with Help Icon -->
+                        <Grid Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <CheckBox x:Name="ScanWithVirusTotalCheckBox" 
+                                      Grid.Column="0"
+                                      Content="Scan with VirusTotal" 
+                                      Foreground="#CCCCCC" 
+                                      IsChecked="True"
+                                      VerticalAlignment="Center"/>
+
+                            <Button Grid.Column="1" 
+                                    Content="?" 
+                                    Width="20" 
+                                    Height="20" 
+                                    FontSize="12"
+                                    FontWeight="Bold"
+                                    Background="#3F3F5A" 
+                                    Foreground="White" 
+                                    BorderThickness="0" 
+                                    Cursor="Hand"
+                                    HorizontalAlignment="Left"
+                                    Margin="8,0,0,0"
+                                    ToolTipService.InitialShowDelay="0">
+                                <Button.ToolTip>
                                     <ToolTip>
-                                        <TextBlock Text="Standard secure archive format for bundling multiple files" 
+                                        <TextBlock Text="Files will be checked against VirusTotal's database to ensure they're safe. If scanning fails, packaging continues with a warning." 
                                                    TextWrapping="Wrap" 
-                                                   MaxWidth="250"/>
+                                                   MaxWidth="280"/>
                                     </ToolTip>
-                                </ComboBoxItem.ToolTip>
-                            </ComboBoxItem>
-                            <ComboBoxItem Content=".safeexe">
-                                <ComboBoxItem.ToolTip>
+                                </Button.ToolTip>
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border Background="{TemplateBinding Background}" 
+                                                CornerRadius="10" 
+                                                BorderThickness="1" 
+                                                BorderBrush="#6F6F8A">
+                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
+                        </Grid>
+
+                        <!-- Winget Updater with Help Icon -->
+                        <Grid Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <CheckBox x:Name="IncludeWingetUpdaterCheckBox" 
+                                      Grid.Column="0"
+                                      Content="Include Winget Updater" 
+                                      Foreground="#CCCCCC" 
+                                      IsChecked="False"
+                                      VerticalAlignment="Center"/>
+
+                            <Button Grid.Column="1" 
+                                    Content="?" 
+                                    Width="20" 
+                                    Height="20" 
+                                    FontSize="12"
+                                    FontWeight="Bold"
+                                    Background="#3F3F5A" 
+                                    Foreground="White" 
+                                    BorderThickness="0" 
+                                    Cursor="Hand"
+                                    HorizontalAlignment="Left"
+                                    Margin="8,0,0,0"
+                                    ToolTipService.InitialShowDelay="0">
+                                <Button.ToolTip>
                                     <ToolTip>
-                                        <TextBlock Text="Executable installer format that unpacks files automatically" 
+                                        <TextBlock Text="Adds update_all.bat script for automatic app updates via Windows Package Manager (Winget) after installation completes." 
                                                    TextWrapping="Wrap" 
-                                                   MaxWidth="250"/>
+                                                   MaxWidth="280"/>
                                     </ToolTip>
-                                </ComboBoxItem.ToolTip>
-                            </ComboBoxItem>
-                        </ComboBox>
+                                </Button.ToolTip>
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border Background="{TemplateBinding Background}" 
+                                                CornerRadius="10" 
+                                                BorderThickness="1" 
+                                                BorderBrush="#6F6F8A">
+                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
+                        </Grid>
 
-                        <CheckBox x:Name="ScanWithVirusTotalCheckBox" 
-                                  Content="Scan with VirusTotal" 
-                                  Foreground="#CCCCCC"
-                                  IsChecked="True"
-                                  Margin="0,0,0,5">
-                            <CheckBox.ToolTip>
-                                <ToolTip>
-                                    <TextBlock Text="Files will be checked against VirusTotal's database to ensure they're safe" 
-                                               TextWrapping="Wrap" 
-                                               MaxWidth="250"/>
-                                </ToolTip>
-                            </CheckBox.ToolTip>
-                        </CheckBox>
-
-                        <CheckBox x:Name="CreateAutoInstallerCheckBox" 
-                                  Content="Create auto-installer" 
-                                  Foreground="#CCCCCC"
-                                  IsChecked="True"
-                                  Margin="0,0,0,5">
-                            <CheckBox.ToolTip>
-                                <ToolTip>
-                                    <TextBlock Text="Creates a .safeexe file that can automatically install the packed files" 
-                                               TextWrapping="Wrap" 
-                                               MaxWidth="250"/>
-                                </ToolTip>
-                            </CheckBox.ToolTip>
-                        </CheckBox>
                     </StackPanel>
                 </Border>
 
-                <!-- File Statistics -->
+                <!-- Summary Panel -->
                 <Border Grid.Row="1" Background="#252536" CornerRadius="8" Padding="15" Margin="0,0,0,10">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
-                        </Grid.RowDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="Package Summary" FontSize="16" Foreground="White" FontWeight="SemiBold" Margin="0,0,0,15"/>
 
-                        <TextBlock Grid.Row="0" Text="Summary" FontSize="16" Foreground="White" FontWeight="SemiBold" Margin="0,0,0,15"/>
+                        <!-- Files -->
+                        <Grid Margin="0,0,0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <!-- For the label -->
+                                <ColumnDefinition Width="*"/>
+                                <!-- For the value -->
+                                <ColumnDefinition Width="Auto"/>
+                                <!-- For potential help icon (if needed later) -->
+                            </Grid.ColumnDefinitions>
+                            <!-- IMPROVEMENT: Left-align label and add left margin for spacing -->
+                            <TextBlock Grid.Column="0" Text="Files:" Foreground="#9F9FAF" FontSize="14" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="10,0,0,0"/>
+                            <TextBlock Grid.Column="1" x:Name="FileCountTextBlock" Text="0" Foreground="White"
+                       FontFamily="Consolas" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="10,0,0,0"/>
+                            <!-- Grid.Column="2" could be used for a help icon if needed -->
+                        </Grid>
 
-                        <StackPanel Grid.Row="1">
-                            <Grid Margin="0,0,0,5">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Files:" Foreground="#9F9FAF"/>
-                                <TextBlock Grid.Column="1" x:Name="FileCountTextBlock" Text="0" Foreground="White" HorizontalAlignment="Right" FontFamily="Consolas"/>
-                            </Grid>
+                        <!-- Total Size -->
+                        <Grid Margin="0,0,0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <!-- For the label -->
+                                <ColumnDefinition Width="*"/>
+                                <!-- For the value -->
+                                <ColumnDefinition Width="Auto"/>
+                                <!-- For potential help icon (if needed later) -->
+                            </Grid.ColumnDefinitions>
+                            <!-- IMPROVEMENT: Left-align label and add left margin for spacing -->
+                            <TextBlock Grid.Column="0" Text="Total Size:" Foreground="#9F9FAF" FontSize="14" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="10,0,0,0"/>
+                            <TextBlock Grid.Column="1" x:Name="TotalSizeTextBlock" Text="0 KB" Foreground="White"
+                       FontFamily="Consolas" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="10,0,0,0"/>
+                            <!-- Grid.Column="2" could be used for a help icon if needed -->
+                        </Grid>
 
-                            <Grid Margin="0,0,0,5">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Total Size:" Foreground="#9F9FAF"/>
-                                <TextBlock Grid.Column="1" x:Name="TotalSizeTextBlock" Text="0 KB" Foreground="White" HorizontalAlignment="Right" FontFamily="Consolas"/>
-                            </Grid>
+                        <!-- Status -->
+                        <Grid Margin="0,0,0,5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <!-- For the label -->
+                                <ColumnDefinition Width="*"/>
+                                <!-- For the value -->
+                                <ColumnDefinition Width="Auto"/>
+                                <!-- For potential help icon (if needed later) -->
+                            </Grid.ColumnDefinitions>
+                            <!-- IMPROVEMENT: Left-align label and add left margin for spacing -->
+                            <TextBlock Grid.Column="0" Text="Status:" Foreground="#9F9FAF" FontSize="14" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="10,0,0,0"/>
+                            <TextBlock Grid.Column="1" x:Name="StatusTextBlock" Text="Ready" Foreground="#00C176"
+                       FontFamily="Consolas" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="10,0,0,0"/>
+                            <!-- Grid.Column="2" could be used for a help icon if needed -->
+                        </Grid>
 
-                            <Grid Margin="0,0,0,5">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Status:" Foreground="#9F9FAF"/>
-                                <TextBlock Grid.Column="1" x:Name="StatusTextBlock" Text="Ready" Foreground="#00C176" HorizontalAlignment="Right" FontFamily="Consolas"/>
-                            </Grid>
-
-                            <TextBlock Text="About .pipack files:" Foreground="#9F9FAF" Margin="0,15,0,5" FontWeight="SemiBold"/>
-                            <TextBlock TextWrapping="Wrap" Foreground="#CCCCCC" LineHeight="20" FontSize="12">
-                                PackItPro creates a secure archive to bundle multiple files and folders with optional VirusTotal scanning. The .pipack format enables safe distribution and easy installation of software bundles.
-                            </TextBlock>
-                        </StackPanel>
-                    </Grid>
+                        <!-- Informational Text -->
+                        <TextBlock Text="About .packitexe:" Foreground="#9F9FAF" Margin="10,15,0,5" FontWeight="SemiBold" HorizontalAlignment="Left"/>
+                        <!-- Added left margin to match labels -->
+                        <TextBlock TextWrapping="Wrap" Foreground="#CCCCCC" LineHeight="20" FontSize="12" HorizontalAlignment="Left" Margin="10,0,0,0"> <!-- Added left margin to match labels -->
+            The .packitexe format creates a single, self-contained executable that automatically installs all bundled applications. It includes VirusTotal scanning, compression, and optional Winget update support.
+                        </TextBlock>
+                    </StackPanel>
                 </Border>
 
                 <!-- Pack Button -->
@@ -405,52 +513,63 @@
             </Grid>
         </Grid>
 
-        <!-- Status Message Area -->
+        <!-- Status Message Area (Redesigned) -->
         <Border Grid.Row="2" 
                 Background="#252536" 
-                CornerRadius="4" 
-                Padding="10,8"
-                Margin="0,0,0,10">
+                CornerRadius="6" 
+                Padding="12,10"
+                Margin="0,0,0,8">
             <Grid>
-                <TextBlock x:Name="StatusMessageTextBlock" 
-                       Text="Ready to pack files. Add files to continue." 
-                       Foreground="#CCCCCC"
-                       FontFamily="Consolas"/>
-                <ProgressBar x:Name="ProcessingProgressBar"
-                         Height="3"
-                         Minimum="0" 
-                         Maximum="100" 
-                         Value="0"
-                         Foreground="#0078D7"
-                         Background="Transparent"
-                         VerticalAlignment="Bottom"
-                         Visibility="Collapsed"/>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="4"/>
+                    <!-- Space for the inline progress bar -->
+                </Grid.RowDefinitions>
+
+                <!-- Status Text & Percentage -->
+                <Grid Grid.Row="0">
+                    <TextBlock x:Name="StatusMessageTextBlock" 
+                               Text="Ready to pack files. Add files to continue." 
+                               Foreground="#CCCCCC" 
+                               FontFamily="Consolas"
+                               FontSize="12"
+                               VerticalAlignment="Center"/>
+                    <TextBlock x:Name="ProgressPercentTextBlock" 
+                               Text="0%" 
+                               Foreground="#9F9FAF"
+                               FontFamily="Consolas"
+                               FontSize="11"
+                               HorizontalAlignment="Right"
+                               VerticalAlignment="Center"
+                               Visibility="Collapsed"/>
+                    <!-- Initially collapsed -->
+                </Grid>
+
+                <!-- Inline Progress Bar -->
+                <ProgressBar Grid.Row="1" 
+                             x:Name="ProcessingProgressBar" 
+                             Height="4" 
+                             Minimum="0" 
+                             Maximum="100" 
+                             Value="0" 
+                             Foreground="#0078D7" 
+                             Background="#3A3A4D"
+                             Visibility="Collapsed"  
+                    Style="{StaticResource RoundedProgressBarStyle}"/>
+                <!-- Apply the rounded style -->
             </Grid>
         </Border>
 
-        <!-- Progress Bar -->
-        <Grid Grid.Row="3">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-
-            <ProgressBar Grid.Column="0" 
-                         x:Name="ProcessProgressBar"
-                         Height="5"
-                         Minimum="0" 
-                         Maximum="100" 
-                         Value="0"
-                         Foreground="#0078D7"
-                         Background="#3A3A4D"/>
-
-            <TextBlock Grid.Column="1" 
-                       x:Name="ProgressPercentTextBlock" 
-                       Text="0%" 
-                       Foreground="#CCCCCC"
-                       Margin="8,0,0,0"
-                       FontFamily="Consolas"
-                       VerticalAlignment="Center"/>
-        </Grid>
+        <!-- Bottom Progress Bar (Simplified) -->
+        <ProgressBar Grid.Row="3" 
+                     x:Name="ProcessProgressBar" 
+                     Height="6" 
+                     Minimum="0" 
+                     Maximum="100" 
+                     Value="0" 
+                     Foreground="#0078D7" 
+                     Background="#3A3A4D"
+                     Style="{StaticResource RoundedProgressBarStyle}"/>
+        <!-- Apply the rounded style -->
     </Grid>
 </Window>

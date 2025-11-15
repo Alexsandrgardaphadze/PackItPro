@@ -4,12 +4,8 @@
              xmlns:local="clr-namespace:PackItPro"
              ShutdownMode="OnMainWindowClose"
              StartupUri="MainWindow.xaml">
-
     <Application.Resources>
-        <ResourceDictionary>
-            <ResourceDictionary.MergedDictionaries>
-                <!-- Add theme/resources if needed -->
-            </ResourceDictionary.MergedDictionaries>
-        </ResourceDictionary>
+        <SolidColorBrush x:Key="AppStatusCleanColor" Color="Green"/>
+        <SolidColorBrush x:Key="AppStatusErrorColor" Color="Red"/>
     </Application.Resources>
 </Application>
