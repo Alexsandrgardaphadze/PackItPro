@@ -1,6 +1,5 @@
 ﻿using System;
 using System.IO;
-using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 
@@ -8,18 +7,20 @@ namespace PackItPro
 {
     public partial class App : Application
     {
+        private static string? _logPath;
+
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
 
-            // Single instance check
-            /* using var mutex = new Mutex(true, "PackItPro-InstanceMutex", out bool createdNew);
-            if (!createdNew)
-            {
-                MessageBox.Show("Another instance is already running.");
-                Current.Shutdown();
-                return;
-            } */
+            // Initialize directories
+            var appDataDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "PackItPro");
+            Directory.CreateDirectory(Path.Combine(appDataDir, "Cache"));
+            Directory.CreateDirectory(Path.Combine(appDataDir, "Logs"));
+
+            _logPath = Path.Combine(appDataDir, "Logs", "crash.log");
 
             // Global exception handlers
             AppDomain.CurrentDomain.UnhandledException += (s, ex) =>
@@ -29,12 +30,12 @@ namespace PackItPro
             {
                 HandleFatalException("Dispatcher", ex.Exception);
                 ex.Handled = true;
-                Current.Shutdown();
+                Current.Shutdown(1);
             };
 
             TaskScheduler.UnobservedTaskException += (s, ex) =>
             {
-                HandleFatalException("Task", ex.Exception);
+                LogError($"Unobserved task exception: {ex.Exception}");
                 ex.SetObserved();
             };
         }
@@ -43,21 +44,18 @@ namespace PackItPro
         {
             try
             {
-                // Log the error with timestamp
-                File.AppendAllText("crash.log",
-                    $"[{DateTime.UtcNow:u}] [{source}] CRASH: {ex}\n\n");
+                LogError($"[{source}] FATAL: {ex}");
 
-                // Show user-friendly message
                 MessageBox.Show(
-                    "A critical error occurred. The application must close.\n" +
-                    "Technical details have been saved to crash.log",
+                    $"A critical error occurred. The application must close.\n\n" +
+                    $"Log file: {_logPath}",
                     "Fatal Error",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
             }
-            catch (Exception loggingEx)
+            catch
             {
-                MessageBox.Show($"Failed to handle error: {loggingEx.Message}");
+                MessageBox.Show("Critical error occurred.", "Fatal Error");
             }
             finally
             {
@@ -65,9 +63,22 @@ namespace PackItPro
             }
         }
 
+        private void LogError(string message)
+        {
+            try
+            {
+                if (!string.IsNullOrEmpty(_logPath))
+                {
+                    File.AppendAllText(_logPath,
+                        $"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}] {message}\n\n");
+                }
+            }
+            catch { /* Can't log - fail silently */ }
+        }
+
         protected override void OnExit(ExitEventArgs e)
         {
-            // Add any cleanup logic here if needed
+            // TODO: Add cleanup (dispose API clients, save settings)
             base.OnExit(e);
         }
     }

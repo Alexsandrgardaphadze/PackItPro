@@ -5,11 +5,11 @@
              ShutdownMode="OnMainWindowClose"
              StartupUri="MainWindow.xaml">
 
-    <Application.Resources>
+    <!-- <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <!-- Add theme/resources if needed -->
+                // Add theme/resources if needed
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
-    </Application.Resources>
-</Application>
+    </Application.Resources> -->
+</Application> 
