@@ -1,5 +1,4 @@
-﻿using Microsoft.Win32;
-using Microsoft.WindowsAPICodePack.Dialogs;
+﻿// MainWindow.xaml.cs
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -9,23 +8,27 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
-using System.Net.Http.Json;
-using System.Reflection; // For Assembly
-using System.Security.Cryptography;
-using System.Security.Principal; // For WindowsPrincipal, WindowsIdentity, WindowsBuiltInRole
 using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Documents;
-using System.Windows.Input;
+using System.Windows.Input; // For ICommand
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Net.Http.Json;
+using Microsoft.Win32;
+using Microsoft.WindowsAPICodePack.Dialogs;
+using System.Security.Cryptography;
+
+// Uncommon or special-case
+// using static System.Windows.Forms.VisualStyles.VisualStyleElement.TrayNotify; // This line is likely incorrect and removed
+
 
 namespace PackItPro
 {
+    // RelayCommand for ICommand binding
     public class RelayCommand : ICommand
     {
         private readonly Action<object?> _execute;
@@ -45,39 +48,6 @@ namespace PackItPro
 
         public bool CanExecute(object? parameter) => _canExecute?.Invoke(parameter) ?? true;
         public void Execute(object? parameter) => _execute(parameter);
-    }
-
-    public class AppSettings
-    {
-        public string OutputLocation { get; set; } = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-        public string VirusTotalApiKey { get; set; } = "";
-        public bool OnlyScanExecutables { get; set; } = true;
-        public bool AutoRemoveInfectedFiles { get; set; } = true;
-        public int MinimumDetectionsToFlag { get; set; } = 1;
-        public bool IncludeWingetUpdateScript { get; set; } = false; // New setting
-        public bool UseLZMACompression { get; set; } = true; // New setting
-    }
-
-    // Manifest model - Updated to include SHA256Checksum
-    public class PackageManifest
-    {
-        public string Version { get; set; } = "1.0";
-        public string PackageName { get; set; } = "MySoftwareBundle";
-        public List<ManifestFile> Files { get; set; } = new List<ManifestFile>();
-        public bool Cleanup { get; set; } = true;
-        public string? AutoUpdateScript { get; set; } // Optional script name
-        public string? SHA256Checksum { get; set; } // NEW: Add SHA256Checksum for integrity verification
-    }
-
-    public class ManifestFile
-    {
-        public string Name { get; set; } = "";
-        public string InstallType { get; set; } = "exe"; // e.g., exe, msi, appx
-        public string[]? SilentArgs { get; set; } // Changed to string[]
-        public bool RequiresAdmin { get; set; } = false;
-        public int InstallOrder { get; set; } = 0;
-        // TODO: Add WingetId field for mapping during packaging/update
-        // public string? WingetId { get; set; }
     }
 
 
@@ -101,8 +71,8 @@ namespace PackItPro
         private ObservableCollection<FileItem> _fileItems = new();
         private HttpClient _httpClient = new(); // TODO: Consider using IHttpClientFactory or a singleton pattern for better lifecycle management
 
-        // NEW: SemaphoreSlim for rate limiting (4 concurrent requests)
-        private readonly SemaphoreSlim _rateLimitSemaphore = new(4, 4);
+        // NEW: Instance of the VirusTotalClient
+        private VirusTotalClient? _virusTotalClient;
 
         public MainWindow()
         {
@@ -125,6 +95,8 @@ namespace PackItPro
             try
             {
                 await LoadSettingsAndCacheAsync();
+                // NEW: Initialize VirusTotalClient after settings are loaded
+                _virusTotalClient = new VirusTotalClient(_cacheFilePath, _settings.VirusTotalApiKey);
                 UpdateUIState();
             }
             catch (Exception ex)
@@ -213,15 +185,26 @@ namespace PackItPro
         }
         #endregion
 
-        #region VirusTotal Integration
+        #region VirusTotal Integration (Refactored Call)
         private async Task ScanFilesWithVirusTotal()
         {
+            // NEW: Use the VirusTotalClient instance
+            if (_virusTotalClient == null)
+            {
+                LogError("VirusTotalClient not initialized", new InvalidOperationException("VirusTotalClient is null"));
+                MessageBox.Show("VirusTotal client is not initialized.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
             if (string.IsNullOrEmpty(_settings.VirusTotalApiKey))
             {
                 MessageBox.Show("VirusTotal API key is required for scanning. Please set it in Settings.",
                     "Configuration Required", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
+
+            // NEW: Ensure API key is set in the client
+            _virusTotalClient.SetApiKey(_settings.VirusTotalApiKey);
 
             StatusMessageTextBlock.Text = "Scanning files with VirusTotal...";
             ProcessProgressBar.Value = 0;
@@ -243,38 +226,20 @@ namespace PackItPro
                         continue;
                     }
 
-                    string hash = ComputeSHA256(item.FilePath);
-                    VirusScanResult result;
+                    // NEW: Use the client to scan the file
+                    var result = await _virusTotalClient.ScanFileAsync(
+                        item.FilePath,
+                        _settings.VirusTotalApiKey, // Pass API key explicitly if needed, or let client manage it
+                        _settings.OnlyScanExecutables,
+                        _settings.MinimumDetectionsToFlag
+                    );
 
-                    if (_scanCache.TryGetValue(hash, out var cachedResult))
-                    {
-                        result = ApplyScanResult(item, cachedResult);
-                    }
-                    else
-                    {
-                        await _scanSemaphore.WaitAsync();
-                        try
-                        {
-                            // NEW: Use SemaphoreSlim for rate limiting, await the permit
-                            await _rateLimitSemaphore.WaitAsync();
-
-                            try
-                            {
-                                result = await QueryVirusTotal(item.FilePath, hash);
-                                _scanCache[hash] = result;
-                                ApplyScanResult(item, result);
-                            }
-                            finally
-                            {
-                                // NEW: Always release the rate limit permit
-                                _rateLimitSemaphore.Release();
-                            }
-                        }
-                        finally
-                        {
-                            _scanSemaphore.Release();
-                        }
-                    }
+                    // NEW: Apply result to the item
+                    item.IsInfected = result.IsInfected; // Assuming VirusTotalClient calculates this
+                    item.Status = item.IsInfected ?
+                        $"Infected ({result.Positives}/{result.TotalScans})" :
+                        "Clean";
+                    item.StatusColor = item.IsInfected ? (SolidColorBrush)FindResource("AppStatusErrorColor") : (SolidColorBrush)FindResource("AppStatusCleanColor");
 
                     if (item.IsInfected && _settings.AutoRemoveInfectedFiles)
                         filesToRemove.Add(item);
@@ -309,125 +274,20 @@ namespace PackItPro
 
             UpdateUIState();
             StatusMessageTextBlock.Text = "Scan completed";
-            SaveVirusScanCache();
-        }
-
-        private VirusScanResult ApplyScanResult(FileItem item, VirusScanResult result)
-        {
-            item.IsInfected = result.Positives >= _settings.MinimumDetectionsToFlag;
-            item.Status = item.IsInfected ?
-                $"Infected ({result.Positives}/{result.TotalScans})" :
-                "Clean";
-            item.StatusColor = item.IsInfected ? (SolidColorBrush)FindResource("AppStatusErrorColor") : (SolidColorBrush)FindResource("AppStatusCleanColor");
-            return result;
-        }
-
-        private async Task<VirusScanResult> QueryVirusTotal(string filePath, string hash)
-        {
-            // NEW: Acquire rate limit permit *before* making the request
-            // This is handled by the caller (ScanFilesWithVirusTotal) using the semaphore.
-
-            try
+            // NEW: Save the updated cache via the client
+            if (_virusTotalClient != null)
             {
-                _httpClient.DefaultRequestHeaders.Clear();
-                _httpClient.DefaultRequestHeaders.Add("x-apikey", _settings.VirusTotalApiKey);
-
-                var reportResponse = await _httpClient.GetAsync(
-                    $"https://www.virustotal.com/api/v3/files/{hash}"); // Fixed URL
-
-                if (reportResponse.IsSuccessStatusCode)
-                {
-                    var report = await reportResponse.Content.ReadFromJsonAsync<VirusTotalFileReport>()
-                    ?? throw new InvalidDataException("Invalid VirusTotal response");
-
-                    if (report.Data?.Attributes?.LastAnalysisStats == null)
-                        throw new InvalidDataException("Missing analysis data in VirusTotal response");
-                    return new VirusScanResult
-                    {
-                        FileHash = hash,
-                        Positives = report.Data.Attributes.LastAnalysisStats.Malicious,
-                        TotalScans = report.Data.Attributes.LastAnalysisStats.Total,
-                        ScanDate = DateTime.UtcNow
-                    };
-                }
-
-                // File not previously scanned, upload it
-                using var fileContent = new ByteArrayContent(File.ReadAllBytes(filePath));
-                using var formData = new MultipartFormDataContent();
-                formData.Add(fileContent, "file", Path.GetFileName(filePath));
-
-                var uploadResponse = await _httpClient.PostAsync(
-                    "https://www.virustotal.com/api/v3/files", formData); // Fixed URL
-                uploadResponse.EnsureSuccessStatusCode();
-
-                var analysisId = (await uploadResponse.Content.ReadFromJsonAsync<VirusTotalUploadResponse>()).Data.Id;
-
-                // Poll for results
-                for (int i = 0; i < 10; i++)
-                {
-                    await Task.Delay(5000);
-                    var analysisResponse = await _httpClient.GetAsync(
-                        $"https://www.virustotal.com/api/v3/analyses/{analysisId}"); // Fixed URL
-
-                    if (analysisResponse.IsSuccessStatusCode)
-                    {
-                        var analysis = await analysisResponse.Content.ReadFromJsonAsync<VirusTotalFileReport>();
-                        return new VirusScanResult
-                        {
-                            FileHash = hash,
-                            Positives = analysis.Data.Attributes.LastAnalysisStats.Malicious,
-                            TotalScans = analysis.Data.Attributes.LastAnalysisStats.Total,
-                            ScanDate = DateTime.UtcNow
-                        };
-                    }
-                }
-
-                throw new TimeoutException("VirusTotal analysis timed out");
-            }
-            catch (Exception ex)
-            {
-                LogError("VirusTotal query failed", ex);
-                return new VirusScanResult
-                {
-                    FileHash = hash,
-                    Positives = 0,
-                    TotalScans = 0,
-                    Error = ex.Message,
-                    ScanDate = DateTime.UtcNow
-                };
+                await _virusTotalClient.SaveCacheAsync();
             }
         }
 
-        private string ComputeSHA256(string filePath)
-        {
-            using var sha = SHA256.Create();
-            using var stream = File.OpenRead(filePath);
-            return BitConverter.ToString(sha.ComputeHash(stream)).Replace("-", "").ToLowerInvariant();
-        }
+        // REMOVED: QueryVirusTotal method (moved to VirusTotalClient)
+        // REMOVED: ComputeSHA256 method (likely used by VirusTotalClient or Packager) - KEEP IF NEEDED ELSEWHERE, MOVE TO UTILS OTHERWISE
         #endregion
 
-        #region Packaging Implementation
+        #region Packaging Implementation (Refactored Call)
         private async void PackNow_Click(object sender, RoutedEventArgs e)
         {
-            // NEW: Validate stub installer exists in AppData or base directory
-            var stubPath = Path.Combine(_appDataDir, "StubInstaller.exe");
-            if (!File.Exists(stubPath))
-            {
-                // Fallback to base directory (old location) if not found in AppData
-                stubPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "StubInstaller.exe");
-                if (!File.Exists(stubPath))
-                {
-                    MessageBox.Show("Stub installer (StubInstaller.exe) not found in application directory or AppData. Please ensure the stub is present.",
-                        "Missing Component", MessageBoxButton.OK, MessageBoxImage.Error);
-                    // TODO: Implement stub installer creation/download mechanism or clear error message.
-                    return;
-                }
-                else
-                {
-                    LogInfo("StubInstaller.exe found in base directory. Consider moving to AppData.");
-                }
-            }
-
             // Validate output filename ends with .packitexe
             string outputFileName = OutputFileNameTextBox.Text;
             if (string.IsNullOrEmpty(outputFileName))
@@ -448,8 +308,6 @@ namespace PackItPro
 
             if (saveDialog.ShowDialog() == true)
             {
-                string tempPayloadPath = null; // Initialize outside try to access in finally
-                string tempFinalPath = null; // Initialize outside try to access in finally
                 try
                 {
                     Dispatcher.Invoke(() => PackButton.IsEnabled = false);
@@ -457,211 +315,16 @@ namespace PackItPro
                     ProcessProgressBar.Value = 0;
                     ProgressPercentTextBlock.Text = "0%";
 
-                    // Create the package payload (zip file)
-                    tempPayloadPath = Path.GetTempFileName();
-                    try
-                    {
-                        using (var fs = new FileStream(tempPayloadPath, FileMode.Create))
-                        using (var zipStream = new ZipOutputStream(fs))
-                        {
-                            // NEW: Clarify compression setting
-                            if (_settings.UseLZMACompression)
-                            {
-                                // TODO: Implement LZMA using SevenZipSharp or SharpCompress
-                                // For now, using Deflate with highest level as a placeholder.
-                                // SharpZipLib's ZipOutputStream doesn't support LZMA natively.
-                                zipStream.SetLevel(9); // Highest compression for Deflate
-                                LogInfo("Using Deflate (level 9) as LZMA placeholder. Consider using SevenZipSharp for true LZMA.");
-                            }
-                            else
-                            {
-                                zipStream.SetLevel(0); // No compression
-                            }
+                    // NEW: Call the Packager class
+                    var outputPath = await Packager.CreatePackageAsync(
+                        _fileItems.Select(f => f.FilePath).ToList(),
+                        _settings.OutputLocation,
+                        Path.GetFileNameWithoutExtension(saveDialog.FileName),
+                        requiresAdmin: false, // Could be configurable from UI later
+                        useLZMACompression: _settings.UseLZMACompression // <-- Added missing argument
+                    );
 
-                            int totalFiles = _fileItems.Count + (_settings.IncludeWingetUpdateScript ? 2 : 1); // +1 for manifest, +1 for winget script if included
-                            int processed = 0;
-
-                            // Add the manifest file
-                            var manifest = new PackageManifest
-                            {
-                                PackageName = Path.GetFileNameWithoutExtension(saveDialog.FileName),
-                                Files = _fileItems.Select((f, i) => new ManifestFile
-                                {
-                                    Name = Path.GetFileName(f.FilePath),
-                                    InstallType = GetInstallTypeFromExtension(Path.GetExtension(f.FilePath)),
-                                    SilentArgs = GetDefaultSilentArgs(Path.GetExtension(f.FilePath)), // Use string[] now
-                                    RequiresAdmin = false, // Could be configurable per file later
-                                    InstallOrder = i
-                                    // TODO: Add WingetId mapping here if available
-                                }).ToList()
-                            };
-
-                            if (_settings.IncludeWingetUpdateScript)
-                            {
-                                manifest.AutoUpdateScript = "update_all.bat";
-                            }
-
-                            // NEW: Calculate directory hash for integrity check (Step 2a)
-                            var tempExtractionDir = Path.Combine(Path.GetTempPath(), "PackItPro_Packaging_" + Guid.NewGuid().ToString());
-                            Directory.CreateDirectory(tempExtractionDir); // Create temp dir for hashing prep
-
-                            try
-                            {
-                                // Copy files to temp dir for hashing calculation
-                                foreach (var fileItem in _fileItems)
-                                {
-                                    var destPath = Path.Combine(tempExtractionDir, Path.GetFileName(fileItem.FilePath));
-                                    File.Copy(fileItem.FilePath, destPath, overwrite: true);
-                                }
-
-                                // Add the *initial* manifest (without hash) to temp dir for hashing calculation
-                                string tempManifestJson = JsonSerializer.Serialize(manifest, new JsonSerializerOptions { WriteIndented = true });
-                                File.WriteAllText(Path.Combine(tempExtractionDir, "packitmeta.json"), tempManifestJson);
-
-                                // Add Winget script if enabled, to temp dir for hashing calculation
-                                if (_settings.IncludeWingetUpdateScript)
-                                {
-                                    string wingetScriptContent = @"@echo off
-REM This is a placeholder for Winget updates.
-REM In a real scenario, you would call winget upgrade for each installed package.
-REM You need to map the bundled installer filenames to their respective Winget IDs.
-REM Example (hardcoded, needs mapping):
-REM winget upgrade --id Microsoft.Edge
-REM winget upgrade --id VideoLAN.VLC
-REM A more robust solution would read the packitmeta.json and look up Winget IDs stored there.
-echo Placeholder: Winget update script would run here based on packitmeta.json.
-pause
-";
-                                    File.WriteAllText(Path.Combine(tempExtractionDir, "update_all.bat"), wingetScriptContent);
-                                }
-
-                                // Calculate the hash of the temp directory contents
-                                var calculatedDirHash = Convert.ToBase64String(ComputeDirectoryHash(tempExtractionDir));
-                                LogInfo($"Calculated directory hash for integrity check: {calculatedDirHash}");
-
-                                // NOW, update the manifest object with the calculated hash
-                                manifest.SHA256Checksum = calculatedDirHash;
-                            }
-                            finally
-                            {
-                                // Clean up the temporary directory used for hash calculation
-                                if (Directory.Exists(tempExtractionDir))
-                                {
-                                    Directory.Delete(tempExtractionDir, true);
-                                }
-                            }
-
-
-                            string manifestJson = JsonSerializer.Serialize(manifest, new JsonSerializerOptions { WriteIndented = true });
-                            var manifestEntry = new ZipEntry("packitmeta.json")
-                            {
-                                DateTime = DateTime.Now,
-                                Size = Encoding.UTF8.GetByteCount(manifestJson)
-                            };
-                            zipStream.PutNextEntry(manifestEntry);
-                            using (var manifestStream = new MemoryStream(Encoding.UTF8.GetBytes(manifestJson)))
-                            {
-                                await manifestStream.CopyToAsync(zipStream);
-                            }
-                            zipStream.CloseEntry();
-                            processed++;
-                            UpdateProgress(processed, totalFiles, "Packing");
-
-                            // Add files from the list
-                            foreach (var fileItem in _fileItems)
-                            {
-                                var entry = new ZipEntry(Path.GetFileName(fileItem.FilePath))
-                                {
-                                    DateTime = DateTime.Now,
-                                    Size = new FileInfo(fileItem.FilePath).Length
-                                };
-                                zipStream.PutNextEntry(entry);
-                                using var fileStream = File.OpenRead(fileItem.FilePath);
-                                await fileStream.CopyToAsync(zipStream);
-                                zipStream.CloseEntry();
-
-                                processed++;
-                                UpdateProgress(processed, totalFiles, "Packing");
-                            }
-
-                            // Add Winget update script if enabled
-                            if (_settings.IncludeWingetUpdateScript)
-                            {
-                                // NEW: Placeholder script with TODO comment
-                                string wingetScriptContent = @"@echo off
-REM This is a placeholder for Winget updates.
-REM In a real scenario, you would call winget upgrade for each installed package.
-REM You need to map the bundled installer filenames to their respective Winget IDs.
-REM Example (hardcoded, needs mapping):
-REM winget upgrade --id Microsoft.Edge
-REM winget upgrade --id VideoLAN.VLC
-REM A more robust solution would read the packitmeta.json and look up Winget IDs stored there.
-echo Placeholder: Winget update script would run here based on packitmeta.json.
-pause
-";
-                                var scriptEntry = new ZipEntry("update_all.bat")
-                                {
-                                    DateTime = DateTime.Now,
-                                    Size = Encoding.UTF8.GetByteCount(wingetScriptContent)
-                                };
-                                zipStream.PutNextEntry(scriptEntry);
-                                using (var scriptStream = new MemoryStream(Encoding.UTF8.GetBytes(wingetScriptContent)))
-                                {
-                                    await scriptStream.CopyToAsync(zipStream);
-                                }
-                                zipStream.CloseEntry();
-                                processed++;
-                                UpdateProgress(processed, totalFiles, "Packing");
-                            }
-                        }
-
-                        // Create the final .packitexe by combining stub and payload
-                        tempFinalPath = Path.GetTempFileName();
-                        using (var finalStream = new FileStream(tempFinalPath, FileMode.Create))
-                        using (var stubStream = new FileStream(stubPath, FileMode.Open, FileAccess.Read))
-                        using (var payloadStream = new FileStream(tempPayloadPath, FileMode.Open, FileAccess.Read))
-                        {
-                            // NEW: Copy stub first with progress update
-                            var stubLength = stubStream.Length;
-                            var buffer = new byte[8192]; // 8KB buffer
-                            int read;
-                            long totalBytesRead = 0;
-                            StatusMessageTextBlock.Text = "Embedding stub installer...";
-                            while ((read = await stubStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
-                            {
-                                await finalStream.WriteAsync(buffer, 0, read);
-                                totalBytesRead += read;
-                                // Update progress based on stub size
-                                var stubProgress = (double)totalBytesRead / stubLength * 50; // Assume stub is ~50% of final file for progress estimation
-                                UpdateProgress((int)stubProgress, 100, "Embedding Stub");
-                            }
-                            UpdateProgress(50, 100, "Embedding Stub"); // Mark stub copy as ~50%
-
-                            // NEW: Then append payload with progress update
-                            var payloadLength = payloadStream.Length;
-                            totalBytesRead = 0;
-                            StatusMessageTextBlock.Text = "Appending payload...";
-                            while ((read = await payloadStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
-                            {
-                                await finalStream.WriteAsync(buffer, 0, read);
-                                totalBytesRead += read;
-                                // Update progress based on payload size, starting from 50%
-                                var payloadProgress = 50 + (double)totalBytesRead / payloadLength * 50; // Remaining 50%
-                                UpdateProgress((int)payloadProgress, 100, "Appending Payload");
-                            }
-                            UpdateProgress(100, 100, "Finalizing"); // Mark as complete
-                        }
-
-                        // Move temp file to final location
-                        File.Move(tempFinalPath, saveDialog.FileName, overwrite: true);
-                    }
-                    catch (Exception innerEx) // NEW: Catch block for the inner try
-                    {
-                        LogError("Inner packaging process failed", innerEx);
-                        throw; // Re-throw to be caught by the outer catch
-                    }
-
-                    MessageBox.Show($"Package created successfully!\n{saveDialog.FileName}",
+                    MessageBox.Show($"Package created successfully!\n{outputPath}",
                                   "Success", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
                 catch (Exception ex)
@@ -672,96 +335,13 @@ pause
                 }
                 finally
                 {
-                    // NEW: Ensure temporary files are deleted even if an exception occurs
-                    if (!string.IsNullOrEmpty(tempPayloadPath) && File.Exists(tempPayloadPath))
-                    {
-                        try { File.Delete(tempPayloadPath); } catch { /* Ignore errors during cleanup */ }
-                    }
-                    if (!string.IsNullOrEmpty(tempFinalPath) && File.Exists(tempFinalPath))
-                    {
-                        try { File.Delete(tempFinalPath); } catch { /* Ignore errors during cleanup */ }
-                    }
                     ResetProgress();
                     PackButton.IsEnabled = true;
                 }
             }
         }
 
-        // NEW: Helper function to compute directory hash (Step 2a)
-        private static byte[] ComputeDirectoryHash(string directoryPath)
-        {
-            using var sha256 = SHA256.Create();
-            var fileHashes = new List<byte[]>();
-
-            var files = Directory.GetFiles(directoryPath, "*", SearchOption.AllDirectories);
-            Array.Sort(files); // Sort filenames to ensure consistent order
-
-            foreach (var filePath in files)
-            {
-                var fileContentHash = ComputeFileHash(filePath);
-                var relativePath = Path.GetRelativePath(directoryPath, filePath);
-                var pathBytes = Encoding.UTF8.GetBytes(relativePath.ToLowerInvariant());
-
-                using var tempStream = new MemoryStream();
-                tempStream.Write(pathBytes, 0, pathBytes.Length);
-                tempStream.Write(fileContentHash, 0, fileContentHash.Length);
-                tempStream.Position = 0;
-
-                var combinedHash = sha256.ComputeHash(tempStream);
-                fileHashes.Add(combinedHash);
-            }
-
-            fileHashes.Sort((x, y) => Comparer<byte[]>.Default.Compare(x, y));
-
-            using var finalStream = new MemoryStream();
-            foreach (var hash in fileHashes)
-            {
-                finalStream.Write(hash, 0, hash.Length);
-            }
-            finalStream.Position = 0;
-
-            return sha256.ComputeHash(finalStream);
-        }
-
-        // NEW: Helper function to compute file hash
-        private static byte[] ComputeFileHash(string filePath)
-        {
-            using var fileStream = File.OpenRead(filePath);
-            using var sha256 = SHA256.Create();
-            return sha256.ComputeHash(fileStream);
-        }
-
-
-        private string GetInstallTypeFromExtension(string ext)
-        {
-            switch (ext.ToLower())
-            {
-                case ".msi":
-                    return "msi";
-                case ".exe":
-                    return "exe";
-                case ".appx":
-                case ".appxbundle":
-                    return "appx";
-                default:
-                    return "file"; // Generic file type
-            }
-        }
-
-        // NEW: Return string[] for silent args
-        private string[]? GetDefaultSilentArgs(string ext)
-        {
-            switch (ext.ToLower())
-            {
-                case ".msi":
-                    return new[] { "/quiet", "/norestart" };
-                case ".exe":
-                    // Return an array of common silent flags. The stub installer can try them sequentially.
-                    return new[] { "/S", "/silent", "/quiet", "/SILENT", "/VERYSILENT" };
-                default:
-                    return null;
-            }
-        }
+        // REMOVED: Logic for creating payload.zip, calculating hash, embedding into stub (moved to Packager, ManifestGenerator, ResourceInjector)
         #endregion
 
         #region UI Management
@@ -825,23 +405,33 @@ pause
             if (e.Data.GetDataPresent(DataFormats.FileDrop))
             {
                 e.Effects = DragDropEffects.Copy;
-                DropAreaBorder.BorderBrush = (SolidColorBrush)FindResource("AppDropAreaHoverColor");
-                // NEW: Use named resource instead of hardcoded Color.FromArgb
-                var brush = (SolidColorBrush)FindResource("AppDropAreaHoverColor");
-                var color = brush.Color;
+                // Safe brush retrieval with fallback
+                var hoverBrush = TryFindResource("AppDropAreaHoverColor") as SolidColorBrush
+                                 ?? new SolidColorBrush(Colors.LightBlue);
+
+                DropAreaBorder.BorderBrush = hoverBrush;
+
+                var color = hoverBrush.Color;
                 DropAreaBorder.Background = new SolidColorBrush(Color.FromArgb(30, color.R, color.G, color.B)); // Use R, G, B from named color
             }
             else
             {
                 e.Effects = DragDropEffects.None;
             }
+
             e.Handled = true;
         }
 
         private void DropArea_DragLeave(object sender, DragEventArgs e)
         {
-            DropAreaBorder.BorderBrush = (SolidColorBrush)FindResource("AppBorderColor");
-            DropAreaBorder.Background = (SolidColorBrush)FindResource("AppPanelColor");
+            // Safe brush retrieval with fallback
+            var defaultBorderBrush = TryFindResource("AppBorderColor") as SolidColorBrush
+                                     ?? new SolidColorBrush(Colors.Gray);
+            var defaultBackgroundBrush = TryFindResource("AppPanelColor") as SolidColorBrush
+                                         ?? new SolidColorBrush(Colors.Black);
+
+            DropAreaBorder.BorderBrush = defaultBorderBrush;
+            DropAreaBorder.Background = defaultBackgroundBrush;
             e.Handled = true;
         }
 
@@ -948,12 +538,18 @@ pause
                 }
 
                 _settings.VirusTotalApiKey = cleanedKey;
+                // NEW: Update the client's API key if it exists
+                if (_virusTotalClient != null)
+                {
+                    _virusTotalClient.SetApiKey(cleanedKey);
+                }
                 SaveSettings();
                 MessageBox.Show("API key updated successfully!",
                     "Success", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
 
+        // NEW: Add the missing PackItProSettings_Click method
         private void PackItProSettings_Click(object sender, RoutedEventArgs e)
         {
             // You can add a more detailed settings dialog here if needed
@@ -977,6 +573,8 @@ pause
         }
         #endregion
 
+        // ... rest of MainWindow.xaml.cs ...
+
         #region Settings and Cache Management
         private async Task LoadSettingsAndCacheAsync()
         {
@@ -988,23 +586,21 @@ pause
                     _settings = JsonSerializer.Deserialize<AppSettings>(json) ?? new AppSettings();
                 }
 
-                if (File.Exists(_cacheFilePath)) // Use new path
+                // NEW: Load VirusTotal cache using the client
+                if (_virusTotalClient != null)
                 {
-                    var cacheJson = await File.ReadAllTextAsync(_cacheFilePath);
-                    var cache = JsonSerializer.Deserialize<List<VirusScanResult>>(cacheJson);
-                    if (cache != null)
-                    {
-                        foreach (var item in cache)
-                        {
-                            _scanCache[item.FileHash] = item;
-                        }
-                    }
+                    await _virusTotalClient.LoadCacheAsync();
                 }
             }
             catch (Exception ex)
             {
                 LogError("Settings load failed", ex);
                 _settings = new AppSettings();
+                // Optionally clear the client's cache if loading failed
+                if (_virusTotalClient != null)
+                {
+                    _virusTotalClient.ClearCache();
+                }
             }
         }
 
@@ -1028,26 +624,7 @@ pause
             }
         }
 
-        private void SaveVirusScanCache()
-        {
-            try
-            {
-                // Ensure directory exists before saving
-                var dirPath = Path.GetDirectoryName(_cacheFilePath);
-                if (!string.IsNullOrEmpty(dirPath) && !Directory.Exists(dirPath))
-                {
-                    Directory.CreateDirectory(dirPath);
-                }
-
-                File.WriteAllText(_cacheFilePath, // Use new path
-                    JsonSerializer.Serialize(_scanCache.Values.ToList(),
-                    new JsonSerializerOptions { WriteIndented = true }));
-            }
-            catch (Exception ex)
-            {
-                LogError("Failed to save scan cache", ex);
-            }
-        }
+        // REMOVED: SaveVirusScanCache method (now handled by VirusTotalClient)
         #endregion
 
         #region Error Handling
@@ -1088,7 +665,8 @@ pause
                     // TODO: Dispose managed state (managed objects).
                     _httpClient?.Dispose();
                     _scanSemaphore?.Dispose();
-                    _rateLimitSemaphore?.Dispose(); // NEW: Dispose the rate limit semaphore
+                    // NEW: Dispose the VirusTotalClient
+                    _virusTotalClient?.Dispose();
                 }
 
                 // TODO: Free unmanaged resources (unmanaged objects) and override a finalizer below.
@@ -1169,46 +747,7 @@ pause
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 
-    public class VirusScanResult
-    {
-        public string FileHash { get; set; } = string.Empty;
-        public int Positives { get; set; }
-        public int TotalScans { get; set; }
-        public DateTime ScanDate { get; set; } = DateTime.UtcNow;
-        public string? Error { get; set; }
-    }
-
-    public class VirusTotalFileReport
-    {
-        public VirusTotalFileData? Data { get; set; }
-    }
-
-    public class VirusTotalFileData
-    {
-        public string? Id { get; set; }
-        public VirusTotalFileAttributes? Attributes { get; set; }
-    }
-
-    public class VirusTotalFileAttributes
-    {
-        public VirusTotalAnalysisStats? LastAnalysisStats { get; set; }
-    }
-
-    public class VirusTotalAnalysisStats
-    {
-        public int Malicious { get; set; }
-        public int Total { get; set; }
-    }
-
-    public class VirusTotalUploadResponse
-    {
-        public VirusTotalUploadData? Data { get; set; }
-    }
-
-    public class VirusTotalUploadData
-    {
-        public string? Id { get; set; }
-    }
+    // REMOVED: VirusScanResult, VirusTotalFileReport, VirusTotalFileData, etc. (Moved to VirusTotalClient or kept if used elsewhere)
     #endregion
 
     #region Helper Classes

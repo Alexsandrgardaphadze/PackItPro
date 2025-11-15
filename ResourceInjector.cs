@@ -1,7 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
+﻿// ResourceInjector.cs
+using System;
 using System.IO;
-using Vestris.ResourceLib;
+using Vestris.ResourceLib; // Requires installing the NuGet package
 
 namespace PackItPro
 {
@@ -16,19 +16,19 @@ namespace PackItPro
             ri.Load(outputPath);
 
             var resource = new GenericResource(
-                new ResourceId("PAYLOAD"),
-                new ResourceId((IntPtr)10), // RT_RCDATA
-                0x0409
+                new ResourceId("PAYLOAD"), // Resource Name
+                new ResourceId((IntPtr)10), // RT_RCDATA (integer ID 10)
+                0x0409 // Language ID (0x0409 = English US)
             );
             resource.Data = payloadBytes;
 
-            // Fix: Add requires ResourceId as key and List<Resource> as value
-            var resourceId = new ResourceId((IntPtr)10);
-            if (!ri.Resources.ContainsKey(resourceId))
+            // Ensure the resource collection for RT_RCDATA exists
+            var rcDataId = new ResourceId((IntPtr)10);
+            if (!ri.Resources.ContainsKey(rcDataId))
             {
-                ri.Resources.Add(resourceId, new List<Resource>());
+                ri.Resources.Add(rcDataId, new System.Collections.Generic.List<Resource>());
             }
-            ri.Resources[resourceId].Add(resource);
+            ri.Resources[rcDataId].Add(resource);
 
             ri.Save(outputPath);
         }
