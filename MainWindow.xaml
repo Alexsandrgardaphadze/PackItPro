@@ -490,13 +490,6 @@
                        FontFamily="Consolas" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="10,0,0,0"/>
                             <!-- Grid.Column="2" could be used for a help icon if needed -->
                         </Grid>
-
-                        <!-- Informational Text -->
-                        <TextBlock Text="About .packitexe:" Foreground="#9F9FAF" Margin="10,15,0,5" FontWeight="SemiBold" HorizontalAlignment="Left"/>
-                        <!-- Added left margin to match labels -->
-                        <TextBlock TextWrapping="Wrap" Foreground="#CCCCCC" LineHeight="20" FontSize="12" HorizontalAlignment="Left" Margin="10,0,0,0"> <!-- Added left margin to match labels -->
-            The .packitexe format creates a single, self-contained executable that automatically installs all bundled applications. It includes VirusTotal scanning, compression, and optional Winget update support.
-                        </TextBlock>
                     </StackPanel>
                 </Border>
 
