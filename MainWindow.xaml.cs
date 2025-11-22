@@ -21,6 +21,8 @@ using System.Net.Http.Json;
 using Microsoft.Win32;
 using Microsoft.WindowsAPICodePack.Dialogs;
 using System.Security.Cryptography;
+using System.Reflection; // For AppContext.BaseDirectory
+using System.Security.Principal; // For WindowsIdentity, WindowsPrincipal
 
 // Uncommon or special-case
 // using static System.Windows.Forms.VisualStyles.VisualStyleElement.TrayNotify; // This line is likely incorrect and removed
@@ -103,7 +105,7 @@ namespace PackItPro
                 // NEW: Apply the loaded API key to the client instance
                 _virusTotalClient?.SetApiKey(_settings.VirusTotalApiKey);
 
-                // NEW: Sync loaded settings to UI elements
+                // NEW: Sync loaded settings to UI elements (after client is initialized and settings are loaded)
                 SyncSettingsToUI();
 
                 UpdateUIState();
@@ -341,7 +343,7 @@ namespace PackItPro
                 catch (Exception ex)
                 {
                     // NEW: Log packaging error
-                    LogError("Packaging failed", ex);
+                    LogError("Packager.CreatePackageAsync failed", ex);
                     MessageBox.Show($"Packaging failed: {ex.Message}",
                                   "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
@@ -374,18 +376,18 @@ namespace PackItPro
             FileCountTextBlock.Text = _fileItems.Count.ToString();
             TotalSizeTextBlock.Text = FormatBytes(totalSize);
 
-            // Count clean files - Logic remains, but UI update is skipped
+            // Count clean files - Logic remains, but UI update is skipped if SafeFilesTextBlock is missing
             int cleanCount = _fileItems.Count(f => !f.IsInfected && f.Status != "Skipped Scan" && f.Status != "Scan Failed");
             int infectedCount = _fileItems.Count(f => f.IsInfected);
 
-            // NEW: Update SafeFilesTextBlock if it exists, otherwise log
+            // NEW: Check if SafeFilesTextBlock exists before trying to update it (Fixes error)
             if (SafeFilesTextBlock != null) // Assuming SafeFilesTextBlock exists in XAML
             {
                 SafeFilesTextBlock.Text = cleanCount.ToString();
             }
             else
             {
-                LogInfo($"UpdateSummary: Total Files = {_fileItems.Count}, Clean Files = {cleanCount}, Infected Files = {infectedCount}"); // Optional: Log for debugging
+                LogInfo($"UpdateSummary: Total Files = {_fileItems.Count}, Clean Files = {cleanCount}, Infected Files = {infectedCount}"); // Optional: Log for debugging if UI element is missing
             }
 
             StatusTextBlock.Text = _fileItems.Any(f => f.IsInfected) ?
@@ -597,67 +599,283 @@ namespace PackItPro
             MessageBox.Show("PackItPro v1.0\n\nA secure file packaging tool designed to bundle executable files into a single installer package with malware scanning capability.",
                 "About PackItPro", MessageBoxButton.OK, MessageBoxImage.Information);
         }
+
         #endregion
 
         #region Settings Synchronization (NEW)
-        // NEW: Method to sync settings object values to UI controls
+        // NEW: Method to sync settings object values to UI controls (Handles potentially missing XAML elements)
         private void SyncSettingsToUI()
         {
+            // Check if UI elements exist before setting their properties
             if (RequireAdminCheckBox != null) RequireAdminCheckBox.IsChecked = _settings.RequiresAdmin;
             if (IncludeWingetUpdaterCheckBox != null) IncludeWingetUpdaterCheckBox.IsChecked = _settings.IncludeWingetUpdateScript;
-            if (UseLZMACompressionCheckBox != null) UseLZMACompressionCheckBox.IsChecked = _settings.UseLZMACompression; // Assuming this checkbox exists
-            if (OnlyScanExecutablesCheckBox != null) OnlyScanExecutablesCheckBox.IsChecked = _settings.OnlyScanExecutables; // Assuming this checkbox exists
-            if (AutoRemoveInfectedFilesCheckBox != null) AutoRemoveInfectedFilesCheckBox.IsChecked = _settings.AutoRemoveInfectedFiles; // Assuming this checkbox exists
-            // Add other settings syncs here as needed
+            // NEW: Handle potentially missing checkboxes gracefully
+            if (UseLZMACompressionCheckBox != null) UseLZMACompressionCheckBox.IsChecked = _settings.UseLZMACompression;
+            if (OnlyScanExecutablesCheckBox != null) OnlyScanExecutablesCheckBox.IsChecked = _settings.OnlyScanExecutables;
+            if (AutoRemoveInfectedFilesCheckBox != null) AutoRemoveInfectedFilesCheckBox.IsChecked = _settings.AutoRemoveInfectedFiles;
+            // Add other settings syncs here as needed, checking for null UI elements
         }
 
-        // NEW: Event handlers for each checkbox to update the settings object and save
-        private void RequireAdminCheckBox_Changed(object sender, RoutedEventArgs e)
+        // NEW: Event handlers for each checkbox to update the settings object and save (Handles potentially missing XAML elements)
+        private void RequireAdminCheckBox_Checked(object sender, RoutedEventArgs e)
         {
-            if (sender is CheckBox cb)
+            if (sender is CheckBox cb && cb.IsChecked == true) // Check if sender is CheckBox and is checked
             {
-                _settings.RequiresAdmin = cb.IsChecked == true;
+                _settings.RequiresAdmin = true;
                 SaveSettings(); // Save settings immediately when changed
             }
         }
 
-        private void IncludeWingetUpdaterCheckBox_Changed(object sender, RoutedEventArgs e)
+        private void RequireAdminCheckBox_Unchecked(object sender, RoutedEventArgs e)
         {
-            if (sender is CheckBox cb)
+            if (sender is CheckBox cb && cb.IsChecked == false) // Check if sender is CheckBox and is unchecked
             {
-                _settings.IncludeWingetUpdateScript = cb.IsChecked == true;
+                _settings.RequiresAdmin = false;
+                SaveSettings(); // Save settings immediately when changed
+            }
+        }
+
+        private void IncludeWingetUpdaterCheckBox_Checked(object sender, RoutedEventArgs e)
+        {
+            if (sender is CheckBox cb && cb.IsChecked == true)
+            {
+                _settings.IncludeWingetUpdateScript = true;
                 SaveSettings();
             }
         }
 
-        private void UseLZMACompressionCheckBox_Changed(object sender, RoutedEventArgs e)
+        private void IncludeWingetUpdaterCheckBox_Unchecked(object sender, RoutedEventArgs e)
         {
-            if (sender is CheckBox cb)
+            if (sender is CheckBox cb && cb.IsChecked == false)
             {
-                _settings.UseLZMACompression = cb.IsChecked == true;
+                _settings.IncludeWingetUpdateScript = false;
                 SaveSettings();
             }
         }
 
-        private void OnlyScanExecutablesCheckBox_Changed(object sender, RoutedEventArgs e)
+        // NEW: Handle potentially missing checkboxes gracefully
+        private void UseLZMACompressionCheckBox_Checked(object sender, RoutedEventArgs e)
         {
-            if (sender is CheckBox cb)
+            if (sender is CheckBox cb && cb.IsChecked == true)
             {
-                _settings.OnlyScanExecutables = cb.IsChecked == true;
+                _settings.UseLZMACompression = true;
                 SaveSettings();
             }
         }
 
-        private void AutoRemoveInfectedFilesCheckBox_Changed(object sender, RoutedEventArgs e)
+        private void UseLZMACompressionCheckBox_Unchecked(object sender, RoutedEventArgs e)
         {
-            if (sender is CheckBox cb)
+            if (sender is CheckBox cb && cb.IsChecked == false)
             {
-                _settings.AutoRemoveInfectedFiles = cb.IsChecked == true;
+                _settings.UseLZMACompression = false;
+                SaveSettings();
+            }
+        }
+
+        private void OnlyScanExecutablesCheckBox_Checked(object sender, RoutedEventArgs e)
+        {
+            if (sender is CheckBox cb && cb.IsChecked == true)
+            {
+                _settings.OnlyScanExecutables = true;
+                SaveSettings();
+            }
+        }
+
+        private void OnlyScanExecutablesCheckBox_Unchecked(object sender, RoutedEventArgs e)
+        {
+            if (sender is CheckBox cb && cb.IsChecked == false)
+            {
+                _settings.OnlyScanExecutables = false;
+                SaveSettings();
+            }
+        }
+
+        private void AutoRemoveInfectedFilesCheckBox_Checked(object sender, RoutedEventArgs e)
+        {
+            if (sender is CheckBox cb && cb.IsChecked == true)
+            {
+                _settings.AutoRemoveInfectedFiles = true;
+                SaveSettings();
+            }
+        }
+
+        private void AutoRemoveInfectedFilesCheckBox_Unchecked(object sender, RoutedEventArgs e)
+        {
+            if (sender is CheckBox cb && cb.IsChecked == false)
+            {
+                _settings.AutoRemoveInfectedFiles = false;
                 SaveSettings();
             }
         }
 
         // Add other checkbox event handlers similarly...
+        #endregion
+
+        #region Missing Event Handlers (NEW)
+        // NEW: Placeholder methods for event handlers referenced in XAML but missing in code-behind
+        // These prevent the build errors. You can implement the actual logic later.
+
+        private void ExportLogs_Click(object sender, RoutedEventArgs e)
+        {
+            // Implement logic to export logs
+            // For now, just show a message
+            var logPath = Path.Combine(_appDataDir, "packitpro.log");
+            if (File.Exists(logPath))
+            {
+                var saveDialog = new SaveFileDialog
+                {
+                    Filter = "Log Files (*.log)|*.log|All Files (*.*)|*.*",
+                    FileName = $"PackItPro_Log_{DateTime.Now:yyyyMMdd_HHmmss}.log",
+                    InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Desktop)
+                };
+
+                if (saveDialog.ShowDialog() == true)
+                {
+                    try
+                    {
+                        File.Copy(logPath, saveDialog.FileName, overwrite: true);
+                        MessageBox.Show($"Logs exported to:\n{saveDialog.FileName}", "Export Successful", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                    catch (Exception ex)
+                    {
+                        LogError("Log export failed", ex);
+                        MessageBox.Show($"Failed to export logs: {ex.Message}", "Export Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                }
+            }
+            else
+            {
+                MessageBox.Show("No log file found to export.", "No Logs", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+
+        private void ViewCache_Click(object sender, RoutedEventArgs e)
+        {
+            // Implement logic to view the scan cache (e.g., show a list of cached hashes and results in a new window)
+            // For now, just show a message with the cache path
+            MessageBox.Show($"VirusTotal scan cache is located at:\n{_cacheFilePath}\n\nYou can open this file to view cached scan results.", "View Cache", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        private void ClearCache_Click(object sender, RoutedEventArgs e)
+        {
+            // Implement logic to clear the scan cache
+            // For now, just confirm and clear the dictionary
+            var result = MessageBox.Show(
+                "Are you sure you want to clear the VirusTotal scan cache? This will force rescan of all files.",
+                "Clear Cache",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            if (result == MessageBoxResult.Yes)
+            {
+                _scanCache.Clear();
+                _virusTotalClient?.ClearCache(); // Also clear the client's in-memory cache if it exists
+                // Optionally delete the cache file on disk
+                try
+                {
+                    if (File.Exists(_cacheFilePath))
+                    {
+                        File.Delete(_cacheFilePath);
+                        LogInfo("VirusTotal scan cache file deleted.");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogError("Failed to delete cache file", ex);
+                    MessageBox.Show($"Failed to delete cache file: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+                MessageBox.Show("VirusTotal scan cache cleared.", "Cache Cleared", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+
+        private void TestPackage_Click(object sender, RoutedEventArgs e)
+        {
+            // Implement logic to test the generated package (e.g., run it in a sandboxed environment if possible)
+            // For now, just show a message
+            MessageBox.Show("Package testing functionality is not yet implemented.", "Not Implemented", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        private void ExportList_Click(object sender, RoutedEventArgs e)
+        {
+            // Implement logic to export the list of added files (e.g., as a text file)
+            // For now, just show a message
+            var sb = new StringBuilder();
+            sb.AppendLine("Files in current package:");
+            foreach (var item in _fileItems)
+            {
+                sb.AppendLine($"- {item.FileName} ({item.Size})");
+            }
+
+            var saveDialog = new SaveFileDialog
+            {
+                Filter = "Text Files (*.txt)|*.txt|All Files (*.*)|*.*",
+                FileName = $"Package_List_{DateTime.Now:yyyyMMdd_HHmmss}.txt",
+                InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Desktop)
+            };
+
+            if (saveDialog.ShowDialog() == true)
+            {
+                try
+                {
+                    File.WriteAllText(saveDialog.FileName, sb.ToString());
+                    MessageBox.Show($"File list exported to:\n{saveDialog.FileName}", "Export Successful", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                catch (Exception ex)
+                {
+                    LogError("File list export failed", ex);
+                    MessageBox.Show($"Failed to export file list: {ex.Message}", "Export Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+        }
+
+        private void Documentation_Click(object sender, RoutedEventArgs e)
+        {
+            // Implement logic to open documentation (e.g., a web page or a local PDF/HTML file)
+            // For now, just show a message
+            MessageBox.Show("Opening documentation...", "Documentation", MessageBoxButton.OK, MessageBoxImage.Information);
+            // Process.Start(new ProcessStartInfo("https://your-documentation-url.com") { UseShellExecute = true }); // Example
+        }
+
+        private void GitHub_Click(object sender, RoutedEventArgs e)
+        {
+            // Implement logic to open the GitHub repository
+            // For now, just show a message
+            MessageBox.Show("Opening GitHub repository...", "GitHub", MessageBoxButton.OK, MessageBoxImage.Information);
+            // Process.Start(new ProcessStartInfo("https://github.com/your-username/your-repo") { UseShellExecute = true }); // Example
+        }
+
+        private void ReportIssue_Click(object sender, RoutedEventArgs e)
+        {
+            // Implement logic to report an issue (e.g., open GitHub Issues page or an email client)
+            // For now, just show a message
+            MessageBox.Show("Opening issue reporting page...", "Report Issue", MessageBoxButton.OK, MessageBoxImage.Information);
+            // Process.Start(new ProcessStartInfo("https://github.com/your-username/your-repo/issues/new") { UseShellExecute = true }); // Example
+        }
+
+        private void CheckUpdates_Click(object sender, RoutedEventArgs e)
+        {
+            // Implement logic to check for updates
+            // For now, just show a message
+            MessageBox.Show("Checking for updates...", "Check Updates", MessageBoxButton.OK, MessageBoxImage.Information);
+            // Simulate update check
+            // await Task.Delay(2000); // Simulate network call
+            // MessageBox.Show("You are running the latest version.", "No Updates", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        private void Retry_Click(object sender, RoutedEventArgs e)
+        {
+            // Implement logic to retry a failed operation (e.g., retry scan if a scan failed)
+            // For now, just show a message
+            MessageBox.Show("Retrying last operation...", "Retry", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        private void DismissError_Click(object sender, RoutedEventArgs e)
+        {
+            // Implement logic to dismiss an error message or clear the error state
+            // For now, just clear the status message
+            StatusMessageTextBlock.Text = "Ready to create .packitexe package";
+            ProcessingProgressBar.Visibility = Visibility.Collapsed; // Hide the inline progress bar if it was shown for an error
+        }
         #endregion
 
         #region Settings and Cache Management
