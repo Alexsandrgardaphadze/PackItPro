@@ -94,9 +94,18 @@ namespace PackItPro
         {
             try
             {
-                await LoadSettingsAndCacheAsync();
-                // NEW: Initialize VirusTotalClient after settings are loaded
-                _virusTotalClient = new VirusTotalClient(_cacheFilePath, _settings.VirusTotalApiKey);
+                // NEW: Initialize VirusTotalClient FIRST, before loading settings/cache
+                // This allows LoadSettingsAndCacheAsync to use the client instance for loading cache.
+                _virusTotalClient = new VirusTotalClient(_cacheFilePath, apiKey: null); // Initialize with a dummy key or null, set it after loading settings
+
+                await LoadSettingsAndCacheAsync(); // This will now correctly load the cache using the client instance
+
+                // NEW: Apply the loaded API key to the client instance
+                _virusTotalClient?.SetApiKey(_settings.VirusTotalApiKey);
+
+                // NEW: Sync loaded settings to UI elements
+                SyncSettingsToUI();
+
                 UpdateUIState();
             }
             catch (Exception ex)
@@ -203,7 +212,7 @@ namespace PackItPro
                 return;
             }
 
-            // NEW: Ensure API key is set in the client
+            // NEW: Ensure API key is set in the client (should already be done on load, but re-set if key changed recently)
             _virusTotalClient.SetApiKey(_settings.VirusTotalApiKey);
 
             StatusMessageTextBlock.Text = "Scanning files with VirusTotal...";
@@ -316,12 +325,14 @@ namespace PackItPro
                     ProgressPercentTextBlock.Text = "0%";
 
                     // NEW: Call the Packager class
+                    // NEW: Pass admin requirement based on UI/Settings (example: reading the checkbox directly here, or use _settings.RequiresAdmin if bound correctly)
+                    bool requiresAdmin = RequireAdminCheckBox.IsChecked == true; // Or _settings.RequiresAdmin if properly bound
                     var outputPath = await Packager.CreatePackageAsync(
                         _fileItems.Select(f => f.FilePath).ToList(),
                         _settings.OutputLocation,
                         Path.GetFileNameWithoutExtension(saveDialog.FileName),
-                        requiresAdmin: false, // Could be configurable from UI later
-                        useLZMACompression: _settings.UseLZMACompression // <-- Added missing argument
+                        requiresAdmin: requiresAdmin, // Use the value from the checkbox or settings
+                        useLZMACompression: _settings.UseLZMACompression // <-- Added missing argument, relies on UI updating _settings
                     );
 
                     MessageBox.Show($"Package created successfully!\n{outputPath}",
@@ -329,6 +340,7 @@ namespace PackItPro
                 }
                 catch (Exception ex)
                 {
+                    // NEW: Log packaging error
                     LogError("Packaging failed", ex);
                     MessageBox.Show($"Packaging failed: {ex.Message}",
                                   "Error", MessageBoxButton.OK, MessageBoxImage.Error);
@@ -361,10 +373,20 @@ namespace PackItPro
             var totalSize = _fileItems.Sum(f => new FileInfo(f.FilePath).Length);
             FileCountTextBlock.Text = _fileItems.Count.ToString();
             TotalSizeTextBlock.Text = FormatBytes(totalSize);
+
             // Count clean files - Logic remains, but UI update is skipped
             int cleanCount = _fileItems.Count(f => !f.IsInfected && f.Status != "Skipped Scan" && f.Status != "Scan Failed");
-            // Log the count if SafeFilesTextBlock is missing
-            LogInfo($"UpdateSummary: Total Files = {_fileItems.Count}, Clean Files = {cleanCount}"); // Optional: Log for debugging
+            int infectedCount = _fileItems.Count(f => f.IsInfected);
+
+            // NEW: Update SafeFilesTextBlock if it exists, otherwise log
+            if (SafeFilesTextBlock != null) // Assuming SafeFilesTextBlock exists in XAML
+            {
+                SafeFilesTextBlock.Text = cleanCount.ToString();
+            }
+            else
+            {
+                LogInfo($"UpdateSummary: Total Files = {_fileItems.Count}, Clean Files = {cleanCount}, Infected Files = {infectedCount}"); // Optional: Log for debugging
+            }
 
             StatusTextBlock.Text = _fileItems.Any(f => f.IsInfected) ?
                 "Infected Files Detected" : "Ready";
@@ -441,7 +463,7 @@ namespace PackItPro
             if (e.Data.GetData(DataFormats.FileDrop) is string[] files)
             {
                 AddFilesWithValidation(files);
-                if (ScanWithVirusTotalCheckBox.IsChecked == true)
+                if (IncludeWingetUpdaterCheckBox.IsChecked == true) // NEW: Changed from ScanWithVirusTotalCheckBox
                     _ = ScanFilesWithVirusTotal();
             }
         }
@@ -457,7 +479,7 @@ namespace PackItPro
             if (openFileDialog.ShowDialog() == true)
             {
                 AddFilesWithValidation(openFileDialog.FileNames);
-                if (ScanWithVirusTotalCheckBox.IsChecked == true)
+                if (IncludeWingetUpdaterCheckBox.IsChecked == true) // NEW: Changed from ScanWithVirusTotalCheckBox
                     _ = ScanFilesWithVirusTotal();
             }
         }
@@ -560,8 +582,12 @@ namespace PackItPro
             settingsInfo.AppendLine($"- VirusTotal API Key Set: {!string.IsNullOrEmpty(_settings.VirusTotalApiKey)}");
             settingsInfo.AppendLine($"- Only Scan Executables: {_settings.OnlyScanExecutables}");
             settingsInfo.AppendLine($"- Auto Remove Infected: {_settings.AutoRemoveInfectedFiles}");
+            // NEW: Added Winget setting
             settingsInfo.AppendLine($"- Include Winget Update Script: {_settings.IncludeWingetUpdateScript}");
+            // NEW: Added LZMA setting
             settingsInfo.AppendLine($"- Use LZMA Compression: {_settings.UseLZMACompression}");
+            // NEW: Added RequiresAdmin setting
+            settingsInfo.AppendLine($"- Requires Admin: {_settings.RequiresAdmin}");
 
             MessageBox.Show(settingsInfo.ToString(), "PackItPro Settings", MessageBoxButton.OK, MessageBoxImage.Information);
         }
@@ -573,7 +599,66 @@ namespace PackItPro
         }
         #endregion
 
-        // ... rest of MainWindow.xaml.cs ...
+        #region Settings Synchronization (NEW)
+        // NEW: Method to sync settings object values to UI controls
+        private void SyncSettingsToUI()
+        {
+            if (RequireAdminCheckBox != null) RequireAdminCheckBox.IsChecked = _settings.RequiresAdmin;
+            if (IncludeWingetUpdaterCheckBox != null) IncludeWingetUpdaterCheckBox.IsChecked = _settings.IncludeWingetUpdateScript;
+            if (UseLZMACompressionCheckBox != null) UseLZMACompressionCheckBox.IsChecked = _settings.UseLZMACompression; // Assuming this checkbox exists
+            if (OnlyScanExecutablesCheckBox != null) OnlyScanExecutablesCheckBox.IsChecked = _settings.OnlyScanExecutables; // Assuming this checkbox exists
+            if (AutoRemoveInfectedFilesCheckBox != null) AutoRemoveInfectedFilesCheckBox.IsChecked = _settings.AutoRemoveInfectedFiles; // Assuming this checkbox exists
+            // Add other settings syncs here as needed
+        }
+
+        // NEW: Event handlers for each checkbox to update the settings object and save
+        private void RequireAdminCheckBox_Changed(object sender, RoutedEventArgs e)
+        {
+            if (sender is CheckBox cb)
+            {
+                _settings.RequiresAdmin = cb.IsChecked == true;
+                SaveSettings(); // Save settings immediately when changed
+            }
+        }
+
+        private void IncludeWingetUpdaterCheckBox_Changed(object sender, RoutedEventArgs e)
+        {
+            if (sender is CheckBox cb)
+            {
+                _settings.IncludeWingetUpdateScript = cb.IsChecked == true;
+                SaveSettings();
+            }
+        }
+
+        private void UseLZMACompressionCheckBox_Changed(object sender, RoutedEventArgs e)
+        {
+            if (sender is CheckBox cb)
+            {
+                _settings.UseLZMACompression = cb.IsChecked == true;
+                SaveSettings();
+            }
+        }
+
+        private void OnlyScanExecutablesCheckBox_Changed(object sender, RoutedEventArgs e)
+        {
+            if (sender is CheckBox cb)
+            {
+                _settings.OnlyScanExecutables = cb.IsChecked == true;
+                SaveSettings();
+            }
+        }
+
+        private void AutoRemoveInfectedFilesCheckBox_Changed(object sender, RoutedEventArgs e)
+        {
+            if (sender is CheckBox cb)
+            {
+                _settings.AutoRemoveInfectedFiles = cb.IsChecked == true;
+                SaveSettings();
+            }
+        }
+
+        // Add other checkbox event handlers similarly...
+        #endregion
 
         #region Settings and Cache Management
         private async Task LoadSettingsAndCacheAsync()
@@ -586,7 +671,7 @@ namespace PackItPro
                     _settings = JsonSerializer.Deserialize<AppSettings>(json) ?? new AppSettings();
                 }
 
-                // NEW: Load VirusTotal cache using the client
+                // NEW: Load VirusTotal cache using the client instance that was created before this call
                 if (_virusTotalClient != null)
                 {
                     await _virusTotalClient.LoadCacheAsync();
