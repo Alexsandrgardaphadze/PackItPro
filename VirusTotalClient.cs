@@ -8,6 +8,7 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -58,9 +59,12 @@ namespace PackItPro
         {
             if (onlyScanExecutables && !IsExecutableExtension(filePath))
             {
+                // NEW: Convert byte[] hash to string for storage/reporting
+                var fileHashBytes = FileHasher.ComputeFileHash(filePath);
+                var fileHashString = BitConverter.ToString(fileHashBytes).Replace("-", "").ToLowerInvariant();
                 return new VirusScanResult
                 {
-                    FileHash = ComputeSHA256(filePath), // Still compute hash for potential cache consistency, though not scanned
+                    FileHash = fileHashString, // Store as string
                     Positives = 0,
                     TotalScans = 0,
                     ScanDate = DateTime.UtcNow,
@@ -69,7 +73,8 @@ namespace PackItPro
                 };
             }
 
-            string hash = ComputeSHA256(filePath);
+            // NEW: Convert byte[] hash to string for API calls and storage
+            string hash = BitConverter.ToString(FileHasher.ComputeFileHash(filePath)).Replace("-", "").ToLowerInvariant();
             VirusScanResult result;
 
             if (_scanCache.TryGetValue(hash, out var cachedResult))
@@ -87,7 +92,7 @@ namespace PackItPro
                     try
                     {
                         result = await QueryVirusTotalAsync(filePath, hash, apiKey);
-                        _scanCache[hash] = result; // Cache the result
+                        _scanCache[hash] = result; // Cache the result (using the string hash as the key)
                     }
                     finally
                     {
@@ -119,7 +124,7 @@ namespace PackItPro
             try
             {
                 var reportResponse = await _httpClient.GetAsync(
-                    $"https://www.virustotal.com/api/v3/files/{hash}"); // Fixed URL
+                    $"https://www.virustotal.com/api/v3/files/{hash}"); // Fixed URL - Uses string hash
 
                 if (reportResponse.IsSuccessStatusCode)
                 {
@@ -130,7 +135,7 @@ namespace PackItPro
                         throw new InvalidDataException("Missing analysis data in VirusTotal response");
                     return new VirusScanResult
                     {
-                        FileHash = hash,
+                        FileHash = hash, // Return the string hash
                         Positives = report.Data.Attributes.LastAnalysisStats.Malicious,
                         TotalScans = report.Data.Attributes.LastAnalysisStats.Total,
                         ScanDate = DateTime.UtcNow
@@ -153,14 +158,14 @@ namespace PackItPro
                 {
                     await Task.Delay(5000);
                     var analysisResponse = await _httpClient.GetAsync(
-                        $"https://www.virustotal.com/api/v3/analyses/{analysisId}"); // Fixed URL
+                        $"https://www.virustotal.com/api/v3/analyses/{analysisId}"); // Fixed URL - Uses string analysisId
 
                     if (analysisResponse.IsSuccessStatusCode)
                     {
                         var analysis = await analysisResponse.Content.ReadFromJsonAsync<VirusTotalFileReport>();
                         return new VirusScanResult
                         {
-                            FileHash = hash,
+                            FileHash = hash, // Return the string hash
                             Positives = analysis.Data.Attributes.LastAnalysisStats.Malicious,
                             TotalScans = analysis.Data.Attributes.LastAnalysisStats.Total,
                             ScanDate = DateTime.UtcNow
@@ -173,9 +178,10 @@ namespace PackItPro
             catch (Exception ex)
             {
                 LogError("VirusTotal query failed", ex);
+                // NEW: Ensure FileHash is a string even on error
                 return new VirusScanResult
                 {
-                    FileHash = hash,
+                    FileHash = hash, // Use the string hash passed in
                     Positives = 0,
                     TotalScans = 0,
                     Error = ex.Message,
@@ -185,56 +191,9 @@ namespace PackItPro
             }
         }
 
-        private string ComputeSHA256(string filePath)
-        {
-            using var sha = System.Security.Cryptography.SHA256.Create();
-            using var stream = File.OpenRead(filePath);
-            return BitConverter.ToString(sha.ComputeHash(stream)).Replace("-", "").ToLowerInvariant();
-        }
-
-        // NEW: Helper method to compute directory hash (if needed elsewhere, e.g., for integrity check in packaging)
-        // This can be moved to a utility class if used frequently outside VirusTotal context.
-        public static byte[] ComputeDirectoryHash(string directoryPath)
-        {
-            using var sha256 = System.Security.Cryptography.SHA256.Create();
-            var fileHashes = new List<byte[]>();
-
-            var files = Directory.GetFiles(directoryPath, "*", SearchOption.AllDirectories);
-            Array.Sort(files, StringComparer.OrdinalIgnoreCase); // Sort filenames to ensure consistent order
-
-            foreach (var filePath in files)
-            {
-                var fileContentHash = ComputeFileHash(filePath);
-                var relativePath = Path.GetRelativePath(directoryPath, filePath).ToLowerInvariant();
-                var pathBytes = System.Text.Encoding.UTF8.GetBytes(relativePath);
-
-                using var tempStream = new MemoryStream();
-                tempStream.Write(pathBytes, 0, pathBytes.Length);
-                tempStream.Write(fileContentHash, 0, fileContentHash.Length);
-                tempStream.Position = 0;
-
-                var combinedHash = sha256.ComputeHash(tempStream);
-                fileHashes.Add(combinedHash);
-            }
-
-            fileHashes.Sort((x, y) => Comparer<byte[]>.Default.Compare(x, y));
-
-            using var finalStream = new MemoryStream();
-            foreach (var hash in fileHashes)
-            {
-                finalStream.Write(hash, 0, hash.Length);
-            }
-            finalStream.Position = 0;
-
-            return sha256.ComputeHash(finalStream);
-        }
-
-        private static byte[] ComputeFileHash(string filePath)
-        {
-            using var fileStream = File.OpenRead(filePath);
-            using var sha256 = System.Security.Cryptography.SHA256.Create();
-            return sha256.ComputeHash(fileStream);
-        }
+        // REMOVED: ComputeSHA256 method (moved to FileHasher)
+        // REMOVED: ComputeDirectoryHash method (moved to FileHasher)
+        // REMOVED: ComputeFileHash method (moved to FileHasher)
 
 
         // NEW: Method to load cache from file
@@ -248,6 +207,7 @@ namespace PackItPro
                 {
                     foreach (var item in cache)
                     {
+                        // NEW: The cache file should contain string hashes, which are the keys
                         _scanCache[item.FileHash] = item;
                     }
                 }
@@ -292,7 +252,7 @@ namespace PackItPro
     // Model classes for VirusTotal API responses (kept here or could be shared)
     public class VirusScanResult
     {
-        public string FileHash { get; set; } = string.Empty;
+        public string FileHash { get; set; } = string.Empty; // Must be string for API interaction and caching keys
         public int Positives { get; set; }
         public int TotalScans { get; set; }
         public DateTime ScanDate { get; set; } = DateTime.UtcNow;

@@ -21,8 +21,6 @@ using System.Net.Http.Json;
 using Microsoft.Win32;
 using Microsoft.WindowsAPICodePack.Dialogs;
 using System.Security.Cryptography;
-using System.Reflection; // For AppContext.BaseDirectory
-using System.Security.Principal; // For WindowsIdentity, WindowsPrincipal
 
 // Uncommon or special-case
 // using static System.Windows.Forms.VisualStyles.VisualStyleElement.TrayNotify; // This line is likely incorrect and removed
@@ -106,6 +104,7 @@ namespace PackItPro
                 _virusTotalClient?.SetApiKey(_settings.VirusTotalApiKey);
 
                 // NEW: Sync loaded settings to UI elements (after client is initialized and settings are loaded)
+                // This handles potentially missing XAML elements gracefully.
                 SyncSettingsToUI();
 
                 UpdateUIState();
@@ -157,7 +156,7 @@ namespace PackItPro
                     FilePath = file,
                     Size = FormatBytes(fileInfo.Length),
                     Status = "Pending Scan",
-                    StatusColor = (SolidColorBrush)FindResource("AppStatusPendingColor"),
+                    StatusColor = TryFindResource("AppStatusPendingColor") as SolidColorBrush ?? new SolidColorBrush(Colors.Gray),
                     // RemoveCommand will be set after initialization
                 };
                 // NEW: Set the command after the object is initialized to avoid the closure issue
@@ -328,13 +327,14 @@ namespace PackItPro
 
                     // NEW: Call the Packager class
                     // NEW: Pass admin requirement based on UI/Settings (example: reading the checkbox directly here, or use _settings.RequiresAdmin if bound correctly)
+                    // Ensure the UI element name matches your XAML
                     bool requiresAdmin = RequireAdminCheckBox.IsChecked == true; // Or _settings.RequiresAdmin if properly bound
                     var outputPath = await Packager.CreatePackageAsync(
                         _fileItems.Select(f => f.FilePath).ToList(),
                         _settings.OutputLocation,
                         Path.GetFileNameWithoutExtension(saveDialog.FileName),
                         requiresAdmin: requiresAdmin, // Use the value from the checkbox or settings
-                        useLZMACompression: _settings.UseLZMACompression // <-- Added missing argument, relies on UI updating _settings
+                        useLZMACompression: _settings.UseLZMACompression // <-- Added missing argument, relies on UI updating _settings via event handlers
                     );
 
                     MessageBox.Show($"Package created successfully!\n{outputPath}",
@@ -375,23 +375,42 @@ namespace PackItPro
             var totalSize = _fileItems.Sum(f => new FileInfo(f.FilePath).Length);
             FileCountTextBlock.Text = _fileItems.Count.ToString();
             TotalSizeTextBlock.Text = FormatBytes(totalSize);
-
             // Count clean files - Logic remains, but UI update is skipped if SafeFilesTextBlock is missing
             int cleanCount = _fileItems.Count(f => !f.IsInfected && f.Status != "Skipped Scan" && f.Status != "Scan Failed");
-            int infectedCount = _fileItems.Count(f => f.IsInfected);
+            int infectedCount = _fileItems.Count(f => f.IsInfected); // NEW: Calculate infected count too
 
             // NEW: Check if SafeFilesTextBlock exists before trying to update it (Fixes error)
-            if (SafeFilesTextBlock != null) // Assuming SafeFilesTextBlock exists in XAML
+            var safeFilesBlock = FindName("SafeFilesTextBlock") as TextBlock; // Find the element by name
+            if (safeFilesBlock != null) // Check if the XAML element exists
             {
-                SafeFilesTextBlock.Text = cleanCount.ToString();
+                safeFilesBlock.Text = cleanCount.ToString();
+                safeFilesBlock.Foreground = cleanCount == _fileItems.Count ?
+                    (SolidColorBrush)FindResource("AppStatusCleanColor") :
+                    (SolidColorBrush)FindResource("AppStatusWarningColor");
             }
             else
             {
-                LogInfo($"UpdateSummary: Total Files = {_fileItems.Count}, Clean Files = {cleanCount}, Infected Files = {infectedCount}"); // Optional: Log for debugging if UI element is missing
+                LogInfo($"UpdateSummary: Total Files = {_fileItems.Count}, Clean Files = {cleanCount}, Infected Files = {infectedCount}"); // Log if UI element is missing
             }
 
+            // NEW: Check if InfectedFilesTextBlock exists before trying to update it (Fixes error)
+            var infectedFilesBlock = FindName("InfectedFilesTextBlock") as TextBlock; // Assuming this might exist in XAML
+            if (infectedFilesBlock != null)
+            {
+                infectedFilesBlock.Text = infectedCount.ToString();
+                infectedFilesBlock.Foreground = infectedCount > 0 ?
+                    (SolidColorBrush)FindResource("AppStatusErrorColor") :
+                    (SolidColorBrush)FindResource("AppStatusCleanColor");
+            }
+            // Optional: Log infected count too if no UI element
+            // else
+            // {
+            //     LogInfo($"UpdateSummary: Infected Files = {infectedCount}");
+            // }
+
+
             StatusTextBlock.Text = _fileItems.Any(f => f.IsInfected) ?
-                "Infected Files Detected" : "Ready";
+                "⚠️ Infected Files" : "Ready";
             StatusTextBlock.Foreground = _fileItems.Any(f => f.IsInfected)
                     ? (SolidColorBrush)FindResource("AppStatusErrorColor")
                     : (SolidColorBrush)FindResource("AppStatusCleanColor");
@@ -421,6 +440,129 @@ namespace PackItPro
                 StatusMessageTextBlock.Text = "Ready to create .packitexe package";
             });
         }
+        #endregion
+
+        #region Settings Synchronization (NEW)
+        // NEW: Method to sync settings object values to UI controls (Handles potentially missing XAML elements)
+        private void SyncSettingsToUI()
+        {
+            // Check if UI elements exist before setting their properties
+            if (RequireAdminCheckBox != null) RequireAdminCheckBox.IsChecked = _settings.RequiresAdmin;
+            if (IncludeWingetUpdaterCheckBox != null) IncludeWingetUpdaterCheckBox.IsChecked = _settings.IncludeWingetUpdateScript;
+
+            // NEW: Handle potentially missing checkboxes gracefully
+            var useLZMABox = FindName("UseLZMACompressionCheckBox") as CheckBox;
+            if (useLZMABox != null) useLZMABox.IsChecked = _settings.UseLZMACompression;
+
+            var onlyScanExecBox = FindName("OnlyScanExecutablesCheckBox") as CheckBox;
+            if (onlyScanExecBox != null) onlyScanExecBox.IsChecked = _settings.OnlyScanExecutables;
+
+            var autoRemoveInfectedBox = FindName("AutoRemoveInfectedFilesCheckBox") as CheckBox;
+            if (autoRemoveInfectedBox != null) autoRemoveInfectedBox.IsChecked = _settings.AutoRemoveInfectedFiles;
+
+            // Add other settings syncs here as needed, checking for null UI elements
+        }
+
+        // NEW: Event handlers for each checkbox to update the settings object and save (Handles potentially missing XAML elements)
+        private void RequireAdminCheckBox_Checked(object sender, RoutedEventArgs e)
+        {
+            if (sender is CheckBox cb && cb.IsChecked == true)
+            {
+                _settings.RequiresAdmin = true;
+                SaveSettings(); // Save settings immediately when changed
+            }
+        }
+
+        private void RequireAdminCheckBox_Unchecked(object sender, RoutedEventArgs e)
+        {
+            if (sender is CheckBox cb && cb.IsChecked == false)
+            {
+                _settings.RequiresAdmin = false;
+                SaveSettings(); // Save settings immediately when changed
+            }
+        }
+
+        private void IncludeWingetUpdaterCheckBox_Checked(object sender, RoutedEventArgs e)
+        {
+            if (sender is CheckBox cb && cb.IsChecked == true)
+            {
+                _settings.IncludeWingetUpdateScript = true;
+                SaveSettings();
+            }
+        }
+
+        private void IncludeWingetUpdaterCheckBox_Unchecked(object sender, RoutedEventArgs e)
+        {
+            if (sender is CheckBox cb && cb.IsChecked == false)
+            {
+                _settings.IncludeWingetUpdateScript = false;
+                SaveSettings();
+            }
+        }
+
+        // NEW: Handle potentially missing checkboxes gracefully
+        private void UseLZMACompressionCheckBox_Checked(object sender, RoutedEventArgs e)
+        {
+            // Find the checkbox in XAML and update settings if it exists
+            var checkBox = FindName("UseLZMACompressionCheckBox") as CheckBox;
+            if (checkBox != null && checkBox.IsChecked == true)
+            {
+                _settings.UseLZMACompression = true;
+                SaveSettings();
+            }
+        }
+
+        private void UseLZMACompressionCheckBox_Unchecked(object sender, RoutedEventArgs e)
+        {
+            var checkBox = FindName("UseLZMACompressionCheckBox") as CheckBox;
+            if (checkBox != null && checkBox.IsChecked == false)
+            {
+                _settings.UseLZMACompression = false;
+                SaveSettings();
+            }
+        }
+
+        private void OnlyScanExecutablesCheckBox_Checked(object sender, RoutedEventArgs e)
+        {
+            var checkBox = FindName("OnlyScanExecutablesCheckBox") as CheckBox;
+            if (checkBox != null && checkBox.IsChecked == true)
+            {
+                _settings.OnlyScanExecutables = true;
+                SaveSettings();
+            }
+        }
+
+        private void OnlyScanExecutablesCheckBox_Unchecked(object sender, RoutedEventArgs e)
+        {
+            var checkBox = FindName("OnlyScanExecutablesCheckBox") as CheckBox;
+            if (checkBox != null && checkBox.IsChecked == false)
+            {
+                _settings.OnlyScanExecutables = false;
+                SaveSettings();
+            }
+        }
+
+        private void AutoRemoveInfectedFilesCheckBox_Checked(object sender, RoutedEventArgs e)
+        {
+            var checkBox = FindName("AutoRemoveInfectedFilesCheckBox") as CheckBox;
+            if (checkBox != null && checkBox.IsChecked == true)
+            {
+                _settings.AutoRemoveInfectedFiles = true;
+                SaveSettings();
+            }
+        }
+
+        private void AutoRemoveInfectedFilesCheckBox_Unchecked(object sender, RoutedEventArgs e)
+        {
+            var checkBox = FindName("AutoRemoveInfectedFilesCheckBox") as CheckBox;
+            if (checkBox != null && checkBox.IsChecked == false)
+            {
+                _settings.AutoRemoveInfectedFiles = false;
+                SaveSettings();
+            }
+        }
+
+        // Add other checkbox event handlers similarly...
         #endregion
 
         #region Event Handlers
@@ -465,7 +607,8 @@ namespace PackItPro
             if (e.Data.GetData(DataFormats.FileDrop) is string[] files)
             {
                 AddFilesWithValidation(files);
-                if (IncludeWingetUpdaterCheckBox.IsChecked == true) // NEW: Changed from ScanWithVirusTotalCheckBox
+                // NEW: Changed to use IncludeWingetUpdaterCheckBox
+                if (IncludeWingetUpdaterCheckBox.IsChecked == true)
                     _ = ScanFilesWithVirusTotal();
             }
         }
@@ -481,7 +624,8 @@ namespace PackItPro
             if (openFileDialog.ShowDialog() == true)
             {
                 AddFilesWithValidation(openFileDialog.FileNames);
-                if (IncludeWingetUpdaterCheckBox.IsChecked == true) // NEW: Changed from ScanWithVirusTotalCheckBox
+                // NEW: Changed to use IncludeWingetUpdaterCheckBox
+                if (IncludeWingetUpdaterCheckBox.IsChecked == true)
                     _ = ScanFilesWithVirusTotal();
             }
         }
@@ -600,115 +744,6 @@ namespace PackItPro
                 "About PackItPro", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
-        #endregion
-
-        #region Settings Synchronization (NEW)
-        // NEW: Method to sync settings object values to UI controls (Handles potentially missing XAML elements)
-        private void SyncSettingsToUI()
-        {
-            // Check if UI elements exist before setting their properties
-            if (RequireAdminCheckBox != null) RequireAdminCheckBox.IsChecked = _settings.RequiresAdmin;
-            if (IncludeWingetUpdaterCheckBox != null) IncludeWingetUpdaterCheckBox.IsChecked = _settings.IncludeWingetUpdateScript;
-            // NEW: Handle potentially missing checkboxes gracefully
-            if (UseLZMACompressionCheckBox != null) UseLZMACompressionCheckBox.IsChecked = _settings.UseLZMACompression;
-            if (OnlyScanExecutablesCheckBox != null) OnlyScanExecutablesCheckBox.IsChecked = _settings.OnlyScanExecutables;
-            if (AutoRemoveInfectedFilesCheckBox != null) AutoRemoveInfectedFilesCheckBox.IsChecked = _settings.AutoRemoveInfectedFiles;
-            // Add other settings syncs here as needed, checking for null UI elements
-        }
-
-        // NEW: Event handlers for each checkbox to update the settings object and save (Handles potentially missing XAML elements)
-        private void RequireAdminCheckBox_Checked(object sender, RoutedEventArgs e)
-        {
-            if (sender is CheckBox cb && cb.IsChecked == true) // Check if sender is CheckBox and is checked
-            {
-                _settings.RequiresAdmin = true;
-                SaveSettings(); // Save settings immediately when changed
-            }
-        }
-
-        private void RequireAdminCheckBox_Unchecked(object sender, RoutedEventArgs e)
-        {
-            if (sender is CheckBox cb && cb.IsChecked == false) // Check if sender is CheckBox and is unchecked
-            {
-                _settings.RequiresAdmin = false;
-                SaveSettings(); // Save settings immediately when changed
-            }
-        }
-
-        private void IncludeWingetUpdaterCheckBox_Checked(object sender, RoutedEventArgs e)
-        {
-            if (sender is CheckBox cb && cb.IsChecked == true)
-            {
-                _settings.IncludeWingetUpdateScript = true;
-                SaveSettings();
-            }
-        }
-
-        private void IncludeWingetUpdaterCheckBox_Unchecked(object sender, RoutedEventArgs e)
-        {
-            if (sender is CheckBox cb && cb.IsChecked == false)
-            {
-                _settings.IncludeWingetUpdateScript = false;
-                SaveSettings();
-            }
-        }
-
-        // NEW: Handle potentially missing checkboxes gracefully
-        private void UseLZMACompressionCheckBox_Checked(object sender, RoutedEventArgs e)
-        {
-            if (sender is CheckBox cb && cb.IsChecked == true)
-            {
-                _settings.UseLZMACompression = true;
-                SaveSettings();
-            }
-        }
-
-        private void UseLZMACompressionCheckBox_Unchecked(object sender, RoutedEventArgs e)
-        {
-            if (sender is CheckBox cb && cb.IsChecked == false)
-            {
-                _settings.UseLZMACompression = false;
-                SaveSettings();
-            }
-        }
-
-        private void OnlyScanExecutablesCheckBox_Checked(object sender, RoutedEventArgs e)
-        {
-            if (sender is CheckBox cb && cb.IsChecked == true)
-            {
-                _settings.OnlyScanExecutables = true;
-                SaveSettings();
-            }
-        }
-
-        private void OnlyScanExecutablesCheckBox_Unchecked(object sender, RoutedEventArgs e)
-        {
-            if (sender is CheckBox cb && cb.IsChecked == false)
-            {
-                _settings.OnlyScanExecutables = false;
-                SaveSettings();
-            }
-        }
-
-        private void AutoRemoveInfectedFilesCheckBox_Checked(object sender, RoutedEventArgs e)
-        {
-            if (sender is CheckBox cb && cb.IsChecked == true)
-            {
-                _settings.AutoRemoveInfectedFiles = true;
-                SaveSettings();
-            }
-        }
-
-        private void AutoRemoveInfectedFilesCheckBox_Unchecked(object sender, RoutedEventArgs e)
-        {
-            if (sender is CheckBox cb && cb.IsChecked == false)
-            {
-                _settings.AutoRemoveInfectedFiles = false;
-                SaveSettings();
-            }
-        }
-
-        // Add other checkbox event handlers similarly...
         #endregion
 
         #region Missing Event Handlers (NEW)

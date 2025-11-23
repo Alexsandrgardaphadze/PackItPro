@@ -12,18 +12,6 @@
         MinWidth="900" MinHeight="600">
 
     <Window.Resources>
-        <!-- Color Resources -->
-        <SolidColorBrush x:Key="AppStatusPendingColor" Color="#FFA500"/>
-        <SolidColorBrush x:Key="AppStatusCleanColor" Color="#00C176"/>
-        <SolidColorBrush x:Key="AppStatusErrorColor" Color="#E74C3C"/>
-        <SolidColorBrush x:Key="AppStatusWarningColor" Color="#F39C12"/>
-        <SolidColorBrush x:Key="AppTextColor" Color="White"/>
-        <SolidColorBrush x:Key="AppTextTertiaryColor" Color="#9F9FAF"/>
-        <SolidColorBrush x:Key="AppBackgroundColor" Color="#1E1E2F"/>
-        <SolidColorBrush x:Key="AppBorderColor" Color="#3F3F5A"/>
-        <SolidColorBrush x:Key="AppPanelColor" Color="#252536"/>
-        <SolidColorBrush x:Key="AppDropAreaHoverColor" Color="#0078D7"/>
-        <SolidColorBrush x:Key="AppPrimaryColor" Color="#0078D7"/>
 
         <!-- ToolTip Style -->
         <Style TargetType="ToolTip">

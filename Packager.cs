@@ -7,7 +7,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Security.Cryptography;
+// REMOVED: System.Security.Cryptography (moved to FileHasher)
 using System.Text; // For Encoding
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -47,11 +47,8 @@ namespace PackItPro
                 // Then we put this hash INTO the manifest, and re-create the zip.
                 var initialManifestPath = Path.Combine(tempDir, "packitmeta.json");
                 await File.WriteAllTextAsync(initialManifestPath, manifestJson);
-                // NEW: Use the ComputeDirectoryHash from VirusTotalClient or a shared utility
-                // Assuming VirusTotalClient.ComputeDirectoryHash is static and public, or moved to a util class
-                // If it's not static, you'd need an instance or pass it in.
-                // For now, assuming static public.
-                var initialDirHash = Convert.ToBase64String(ComputeDirectoryHash(tempDir)); // Reuse the hash function from VirusTotalClient or move to Utils
+                // NEW: Use the FileHasher.ComputeDirectoryHash
+                var initialDirHash = Convert.ToBase64String(FileHasher.ComputeDirectoryHash(tempDir)); // Reuse the hash function from FileHasher
                 LogInfo($"Calculated initial directory hash for integrity check: {initialDirHash}"); // Log the initial hash
 
                 // Deserialize manifest, update with hash, serialize again
@@ -166,49 +163,7 @@ namespace PackItPro
             Debug.WriteLine($"[Packager] INFO: {message}");
         }
 
-        // NEW: Helper function to compute directory hash (moved from VirusTotalClient or made static here)
-        // This function calculates a deterministic hash based on file content AND relative path.
-        private static byte[] ComputeDirectoryHash(string directoryPath)
-        {
-            using var sha256 = SHA256.Create();
-            var fileHashes = new List<byte[]>();
-
-            var files = Directory.GetFiles(directoryPath, "*", SearchOption.AllDirectories);
-            Array.Sort(files, StringComparer.OrdinalIgnoreCase); // Sort filenames to ensure consistent order
-
-            foreach (var filePath in files)
-            {
-                var fileContentHash = ComputeFileHash(filePath);
-                var relativePath = Path.GetRelativePath(directoryPath, filePath).ToLowerInvariant();
-                var pathBytes = Encoding.UTF8.GetBytes(relativePath);
-
-                using var tempStream = new MemoryStream();
-                tempStream.Write(pathBytes, 0, pathBytes.Length);
-                tempStream.Write(fileContentHash, 0, fileContentHash.Length);
-                tempStream.Position = 0;
-
-                var combinedHash = sha256.ComputeHash(tempStream);
-                fileHashes.Add(combinedHash);
-            }
-
-            fileHashes.Sort((x, y) => Comparer<byte[]>.Default.Compare(x, y));
-
-            using var finalStream = new MemoryStream();
-            foreach (var hash in fileHashes)
-            {
-                finalStream.Write(hash, 0, hash.Length);
-            }
-            finalStream.Position = 0;
-
-            return sha256.ComputeHash(finalStream);
-        }
-
-        // NEW: Helper function to compute file hash
-        private static byte[] ComputeFileHash(string filePath)
-        {
-            using var fileStream = File.OpenRead(filePath);
-            using var sha256 = SHA256.Create();
-            return sha256.ComputeHash(fileStream);
-        }
+        // REMOVED: ComputeDirectoryHash method (moved to FileHasher)
+        // REMOVED: ComputeFileHash method (moved to FileHasher)
     }
 }
