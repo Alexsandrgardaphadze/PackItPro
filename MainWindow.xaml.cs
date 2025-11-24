@@ -476,7 +476,7 @@ namespace PackItPro
         }
         #endregion
 
-        // ... rest of MainWindow.xaml.cs ...
+
 
         #region Settings Synchronization (NEW)
         // NEW: Method to sync settings object values to UI controls (Handles potentially missing XAML elements)

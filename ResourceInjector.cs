@@ -1,36 +1,31 @@
 ﻿// ResourceInjector.cs
 using System;
 using System.IO;
-using Vestris.ResourceLib; // Requires installing the NuGet package
 
 namespace PackItPro
 {
     public static class ResourceInjector
     {
+        // Appends the payload zip to the stub executable
         public static void InjectPayload(string stubPath, string payloadZipPath, string outputPath)
         {
+            // Step 1: Copy the stub to the output path
             File.Copy(stubPath, outputPath, overwrite: true);
+
+            // Step 2: Read the payload zip data
             var payloadBytes = File.ReadAllBytes(payloadZipPath);
 
-            using var ri = new ResourceInfo();
-            ri.Load(outputPath);
+            // Step 3: Append payload, size, and marker to the output file
+            var payloadSize = payloadBytes.Length;
+            var payloadSizeBytes = BitConverter.GetBytes(payloadSize);
+            var magicMarker = System.Text.Encoding.UTF8.GetBytes("PACKIT_END"); // 10-byte marker
 
-            var resource = new GenericResource(
-                new ResourceId("PAYLOAD"), // Resource Name
-                new ResourceId((IntPtr)10), // RT_RCDATA (integer ID 10)
-                0x0409 // Language ID (0x0409 = English US)
-            );
-            resource.Data = payloadBytes;
-
-            // Ensure the resource collection for RT_RCDATA exists
-            var rcDataId = new ResourceId((IntPtr)10);
-            if (!ri.Resources.ContainsKey(rcDataId))
+            using (var fs = new FileStream(outputPath, FileMode.Append, FileAccess.Write))
             {
-                ri.Resources.Add(rcDataId, new System.Collections.Generic.List<Resource>());
+                fs.Write(payloadBytes, 0, payloadBytes.Length);      // payload data
+                fs.Write(payloadSizeBytes, 0, payloadSizeBytes.Length); // payload size
+                fs.Write(magicMarker, 0, magicMarker.Length);       // marker
             }
-            ri.Resources[rcDataId].Add(resource);
-
-            ri.Save(outputPath);
         }
     }
 }
