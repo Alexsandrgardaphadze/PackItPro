@@ -55,7 +55,7 @@ namespace PackItPro
         }
 
         // NEW: Method to scan a single file
-        public async Task<VirusScanResult> ScanFileAsync(string filePath, string apiKey, bool onlyScanExecutables = true, int minDetectionsToFlag = 1)
+        public async Task<VirusScanResult> ScanFileAsync(string filePath, string apiKey, bool onlyScanExecutables = true, int minDetectionsToFlag =1)
         {
             if (onlyScanExecutables && !IsExecutableExtension(filePath))
             {
@@ -65,8 +65,8 @@ namespace PackItPro
                 return new VirusScanResult
                 {
                     FileHash = fileHashString, // Store as string
-                    Positives = 0,
-                    TotalScans = 0,
+                    Positives =0,
+                    TotalScans =0,
                     ScanDate = DateTime.UtcNow,
                     Error = "Skipped (Not Executable)",
                     IsInfected = false // Skipped files are not infected
@@ -77,7 +77,8 @@ namespace PackItPro
             string hash = BitConverter.ToString(FileHasher.ComputeFileHash(filePath)).Replace("-", "").ToLowerInvariant();
             VirusScanResult result;
 
-            if (_scanCache.TryGetValue(hash, out var cachedResult))
+            // Safely handle cached entries that might be null
+            if (_scanCache.TryGetValue(hash, out var cachedResult) && cachedResult != null)
             {
                 result = cachedResult;
             }
@@ -92,7 +93,11 @@ namespace PackItPro
                     try
                     {
                         result = await QueryVirusTotalAsync(filePath, hash, apiKey);
-                        _scanCache[hash] = result; // Cache the result (using the string hash as the key)
+                        // Only cache non-null results
+                        if (result != null)
+                        {
+                            _scanCache[hash] = result; // Cache the result (using the string hash as the key)
+                        }
                     }
                     finally
                     {
@@ -107,6 +112,7 @@ namespace PackItPro
             }
 
             // Determine if it's infected based on the result and settings
+            result ??= new VirusScanResult { FileHash = hash, Positives = 0, TotalScans = 0, ScanDate = DateTime.UtcNow, IsInfected = false };
             result.IsInfected = result.Positives >= minDetectionsToFlag;
             return result;
         }
@@ -115,10 +121,20 @@ namespace PackItPro
         private async Task<VirusScanResult> QueryVirusTotalAsync(string filePath, string hash, string apiKey)
         {
             // Ensure API key is set for this call if passed
-            if (apiKey != _httpClient.DefaultRequestHeaders.GetValues("x-apikey").FirstOrDefault())
+            // In QueryVirusTotalAsync: safely read existing header values
+            string? existingApiKey = null;
+            if (_httpClient.DefaultRequestHeaders.TryGetValues("x-apikey", out var vals))
+            {
+                existingApiKey = vals.FirstOrDefault();
+            }
+
+            if (apiKey != existingApiKey)
             {
                 _httpClient.DefaultRequestHeaders.Remove("x-apikey");
-                _httpClient.DefaultRequestHeaders.Add("x-apikey", apiKey);
+                if (!string.IsNullOrEmpty(apiKey))
+                {
+                    _httpClient.DefaultRequestHeaders.Add("x-apikey", apiKey);
+                }
             }
 
             try
@@ -151,25 +167,33 @@ namespace PackItPro
                     "https://www.virustotal.com/api/v3/files", formData);
                 uploadResponse.EnsureSuccessStatusCode();
 
-                var analysisId = (await uploadResponse.Content.ReadFromJsonAsync<VirusTotalUploadResponse>()).Data.Id;
+                var uploadResult = await uploadResponse.Content.ReadFromJsonAsync<VirusTotalUploadResponse>();
+                if (uploadResult?.Data?.Id == null)
+                    throw new InvalidDataException("VirusTotal upload response missing analysis ID");
+
+                var analysisId = uploadResult.Data.Id;
 
                 // Poll for results
-                for (int i = 0; i < 10; i++)
+                for (int i =0; i <10; i++)
                 {
                     await Task.Delay(5000);
                     var analysisResponse = await _httpClient.GetAsync(
-                        $"https://www.virustotal.com/api/v3/analyses/{analysisId}"); // Fixed URL - Uses string analysisId
+                        $"https://www.virustotal.com/api/v3/analyses/{analysisId}");
 
                     if (analysisResponse.IsSuccessStatusCode)
                     {
                         var analysis = await analysisResponse.Content.ReadFromJsonAsync<VirusTotalFileReport>();
-                        return new VirusScanResult
+                        if (analysis?.Data?.Attributes?.LastAnalysisStats != null)
                         {
-                            FileHash = hash, // Return the string hash
-                            Positives = analysis.Data.Attributes.LastAnalysisStats.Malicious,
-                            TotalScans = analysis.Data.Attributes.LastAnalysisStats.Total,
-                            ScanDate = DateTime.UtcNow
-                        };
+                            return new VirusScanResult
+                            {
+                                FileHash = hash,
+                                Positives = analysis.Data.Attributes.LastAnalysisStats.Malicious,
+                                TotalScans = analysis.Data.Attributes.LastAnalysisStats.Total,
+                                ScanDate = DateTime.UtcNow
+                            };
+                        }
+                        // Optionally, handle incomplete analysis data here
                     }
                 }
 
@@ -182,8 +206,8 @@ namespace PackItPro
                 return new VirusScanResult
                 {
                     FileHash = hash, // Use the string hash passed in
-                    Positives = 0,
-                    TotalScans = 0,
+                    Positives =0,
+                    TotalScans =0,
                     Error = ex.Message,
                     ScanDate = DateTime.UtcNow,
                     IsInfected = false // Error does not imply infection

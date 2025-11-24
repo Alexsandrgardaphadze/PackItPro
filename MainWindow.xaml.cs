@@ -20,6 +20,7 @@ using System.Windows.Media.Animation;
 using System.Net.Http.Json;
 using Microsoft.Win32;
 using Microsoft.WindowsAPICodePack.Dialogs;
+using System.Security.Cryptography;
 
 // Uncommon or special-case
 // using static System.Windows.Forms.VisualStyles.VisualStyleElement.TrayNotify; // This line is likely incorrect and removed
@@ -95,7 +96,7 @@ namespace PackItPro
             {
                 // NEW: Initialize VirusTotalClient FIRST, before loading settings/cache
                 // This allows LoadSettingsAndCacheAsync to use the client instance for loading cache.
-                _virusTotalClient = new VirusTotalClient(_cacheFilePath, apiKey: null); // Initialize with a dummy key or null, set it after loading settings
+                _virusTotalClient = new VirusTotalClient(_cacheFilePath, apiKey: string.Empty); // Initialize with an empty string, set it after loading settings
 
                 await LoadSettingsAndCacheAsync(); // This will now correctly load the cache using the client instance
 
@@ -158,7 +159,7 @@ namespace PackItPro
                     StatusColor = (SolidColorBrush)FindResource("AppStatusPendingColor"),
                     // RemoveCommand will be set after initialization
                 };
-                // NEW: Set the command after the object is initialized to avoid the closure issue
+                // NEW: Set the command AFTER the object is fully initialized to capture the correct 'fileItem' instance in the closure
                 fileItem.RemoveCommand = new RelayCommand((param) => RemoveFile(fileItem));
                 _fileItems.Add(fileItem);
             }
@@ -263,7 +264,6 @@ namespace PackItPro
                 {
                     processed++;
                     UpdateProgress(processed, totalFiles, "Scanning");
-                    // REMOVED: Time tracking logic for rate limiter reset (handled by client)
                 }
             }
 
@@ -292,7 +292,7 @@ namespace PackItPro
         }
 
         // REMOVED: QueryVirusTotal method (moved to VirusTotalClient)
-        // REMOVED: ComputeSHA256 method (likely used by VirusTotalClient or Packager) - KEEP IF NEEDED ELSEWHERE, MOVE TO UTILS OTHERWISE
+        // REMOVED: ComputeSHA256 method (likely used by VirusTotalClient or Packager) - KEEP IF NEEDED ELESWHERE, MOVE TO UTILS OTHERWISE
         #endregion
 
         #region Packaging Implementation (Refactored Call)
@@ -327,7 +327,6 @@ namespace PackItPro
 
                     // NEW: Call the Packager class
                     // NEW: Pass admin requirement based on UI/Settings (example: reading the checkbox directly here, or use _settings.RequiresAdmin if bound correctly)
-                    // Ensure the UI element name matches your XAML
                     bool requiresAdmin = RequireAdminCheckBox.IsChecked == true; // Or _settings.RequiresAdmin if properly bound
                     var outputPath = await Packager.CreatePackageAsync(
                         _fileItems.Select(f => f.FilePath).ToList(),
@@ -370,7 +369,6 @@ namespace PackItPro
             });
         }
 
-        // FIXED: UpdateSummary to use correct TextBlock names from XAML
         private void UpdateSummary()
         {
             var totalSize = _fileItems.Sum(f => new FileInfo(f.FilePath).Length);
@@ -381,62 +379,18 @@ namespace PackItPro
             int cleanCount = _fileItems.Count(f => !f.IsInfected && f.Status != "Skipped Scan" && f.Status != "Scan Failed");
             int infectedCount = _fileItems.Count(f => f.IsInfected); // NEW: Calculate infected count too
 
-            // NEW: Check if CleanFilesTextBlock exists before trying to update it (Fixes error)
-            var cleanFilesBlock = FindName("CleanFilesTextBlock") as TextBlock; // Find the element by name (assuming XAML has CleanFilesTextBlock)
-            if (cleanFilesBlock != null) // Check if the XAML element exists
+            // NEW: Check if SafeFilesTextBlock exists before trying to update it (Fixes error)
+            var safeFilesBlock = FindName("SafeFilesTextBlock") as TextBlock; // Find the element by name (assuming XAML has SafeFilesTextBlock)
+            if (safeFilesBlock != null) // Check if the XAML element exists
             {
-                cleanFilesBlock.Text = $"{cleanCount}/{_fileItems.Count}"; // Update with clean count
-                cleanFilesBlock.Foreground = cleanCount == _fileItems.Count ?
+                safeFilesBlock.Text = $"{cleanCount}/{_fileItems.Count}"; // Update with clean count
+                safeFilesBlock.Foreground = cleanCount == _fileItems.Count ?
                     (SolidColorBrush)FindResource("AppStatusCleanColor") :
                     (SolidColorBrush)FindResource("AppStatusWarningColor");
             }
             else
             {
                 LogInfo($"UpdateSummary: Total Files = {_fileItems.Count}, Clean Files = {cleanCount}, Infected Files = {infectedCount}"); // Log if UI element is missing
-            }
-
-            // NEW: Check if PackageSizeTextBlock exists (as per XAML) and update it, otherwise log
-            var packageSizeBlock = FindName("PackageSizeTextBlock") as TextBlock; // Assuming this name exists in XAML
-            if (packageSizeBlock != null)
-            {
-                // Estimate final size based on current total and potential compression
-                var estimatedFinalSize = (long)(totalSize * 1.05); // Example: Add 5% for metadata
-                packageSizeBlock.Text = $"~{FormatBytes(estimatedFinalSize)}";
-            }
-            else
-            {
-                LogInfo($"UpdateSummary: Estimated Final Size (approx) = {FormatBytes((long)(totalSize * 1.05))}");
-            }
-
-            // NEW: Check if EstTimeTextBlock exists (as per XAML) and update it, otherwise log
-            var estTimeBlock = FindName("EstTimeTextBlock") as TextBlock; // Assuming this name exists in XAML
-            if (estTimeBlock != null)
-            {
-                // Estimate time based on file count (example: 2 minutes per file)
-                var estimatedTimeMinutes = Math.Max(1, _fileItems.Count * 2); // At least 1 minute
-                estTimeBlock.Text = $"~{estimatedTimeMinutes} min";
-            }
-            else
-            {
-                LogInfo($"UpdateSummary: Estimated Time (approx) = ~{Math.Max(1, _fileItems.Count * 2)} min");
-            }
-
-            // NEW: Check if RequiresAdminTextBlock exists (as per XAML) and update it, otherwise log
-            var requiresAdminBlock = FindName("RequiresAdminTextBlock") as TextBlock; // Assuming this name exists in XAML
-            if (requiresAdminBlock != null)
-            {
-                // Estimate admin requirement based on file types (e.g., any .msi)
-                bool estimatedRequiresAdmin = _fileItems.Any(f => Path.GetExtension(f.FilePath).Equals(".msi", StringComparison.OrdinalIgnoreCase));
-                requiresAdminBlock.Text = estimatedRequiresAdmin ? "Yes" : "No";
-                requiresAdminBlock.Foreground = estimatedRequiresAdmin ?
-                    (SolidColorBrush)FindResource("AppStatusWarningColor") : // Highlight if admin is likely needed
-                    (SolidColorBrush)FindResource("AppStatusCleanColor");
-            }
-            else
-            {
-                // Log the estimated requirement if no UI element
-                bool estimatedRequiresAdmin = _fileItems.Any(f => Path.GetExtension(f.FilePath).Equals(".msi", StringComparison.OrdinalIgnoreCase));
-                LogInfo($"UpdateSummary: Estimated Admin Requirement = {(estimatedRequiresAdmin ? "Yes" : "No")}");
             }
 
             StatusTextBlock.Text = _fileItems.Any(f => f.IsInfected) ?
@@ -479,7 +433,8 @@ namespace PackItPro
             // Check if UI elements exist before setting their properties
             if (RequireAdminCheckBox != null) RequireAdminCheckBox.IsChecked = _settings.RequiresAdmin;
             if (IncludeWingetUpdaterCheckBox != null) IncludeWingetUpdaterCheckBox.IsChecked = _settings.IncludeWingetUpdateScript;
-            // NEW: Handle potentially missing checkboxes gracefully
+
+            // NEW: Handle potentially missing checkboxes gracefully using FindName
             var useLZMABox = FindName("UseLZMACompressionCheckBox") as CheckBox;
             if (useLZMABox != null) useLZMABox.IsChecked = _settings.UseLZMACompression;
 
@@ -488,6 +443,14 @@ namespace PackItPro
 
             var autoRemoveInfectedBox = FindName("AutoRemoveInfectedFilesCheckBox") as CheckBox;
             if (autoRemoveInfectedBox != null) autoRemoveInfectedBox.IsChecked = _settings.AutoRemoveInfectedFiles;
+
+            // NEW: Handle potentially missing comboboxes gracefully using FindName
+            var compressionCombo = FindName("CompressionComboBox") as ComboBox;
+            if (compressionCombo != null && compressionCombo.Items.Count > 0)
+            {
+                // Example mapping: Assume UseLZMACompression (bool) maps to Index 2 (Maximum), else Index 1 (Fast)
+                compressionCombo.SelectedIndex = _settings.UseLZMACompression ? 2 : 1;
+            }
 
             // Add other settings syncs here as needed, checking for null UI elements
         }
@@ -529,10 +492,9 @@ namespace PackItPro
             }
         }
 
-        // NEW: Handle potentially missing checkboxes gracefully
+        // NEW: Handle potentially missing checkboxes gracefully using FindName
         private void UseLZMACompressionCheckBox_Checked(object sender, RoutedEventArgs e)
         {
-            // Find the checkbox in XAML and update settings if it exists
             var checkBox = FindName("UseLZMACompressionCheckBox") as CheckBox;
             if (checkBox != null && checkBox.IsChecked == true)
             {
@@ -587,6 +549,18 @@ namespace PackItPro
             if (checkBox != null && checkBox.IsChecked == false)
             {
                 _settings.AutoRemoveInfectedFiles = false;
+                SaveSettings();
+            }
+        }
+
+        // NEW: Event handler for Combobox selection change
+        private void CompressionComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            var comboBox = sender as ComboBox;
+            if (comboBox != null && comboBox.SelectedItem is ComboBoxItem selectedItem)
+            {
+                // Example mapping: Assume Index 2 (Maximum) means UseLZMACompression = true, Index 1 (Fast) means false
+                _settings.UseLZMACompression = comboBox.SelectedIndex == 2; // Adjust mapping as needed
                 SaveSettings();
             }
         }
@@ -773,7 +747,7 @@ namespace PackItPro
 
         #endregion
 
-        #region Missing Event Handlers (NEW)
+        #region Missing Event Handlers (NEW - Added to match XAML)
         // NEW: Placeholder methods for event handlers referenced in XAML but missing in code-behind
         // These prevent the build errors. You can implement the actual logic later.
 
@@ -1106,6 +1080,28 @@ namespace PackItPro
             get => _isInfected;
             set { _isInfected = value; OnPropertyChanged(); }
         }
+
+        // NEW: Add FileIcon and StatusIcon properties (Fix 9)
+        public string FileIcon => Path.GetExtension(FilePath).ToLower() switch
+        {
+            ".exe" => "⚙️",
+            ".msi" => "📦",
+            ".zip" => "🗜️",
+            ".appx" => "📱",
+            ".msix" => "📱",
+            _ => "📄"
+        };
+
+        public string StatusIcon => Status switch
+        {
+            "Clean" => "✅",
+            "Pending Scan" => "⏳",
+            var s when s.Contains("Infected") => "⚠️",
+            "Scan Failed" => "❌",
+            "Skipped" => "⊝",
+            _ => "❓"
+        };
+
 
         public event PropertyChangedEventHandler? PropertyChanged;
         protected virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string? propertyName = null) =>
