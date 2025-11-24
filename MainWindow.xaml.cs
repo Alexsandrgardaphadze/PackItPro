@@ -358,6 +358,8 @@ namespace PackItPro
         // REMOVED: Logic for creating payload.zip, calculating hash, embedding into stub (moved to Packager, ManifestGenerator, ResourceInjector)
         #endregion
 
+        // Inside MainWindow.xaml.cs, within the MainWindow class
+
         #region UI Management
         private void UpdateUIState()
         {
@@ -370,21 +372,23 @@ namespace PackItPro
             });
         }
 
+        // FIXED: UpdateSummary to use correct TextBlock names from XAML
         private void UpdateSummary()
         {
             var totalSize = _fileItems.Sum(f => new FileInfo(f.FilePath).Length);
             FileCountTextBlock.Text = _fileItems.Count.ToString();
             TotalSizeTextBlock.Text = FormatBytes(totalSize);
-            // Count clean files - Logic remains, but UI update is skipped if SafeFilesTextBlock is missing
-            int cleanCount = _fileItems.Count(f => !f.IsInfected && f.Status != "Skipped Scan" && f.Status != "Scan Failed");
-            int infectedCount = _fileItems.Count(f => f.IsInfected); // NEW: Calculate infected count too
 
-            // NEW: Check if SafeFilesTextBlock exists before trying to update it (Fixes error)
-            var safeFilesBlock = FindName("SafeFilesTextBlock") as TextBlock; // Find the element by name
-            if (safeFilesBlock != null) // Check if the XAML element exists
+            // Count clean files - Logic remains, but UI update is applied to the correct element
+            int cleanCount = _fileItems.Count(f => !f.IsInfected && f.Status != "Skipped Scan" && f.Status != "Scan Failed");
+            int infectedCount = _fileItems.Count(f => f.IsInfected); // Calculate infected count too
+
+            // NEW: Check if CleanFilesTextBlock exists (as per XAML) and update it, otherwise log
+            var cleanFilesBlock = FindName("CleanFilesTextBlock") as TextBlock; // Find the element by name (e.g., CleanFilesTextBlock)
+            if (cleanFilesBlock != null) // Check if the XAML element exists
             {
-                safeFilesBlock.Text = cleanCount.ToString();
-                safeFilesBlock.Foreground = cleanCount == _fileItems.Count ?
+                cleanFilesBlock.Text = $"{cleanCount}/{_fileItems.Count}"; // Update with clean count
+                cleanFilesBlock.Foreground = cleanCount == _fileItems.Count ?
                     (SolidColorBrush)FindResource("AppStatusCleanColor") :
                     (SolidColorBrush)FindResource("AppStatusWarningColor");
             }
@@ -393,28 +397,58 @@ namespace PackItPro
                 LogInfo($"UpdateSummary: Total Files = {_fileItems.Count}, Clean Files = {cleanCount}, Infected Files = {infectedCount}"); // Log if UI element is missing
             }
 
-            // NEW: Check if InfectedFilesTextBlock exists before trying to update it (Fixes error)
-            var infectedFilesBlock = FindName("InfectedFilesTextBlock") as TextBlock; // Assuming this might exist in XAML
-            if (infectedFilesBlock != null)
+            // NEW: Check if PackageSizeTextBlock exists (as per XAML) and update it, otherwise log
+            var packageSizeBlock = FindName("PackageSizeTextBlock") as TextBlock; // Assuming this name exists in XAML
+            if (packageSizeBlock != null)
             {
-                infectedFilesBlock.Text = infectedCount.ToString();
-                infectedFilesBlock.Foreground = infectedCount > 0 ?
-                    (SolidColorBrush)FindResource("AppStatusErrorColor") :
+                // Estimate final size based on current total and potential compression
+                var estimatedFinalSize = (long)(totalSize * 1.05); // Example: Add 5% for metadata
+                packageSizeBlock.Text = $"~{FormatBytes(estimatedFinalSize)}";
+            }
+            else
+            {
+                LogInfo($"UpdateSummary: Estimated Final Size (approx) = {FormatBytes((long)(totalSize * 1.05))}");
+            }
+
+            // NEW: Check if EstTimeTextBlock exists (as per XAML) and update it, otherwise log
+            var estTimeBlock = FindName("EstTimeTextBlock") as TextBlock; // Assuming this name exists in XAML
+            if (estTimeBlock != null)
+            {
+                // Estimate time based on file count (example: 2 minutes per file)
+                var estimatedTimeMinutes = Math.Max(1, _fileItems.Count * 2); // At least 1 minute
+                estTimeBlock.Text = $"~{estimatedTimeMinutes} min";
+            }
+            else
+            {
+                LogInfo($"UpdateSummary: Estimated Time (approx) = ~{Math.Max(1, _fileItems.Count * 2)} min");
+            }
+
+            // NEW: Check if RequiresAdminTextBlock exists (as per XAML) and update it, otherwise log
+            var requiresAdminBlock = FindName("RequiresAdminTextBlock") as TextBlock; // Assuming this name exists in XAML
+            if (requiresAdminBlock != null)
+            {
+                // Estimate admin requirement based on file types (e.g., any .msi)
+                bool estimatedRequiresAdmin = _fileItems.Any(f => Path.GetExtension(f.FilePath).Equals(".msi", StringComparison.OrdinalIgnoreCase));
+                requiresAdminBlock.Text = estimatedRequiresAdmin ? "Yes" : "No";
+                requiresAdminBlock.Foreground = estimatedRequiresAdmin ?
+                    (SolidColorBrush)FindResource("AppStatusWarningColor") : // Highlight if admin is likely needed
                     (SolidColorBrush)FindResource("AppStatusCleanColor");
             }
-            // Optional: Log infected count too if no UI element
-            // else
-            // {
-            //     LogInfo($"UpdateSummary: Infected Files = {infectedCount}");
-            // }
+            else
+            {
+                // Log the estimated requirement if no UI element
+                bool estimatedRequiresAdmin = _fileItems.Any(f => Path.GetExtension(f.FilePath).Equals(".msi", StringComparison.OrdinalIgnoreCase));
+                LogInfo($"UpdateSummary: Estimated Admin Requirement = {(estimatedRequiresAdmin ? "Yes" : "No")}");
+            }
 
-
+            // StatusTextBlock update remains the same
             StatusTextBlock.Text = _fileItems.Any(f => f.IsInfected) ?
                 "⚠️ Infected Files" : "Ready";
             StatusTextBlock.Foreground = _fileItems.Any(f => f.IsInfected)
                     ? (SolidColorBrush)FindResource("AppStatusErrorColor")
                     : (SolidColorBrush)FindResource("AppStatusCleanColor");
         }
+
 
         // Updated UpdateProgress to accept operation type
         private void UpdateProgress(int processed, int total, string operationType)
@@ -441,6 +475,8 @@ namespace PackItPro
             });
         }
         #endregion
+
+        // ... rest of MainWindow.xaml.cs ...
 
         #region Settings Synchronization (NEW)
         // NEW: Method to sync settings object values to UI controls (Handles potentially missing XAML elements)

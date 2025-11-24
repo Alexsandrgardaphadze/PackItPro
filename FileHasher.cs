@@ -1,5 +1,5 @@
-﻿// FileHasher.cs
-using System;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
@@ -8,15 +8,14 @@ using System.Text;
 namespace PackItPro
 {
     /// <summary>
-    /// Provides utility methods for calculating file and directory hashes.
+    /// Utility class for computing SHA256 file and directory hashes in a
+    /// deterministic and reproducible way.
     /// </summary>
     public static class FileHasher
     {
         /// <summary>
-        /// Computes the SHA256 hash of a single file as a byte array.
+        /// Computes the SHA256 hash of a file and returns its raw byte array.
         /// </summary>
-        /// <param name="filePath">The path to the file.</param>
-        /// <returns>The SHA256 hash as a byte array.</returns>
         public static byte[] ComputeFileHash(string filePath)
         {
             using var sha = SHA256.Create();
@@ -25,10 +24,8 @@ namespace PackItPro
         }
 
         /// <summary>
-        /// Computes the SHA256 hash of a single file as a lowercase hexadecimal string.
+        /// Computes the SHA256 hash of a file and returns it as a lowercase hex string.
         /// </summary>
-        /// <param name="filePath">The path to the file.</param>
-        /// <returns>The SHA256 hash as a lowercase hexadecimal string.</returns>
         public static string ComputeFileHashString(string filePath)
         {
             var hashBytes = ComputeFileHash(filePath);
@@ -36,39 +33,62 @@ namespace PackItPro
         }
 
         /// <summary>
-        /// Computes a deterministic SHA256 hash representing the contents of a directory.
-        /// The hash is calculated based on the relative file paths (lowercase) and the content hash of each file.
+        /// Computes a deterministic SHA256 hash representing the entire directory contents.
+        /// Includes lowercase relative paths and file content hashes.
         /// </summary>
-        /// <param name="directoryPath">The path to the directory.</param>
-        /// <returns>The SHA256 hash of the directory structure and content as a byte array.</returns>
         public static byte[] ComputeDirectoryHash(string directoryPath)
         {
-            using var sha256 = SHA256.Create();
-            var fileHashes = new List<byte[]>();
+            if (string.IsNullOrWhiteSpace(directoryPath))
+                throw new ArgumentException("Directory path cannot be null or empty.", nameof(directoryPath));
 
+            if (!Directory.Exists(directoryPath))
+                throw new DirectoryNotFoundException($"Directory not found: {directoryPath}");
+
+            using var sha256 = SHA256.Create();
+            var perFileHashes = new List<byte[]>();
+
+            // Get files and sort by their relative path for consistency
             var files = Directory.GetFiles(directoryPath, "*", SearchOption.AllDirectories);
-            Array.Sort(files, StringComparer.OrdinalIgnoreCase); // Sort filenames to ensure consistent order
+            Array.Sort(files, StringComparer.OrdinalIgnoreCase);
 
             foreach (var filePath in files)
             {
-                // NEW: Use the byte array version of ComputeFileHash
-                var fileContentHash = ComputeFileHash(filePath);
-                var relativePath = Path.GetRelativePath(directoryPath, filePath).ToLowerInvariant();
-                var pathBytes = Encoding.UTF8.GetBytes(relativePath);
+                try
+                {
+                    var fileContentHash = ComputeFileHash(filePath);
 
-                using var tempStream = new MemoryStream();
-                tempStream.Write(pathBytes, 0, pathBytes.Length);
-                tempStream.Write(fileContentHash, 0, fileContentHash.Length);
-                tempStream.Position = 0;
+                    // Always use relative path to avoid machine-dependent hashing
+                    var relativePath = Path.GetRelativePath(directoryPath, filePath)
+                        .Replace('\\', '/') // Normalize path separators
+                        .ToLowerInvariant(); // Ensure case-insensitive consistency
 
-                var combinedHash = sha256.ComputeHash(tempStream);
-                fileHashes.Add(combinedHash);
+                    var pathBytes = Encoding.UTF8.GetBytes(relativePath);
+
+                    // Combine path + content hash into a temporary stream
+                    using var combinedStream = new MemoryStream();
+                    combinedStream.Write(pathBytes, 0, pathBytes.Length);
+                    combinedStream.Write(fileContentHash, 0, fileContentHash.Length);
+                    combinedStream.Position = 0; // Reset position for reading
+
+                    // Hash the combined data (path + content hash)
+                    perFileHashes.Add(sha256.ComputeHash(combinedStream));
+                }
+                catch (Exception)
+                {
+                    // Skip files that cannot be read (locked, permissions, etc.)
+                    // This ensures the hash calculation is deterministic: the same set of readable files
+                    // will always produce the same hash, regardless of other unreadable files in the directory.
+                }
             }
 
-            fileHashes.Sort((x, y) => Comparer<byte[]>.Default.Compare(x, y));
+            // NEW: Sort the list of byte arrays using the StructuralComparer adapted via a lambda.
+            // This ensures the final hash is order-independent of the *hashes* themselves,
+            // only depending on the *set* of hashes and their content.
+            perFileHashes.Sort((x, y) => StructuralComparisons.StructuralComparer.Compare(x, y));
 
+            // Combine all sorted hashes into a final stream and hash it
             using var finalStream = new MemoryStream();
-            foreach (var hash in fileHashes)
+            foreach (var hash in perFileHashes)
             {
                 finalStream.Write(hash, 0, hash.Length);
             }

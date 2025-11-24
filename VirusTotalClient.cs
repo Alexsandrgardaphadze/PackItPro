@@ -148,7 +148,7 @@ namespace PackItPro
                 formData.Add(fileContent, "file", Path.GetFileName(filePath));
 
                 var uploadResponse = await _httpClient.PostAsync(
-                    "https://www.virustotal.com/api/v3/files", formData); // Fixed URL
+                    "https://www.virustotal.com/api/v3/files", formData);
                 uploadResponse.EnsureSuccessStatusCode();
 
                 var analysisId = (await uploadResponse.Content.ReadFromJsonAsync<VirusTotalUploadResponse>()).Data.Id;
