@@ -8,7 +8,7 @@
         Title="PackItPro - Secure Package Builder" Height="650" Width="1050"
         Background="#1E1E2F"
         WindowStartupLocation="CenterScreen"
-        ResizeMode="CanResize"
+        ResizeMode="NoResize"
         MinWidth="900" MinHeight="600">
 
     <Window.Resources>

@@ -20,7 +20,6 @@ using System.Windows.Media.Animation;
 using System.Net.Http.Json;
 using Microsoft.Win32;
 using Microsoft.WindowsAPICodePack.Dialogs;
-using System.Security.Cryptography;
 
 // Uncommon or special-case
 // using static System.Windows.Forms.VisualStyles.VisualStyleElement.TrayNotify; // This line is likely incorrect and removed
@@ -156,7 +155,7 @@ namespace PackItPro
                     FilePath = file,
                     Size = FormatBytes(fileInfo.Length),
                     Status = "Pending Scan",
-                    StatusColor = TryFindResource("AppStatusPendingColor") as SolidColorBrush ?? new SolidColorBrush(Colors.Gray),
+                    StatusColor = (SolidColorBrush)FindResource("AppStatusPendingColor"),
                     // RemoveCommand will be set after initialization
                 };
                 // NEW: Set the command after the object is initialized to avoid the closure issue
@@ -264,6 +263,7 @@ namespace PackItPro
                 {
                     processed++;
                     UpdateProgress(processed, totalFiles, "Scanning");
+                    // REMOVED: Time tracking logic for rate limiter reset (handled by client)
                 }
             }
 
@@ -358,8 +358,6 @@ namespace PackItPro
         // REMOVED: Logic for creating payload.zip, calculating hash, embedding into stub (moved to Packager, ManifestGenerator, ResourceInjector)
         #endregion
 
-        // Inside MainWindow.xaml.cs, within the MainWindow class
-
         #region UI Management
         private void UpdateUIState()
         {
@@ -379,12 +377,12 @@ namespace PackItPro
             FileCountTextBlock.Text = _fileItems.Count.ToString();
             TotalSizeTextBlock.Text = FormatBytes(totalSize);
 
-            // Count clean files - Logic remains, but UI update is applied to the correct element
+            // Count clean files - Logic remains, but UI update is skipped if SafeFilesTextBlock is missing
             int cleanCount = _fileItems.Count(f => !f.IsInfected && f.Status != "Skipped Scan" && f.Status != "Scan Failed");
-            int infectedCount = _fileItems.Count(f => f.IsInfected); // Calculate infected count too
+            int infectedCount = _fileItems.Count(f => f.IsInfected); // NEW: Calculate infected count too
 
-            // NEW: Check if CleanFilesTextBlock exists (as per XAML) and update it, otherwise log
-            var cleanFilesBlock = FindName("CleanFilesTextBlock") as TextBlock; // Find the element by name (e.g., CleanFilesTextBlock)
+            // NEW: Check if CleanFilesTextBlock exists before trying to update it (Fixes error)
+            var cleanFilesBlock = FindName("CleanFilesTextBlock") as TextBlock; // Find the element by name (assuming XAML has CleanFilesTextBlock)
             if (cleanFilesBlock != null) // Check if the XAML element exists
             {
                 cleanFilesBlock.Text = $"{cleanCount}/{_fileItems.Count}"; // Update with clean count
@@ -441,14 +439,12 @@ namespace PackItPro
                 LogInfo($"UpdateSummary: Estimated Admin Requirement = {(estimatedRequiresAdmin ? "Yes" : "No")}");
             }
 
-            // StatusTextBlock update remains the same
             StatusTextBlock.Text = _fileItems.Any(f => f.IsInfected) ?
                 "⚠️ Infected Files" : "Ready";
             StatusTextBlock.Foreground = _fileItems.Any(f => f.IsInfected)
                     ? (SolidColorBrush)FindResource("AppStatusErrorColor")
                     : (SolidColorBrush)FindResource("AppStatusCleanColor");
         }
-
 
         // Updated UpdateProgress to accept operation type
         private void UpdateProgress(int processed, int total, string operationType)
@@ -476,8 +472,6 @@ namespace PackItPro
         }
         #endregion
 
-
-
         #region Settings Synchronization (NEW)
         // NEW: Method to sync settings object values to UI controls (Handles potentially missing XAML elements)
         private void SyncSettingsToUI()
@@ -485,7 +479,6 @@ namespace PackItPro
             // Check if UI elements exist before setting their properties
             if (RequireAdminCheckBox != null) RequireAdminCheckBox.IsChecked = _settings.RequiresAdmin;
             if (IncludeWingetUpdaterCheckBox != null) IncludeWingetUpdaterCheckBox.IsChecked = _settings.IncludeWingetUpdateScript;
-
             // NEW: Handle potentially missing checkboxes gracefully
             var useLZMABox = FindName("UseLZMACompressionCheckBox") as CheckBox;
             if (useLZMABox != null) useLZMABox.IsChecked = _settings.UseLZMACompression;
@@ -643,8 +636,7 @@ namespace PackItPro
             if (e.Data.GetData(DataFormats.FileDrop) is string[] files)
             {
                 AddFilesWithValidation(files);
-                // NEW: Changed to use IncludeWingetUpdaterCheckBox
-                if (IncludeWingetUpdaterCheckBox.IsChecked == true)
+                if (IncludeWingetUpdaterCheckBox.IsChecked == true) // NEW: Changed from ScanWithVirusTotalCheckBox
                     _ = ScanFilesWithVirusTotal();
             }
         }
@@ -660,8 +652,7 @@ namespace PackItPro
             if (openFileDialog.ShowDialog() == true)
             {
                 AddFilesWithValidation(openFileDialog.FileNames);
-                // NEW: Changed to use IncludeWingetUpdaterCheckBox
-                if (IncludeWingetUpdaterCheckBox.IsChecked == true)
+                if (IncludeWingetUpdaterCheckBox.IsChecked == true) // NEW: Changed from ScanWithVirusTotalCheckBox
                     _ = ScanFilesWithVirusTotal();
             }
         }
