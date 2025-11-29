@@ -299,20 +299,20 @@ namespace PackItPro
         #region Packaging Implementation (Refactored Call)
         private async void PackNow_Click(object sender, RoutedEventArgs e)
         {
-            // Validate output filename ends with .packitexe
+            // Validate output filename ends with .exe
             string outputFileName = OutputFileNameTextBox.Text;
             if (string.IsNullOrEmpty(outputFileName))
             {
-                outputFileName = $"Package_{DateTime.Now:yyyyMMdd_HHmmss}.packitexe";
+                outputFileName = $"Package_{DateTime.Now:yyyyMMdd_HHmmss}.exe";
             }
-            else if (!outputFileName.EndsWith(".packitexe", StringComparison.OrdinalIgnoreCase))
+            else if (!outputFileName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
             {
-                outputFileName += ".packitexe";
+                outputFileName += ".exe";
             }
 
             var saveDialog = new SaveFileDialog
             {
-                Filter = "PackItPro Executable (.packitexe)|*.packitexe",
+                Filter = "PackItPro Executable (.exe)|*.exe",
                 InitialDirectory = _settings.OutputLocation,
                 FileName = outputFileName
             };
@@ -322,7 +322,7 @@ namespace PackItPro
                 try
                 {
                     Dispatcher.Invoke(() => PackButton.IsEnabled = false);
-                    StatusMessageTextBlock.Text = "Creating .packitexe package...";
+                    StatusMessageTextBlock.Text = "Creating .exe package...";
                     ProcessProgressBar.Value = 0;
                     var progressTb2 = FindName("ProgressPercentTextBlock") as TextBlock;
                     if (progressTb2 != null) progressTb2.Text = "0%";
@@ -427,7 +427,7 @@ namespace PackItPro
                 ProcessProgressBar.Value = 0;
                 var progressTb = FindName("ProgressPercentTextBlock") as TextBlock;
                 if (progressTb != null) progressTb.Text = "0%";
-                StatusMessageTextBlock.Text = "Ready to create .packitexe package";
+                StatusMessageTextBlock.Text = "Ready to create .exe package";
             });
         }
         #endregion
@@ -653,38 +653,52 @@ namespace PackItPro
 
         private void SetOutputLocation_Click(object sender, RoutedEventArgs e)
         {
-            var folderDialog = new CommonOpenFileDialog
-            {
-                IsFolderPicker = true,
-                Title = "Select Output Folder",
-                InitialDirectory = _settings.OutputLocation,
-                EnsurePathExists = true // Critical: Ensure selected path exists
-            };
+#if WINDOWS
+    // Ensure code only runs on supported platforms
+    if (CommonOpenFileDialog.IsPlatformSupported)
+    {
+        var folderDialog = new CommonOpenFileDialog
+        {
+            IsFolderPicker = true,
+            Title = "Select Output Folder",
+            InitialDirectory = _settings.OutputLocation,
+            EnsurePathExists = true // Critical: Ensure selected path exists
+        };
 
-            if (folderDialog.ShowDialog() == CommonFileDialogResult.Ok)
+        if (folderDialog.ShowDialog() == CommonFileDialogResult.Ok)
+        {
+            try
             {
-                try
-                {
-                    // Verify write permissions before saving
-                    var testFile = Path.Combine(folderDialog.FileName, "permission_test.tmp");
-                    File.WriteAllText(testFile, "test");
-                    File.Delete(testFile);
+                // Verify write permissions before saving
+                var testFile = Path.Combine(folderDialog.FileName, "permission_test.tmp");
+                File.WriteAllText(testFile, "test");
+                File.Delete(testFile);
 
-                    _settings.OutputLocation = folderDialog.FileName;
-                    SaveSettings();
-                }
-                catch (UnauthorizedAccessException)
-                {
-                    MessageBox.Show("Write access denied to the selected directory.",
-                        "Permission Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-                catch (Exception ex)
-                {
-                    LogError("Output location validation failed", ex);
-                    MessageBox.Show($"Invalid output location: {ex.Message}",
-                        "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
+                _settings.OutputLocation = folderDialog.FileName;
+                SaveSettings();
             }
+            catch (UnauthorizedAccessException)
+            {
+                MessageBox.Show("Write access denied to the selected directory.",
+                    "Permission Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            catch (Exception ex)
+            {
+                LogError("Output location validation failed", ex);
+                MessageBox.Show($"Invalid output location: {ex.Message}",
+                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+    }
+    else
+    {
+        MessageBox.Show("Folder selection is only supported on Windows 7 or later.",
+            "Unsupported Platform", MessageBoxButton.OK, MessageBoxImage.Warning);
+    }
+#else
+    MessageBox.Show("Folder selection is only supported on Windows 7 or later.",
+        "Unsupported Platform", MessageBoxButton.OK, MessageBoxImage.Warning);
+#endif
         }
 
         private void SetVirusApiKey_Click(object sender, RoutedEventArgs e)
@@ -915,7 +929,7 @@ namespace PackItPro
         {
             // Implement logic to dismiss an error message or clear the error state
             // For now, just clear the status message
-            StatusMessageTextBlock.Text = "Ready to create .packitexe package";
+            StatusMessageTextBlock.Text = "Ready to create .exe package";
             ProcessingProgressBar.Visibility = Visibility.Collapsed; // Hide the inline progress bar if it was shown for an error
         }
         #endregion

@@ -133,7 +133,7 @@ namespace PackItPro
                 ResourceInjector.InjectPayload(stubPath, payloadZipPath, tempFinalPath);
 
                 // Move temp file to final location
-                var outputPath = Path.Combine(outputDirectory, $"{packageName}.packitexe");
+                var outputPath = Path.Combine(outputDirectory, $"{packageName}.exe");
                 File.Move(tempFinalPath, outputPath, overwrite: true);
 
                 return outputPath;
