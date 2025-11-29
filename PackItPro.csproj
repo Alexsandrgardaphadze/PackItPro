@@ -1,5 +1,4 @@
-﻿<!-- Inside PackItPro.csproj -->
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
 		<OutputType>WinExe</OutputType>
 		<TargetFramework>net8.0-windows</TargetFramework>
@@ -7,7 +6,7 @@
 		<ApplicationIcon>PackItPro.ico</ApplicationIcon>
 		<Version>0.3.0</Version>
 		<Authors>PackItPro Team</Authors>
-		<Description>Secure file packaging with VirusTotal scanning</Description>
+		<Description>Secure file packaging</Description>
 		<Nullable>enable</Nullable>
 		<PublishSingleFile>true</PublishSingleFile>
 		<SelfContained>true</SelfContained>
@@ -22,15 +21,13 @@
 		<PackageReference Include="System.Net.Http.Json" Version="8.0.1" />
 		<PackageReference Include="System.Text.Json" Version="8.0.5" />
 		<PackageReference Include="PeNet" Version="5.1.0" />
-		<!-- Keep PeNet -->
-		<!-- REMOVED: Vestris.ResourceLib package reference -->
 	</ItemGroup>
 
 	<ItemGroup>
 		<None Update="PackItPro.ico">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
-		<!-- NEW: Copy StubInstaller.exe from its output directory to PackItPro's output directory after building PackItPro -->
+		<!-- Copy StubInstaller.exe from its output directory to PackItPro's output directory after building PackItPro -->
 		<Content Include="..\StubInstaller\bin\$(Configuration)\net8.0-windows\StubInstaller.exe" Link="StubInstaller.exe">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</Content>
@@ -41,7 +38,6 @@
 		<ProjectReference Include="..\StubInstaller\StubInstaller.csproj" />
 	</ItemGroup> -->
 
-	<!-- NEW: Post-build event (alternative method if ProjectReference isn't sufficient for copying) -->
 	<Target Name="CopyStubInstaller" AfterTargets="Build" Condition="'$(Configuration)' == 'Debug' Or '$(Configuration)' == 'Release'">
 		<Copy SourceFiles="..\StubInstaller\bin\$(Configuration)\net8.0-windows\StubInstaller.exe" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" />
 	</Target>
