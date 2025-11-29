@@ -218,7 +218,8 @@ namespace PackItPro
 
             StatusMessageTextBlock.Text = "Scanning files with VirusTotal...";
             ProcessProgressBar.Value = 0;
-            ProgressPercentTextBlock.Text = "0%";
+            var progressTb = FindName("ProgressPercentTextBlock") as TextBlock;
+            if (progressTb != null) progressTb.Text = "0%";
 
             var filesToRemove = new List<FileItem>();
             int totalFiles = _fileItems.Count;
@@ -323,7 +324,8 @@ namespace PackItPro
                     Dispatcher.Invoke(() => PackButton.IsEnabled = false);
                     StatusMessageTextBlock.Text = "Creating .packitexe package...";
                     ProcessProgressBar.Value = 0;
-                    ProgressPercentTextBlock.Text = "0%";
+                    var progressTb2 = FindName("ProgressPercentTextBlock") as TextBlock;
+                    if (progressTb2 != null) progressTb2.Text = "0%";
 
                     // NEW: Call the Packager class
                     // NEW: Pass admin requirement based on UI/Settings (example: reading the checkbox directly here, or use _settings.RequiresAdmin if bound correctly)
@@ -411,7 +413,10 @@ namespace PackItPro
                     percentage,
                     new Duration(TimeSpan.FromMilliseconds(300)));
                 ProcessProgressBar.BeginAnimation(ProgressBar.ValueProperty, animation);
-                ProgressPercentTextBlock.Text = $"{(int)percentage}% ({operationType})"; // Add operation type label
+
+                var progressTb = FindName("ProgressPercentTextBlock") as TextBlock;
+                if (progressTb != null)
+                    progressTb.Text = $"{(int)percentage}% ({operationType})"; // Add operation type label
             });
         }
 
@@ -420,7 +425,8 @@ namespace PackItPro
             Dispatcher.Invoke(() =>
             {
                 ProcessProgressBar.Value = 0;
-                ProgressPercentTextBlock.Text = "0%";
+                var progressTb = FindName("ProgressPercentTextBlock") as TextBlock;
+                if (progressTb != null) progressTb.Text = "0%";
                 StatusMessageTextBlock.Text = "Ready to create .packitexe package";
             });
         }

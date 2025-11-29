@@ -5,327 +5,34 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:PackItPro"
         mc:Ignorable="d"
-        Title="PackItPro" Height="650" Width="1050"
+        Title="PackItPro - Secure Package Builder" Height="650" Width="1000"
         Background="{StaticResource AppBackgroundColor}"
         WindowStartupLocation="CenterScreen"
-        ResizeMode="NoResize"
-        MinWidth="900" MinHeight="600">
-
-    <Window.Resources>
-        <SolidColorBrush x:Key="AppPrimaryColor" Color="#0078D4"/>
-        <SolidColorBrush x:Key="AppPrimaryHoverColor" Color="#106EBE"/>
-        <SolidColorBrush x:Key="AppPrimaryPressedColor" Color="#005A9E"/>
-        <SolidColorBrush x:Key="AppPrimaryDisabledColor" Color="#7A7A7A"/>
-
-        <SolidColorBrush x:Key="AppTextColor" Color="White"/>
-        <SolidColorBrush x:Key="AppTextDisabledColor" Color="#B0B0B0"/>
-        <SolidColorBrush x:Key="AppTextSecondaryColor" Color="#AAAAAA"/>
-        <SolidColorBrush x:Key="AppTextTertiaryColor" Color="#888888"/>
-        <SolidColorBrush x:Key="AppTextQuaternaryColor" Color="#666666"/>
-
-        <SolidColorBrush x:Key="AppBackgroundColor" Color="#1E1E2D"/>
-        <SolidColorBrush x:Key="AppPanelColor" Color="#2A2A40"/>
-        <SolidColorBrush x:Key="AppPanelSecondaryColor" Color="#33334D"/>
-
-        <SolidColorBrush x:Key="AppBorderColor" Color="#4F4F6A"/>
-        <SolidColorBrush x:Key="AppStatusCleanColor" Color="#4CAF50"/>
-        <SolidColorBrush x:Key="AppStatusErrorColor" Color="#FF5252"/>
-        <SolidColorBrush x:Key="AppStatusWarningColor" Color="#FFD54F"/>
-        <SolidColorBrush x:Key="AppStatusPendingColor" Color="#FFD700"/>
-
-        <Style TargetType="ToolTip">
-            <Setter Property="Background" Value="#353545"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="BorderBrush" Value="#4F4F6A"/>
-            <Setter Property="Padding" Value="8"/>
-        </Style>
-
-        <!-- Ensure menu sizing and font consistency -->
-        <Style TargetType="Menu">
-            <Setter Property="Height" Value="30"/>
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="Background" Value="{StaticResource AppBackgroundColor}"/>
-            <Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
-        </Style>
-
-
-        <Style x:Key="Win11Button" TargetType="Button">
-            <Setter Property="Background" Value="{StaticResource AppPrimaryColor}"/>
-            <Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Padding" Value="15,8"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" 
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="4">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="{StaticResource AppPrimaryHoverColor}"/>
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter Property="Background" Value="{StaticResource AppPrimaryPressedColor}"/>
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Background" Value="{StaticResource AppPrimaryDisabledColor}"/>
-                                <Setter Property="Foreground" Value="{StaticResource AppTextDisabledColor}"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="SecondaryButtonStyle" TargetType="Button" BasedOn="{StaticResource Win11Button}">
-            <Setter Property="Background" Value="#353545"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" 
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="4">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#454555"/>
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter Property="Background" Value="#252535"/>
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Background" Value="#505069"/>
-                                <Setter Property="Foreground" Value="#909090"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="RoundedProgressBarStyle" TargetType="ProgressBar">
-            <Setter Property="Height" Value="5"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ProgressBar">
-                        <Grid Name="TemplateRoot" SnapsToDevicePixels="True">
-                            <Border x:Name="ProgressBarTrack" 
-                                    Background="{TemplateBinding Background}" 
-                                    CornerRadius="3" />
-                            <Rectangle x:Name="PART_Track"/>
-                            <Decorator x:Name="PART_Indicator" 
-                                       HorizontalAlignment="Left" 
-                                       VerticalAlignment="Stretch">
-                                <Grid>
-                                    <Border x:Name="Indicator" 
-                                            Background="{TemplateBinding Foreground}" 
-                                            CornerRadius="3"/>
-                                </Grid>
-                            </Decorator>
-                        </Grid>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="Orientation" Value="Vertical">
-                                <Setter TargetName="TemplateRoot" Property="LayoutTransform">
-                                    <Setter.Value>
-                                        <RotateTransform Angle="-90"/>
-                                    </Setter.Value>
-                                </Setter>
-                            </Trigger>
-                            <Trigger Property="IsIndeterminate" Value="True">
-                                <Setter TargetName="Indicator" Property="Visibility" Value="Collapsed"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="FileItemStyle" TargetType="ListViewItem">
-            <Setter Property="Padding" Value="8,6"/>
-            <Setter Property="Background" Value="{StaticResource AppPanelSecondaryColor}"/>
-            <Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Margin" Value="0,2"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ListViewItem">
-                        <Border Background="{TemplateBinding Background}" 
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="4"
-                                Padding="{TemplateBinding Padding}">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <ContentPresenter Grid.Column="0"/>
-                            </Grid>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#353545"/>
-                            </Trigger>
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter Property="Background" Value="#3A3A50"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="MenuItemStyle" TargetType="MenuItem">
-            <Setter Property="Background" Value="{StaticResource AppPanelColor}"/>
-            <Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="MenuItem">
-                        <Border x:Name="Border" Background="{TemplateBinding Background}">
-                            <Grid>
-                                <ContentPresenter ContentSource="Header" Margin="10,3"/>
-                                <Popup x:Name="Popup" IsOpen="{TemplateBinding IsSubmenuOpen}" 
-                                       Placement="Bottom" PopupAnimation="Fade">
-                                    <Border x:Name="SubMenuBorder" Background="{StaticResource AppPanelColor}" 
-                                            BorderBrush="{StaticResource AppBorderColor}" BorderThickness="1" Padding="2">
-                                        <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle"/>
-                                    </Border>
-                                </Popup>
-                            </Grid>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#353545" TargetName="Border"/>
-                            </Trigger>
-                            <Trigger Property="IsHighlighted" Value="True">
-                                <Setter Property="Background" Value="#353545" TargetName="Border"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="SubMenuItemStyle" TargetType="MenuItem">
-            <Setter Property="Background" Value="{StaticResource AppPanelColor}"/>
-            <Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="MenuItem">
-                        <Border x:Name="Border" Background="{TemplateBinding Background}" Padding="5,3">
-                            <ContentPresenter ContentSource="Header" Margin="10,3"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#353545" TargetName="Border"/>
-                            </Trigger>
-                            <Trigger Property="IsHighlighted" Value="True">
-                                <Setter Property="Background" Value="#353545" TargetName="Border"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="GridViewColumnHeaderStyle" TargetType="GridViewColumnHeader">
-            <Setter Property="Background" Value="{StaticResource AppPanelSecondaryColor}"/>
-            <Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
-            <Setter Property="Padding" Value="10,5"/>
-            <Setter Property="HorizontalContentAlignment" Value="Left"/>
-        </Style>
-
-        <Style x:Key="SummaryLabelStyle" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="{StaticResource AppTextTertiaryColor}"/>
-            <Setter Property="FontSize" Value="13"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-        </Style>
-
-        <Style x:Key="SummaryValueStyle" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
-            <Setter Property="FontFamily" Value="Consolas"/>
-            <Setter Property="HorizontalAlignment" Value="Right"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-        </Style>
-
-        <Style x:Key="InputControlStyle" TargetType="Control">
-            <Setter Property="Background" Value="{StaticResource AppBackgroundColor}"/>
-            <Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource AppBorderColor}"/>
-            <Setter Property="Padding" Value="8,5"/>
-            <Setter Property="FontFamily" Value="Consolas"/>
-        </Style>
-
-        <Style x:Key="SettingLabelStyle" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="{StaticResource AppTextSecondaryColor}"/>
-            <Setter Property="Margin" Value="0,0,0,5"/>
-        </Style>
-
-        <Style x:Key="SettingCheckBoxStyle" TargetType="CheckBox">
-            <Setter Property="Foreground" Value="{StaticResource AppTextSecondaryColor}"/>
-            <Setter Property="Margin" Value="0,0,0,10"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-        </Style>
-
-        <Style x:Key="InfoButtonStyle" TargetType="Button">
-            <Setter Property="Content" Value="?"/>
-            <Setter Property="Width" Value="20"/>
-            <Setter Property="Height" Value="20"/>
-            <Setter Property="FontSize" Value="11"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Background" Value="{StaticResource AppBorderColor}"/>
-            <Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="HorizontalAlignment" Value="Left"/>
-            <Setter Property="Margin" Value="8,0,0,0"/>
-            <Setter Property="ToolTipService.InitialShowDelay" Value="0"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" 
-                                CornerRadius="10" 
-                                BorderThickness="1" 
-                                BorderBrush="#6F6F8A">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="SummarySeparatorStyle" TargetType="Border">
-            <Setter Property="Height" Value="1"/>
-            <Setter Property="Background" Value="{StaticResource AppBorderColor}"/>
-            <Setter Property="Margin" Value="0,15,0,15"/>
-        </Style>
-
-        <!-- Ensure ComboBox items follow theme -->
-        <Style TargetType="ComboBoxItem">
-            <Setter Property="Background" Value="{StaticResource AppPanelColor}"/>
-            <Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
-        </Style>
-
-    </Window.Resources>
+        ResizeMode="CanResize"
+        MinWidth="800" MinHeight="500">
 
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
+            <!-- Menu Bar -->
             <RowDefinition Height="*"/>
+            <!-- Main Content Area -->
             <RowDefinition Height="Auto"/>
+            <!-- Status Area -->
             <RowDefinition Height="Auto"/>
+            <!-- Progress Bar -->
         </Grid.RowDefinitions>
 
-        <Menu Grid.Row="0" Background="{StaticResource AppBackgroundColor}" Padding="0,6,6,0" Margin="0,0,0,0">
+        <!-- Menu Bar -->
+        <Menu Grid.Row="0" Background="{StaticResource AppBackgroundColor}" Padding="0,6" Margin="0,0,0,12">
             <MenuItem Header="File" Foreground="{StaticResource AppTextColor}" Style="{StaticResource MenuItemStyle}">
                 <MenuItem Header="Add Files..." Click="BrowseFiles_Click" InputGestureText="Ctrl+O" Style="{StaticResource SubMenuItemStyle}"/>
                 <MenuItem Header="Clear All Files" Click="ClearAllFiles_Click" InputGestureText="Ctrl+Del" Style="{StaticResource SubMenuItemStyle}"/>
                 <Separator Background="{StaticResource AppBorderColor}"/>
                 <MenuItem Header="Export Logs..." Click="ExportLogs_Click" Style="{StaticResource SubMenuItemStyle}"/>
+                <!-- NEW: Added handler -->
+                <MenuItem Header="Export List..." Click="ExportList_Click" Style="{StaticResource SubMenuItemStyle}"/>
+                <!-- NEW: Added handler -->
                 <Separator Background="{StaticResource AppBorderColor}"/>
                 <MenuItem Header="Exit" Click="Exit_Click" InputGestureText="Alt+F4" Style="{StaticResource SubMenuItemStyle}"/>
             </MenuItem>
@@ -333,33 +40,44 @@
                 <MenuItem Header="Output Location..." Click="SetOutputLocation_Click" Style="{StaticResource SubMenuItemStyle}"/>
                 <MenuItem Header="VirusTotal API Key..." Click="SetVirusApiKey_Click" Style="{StaticResource SubMenuItemStyle}"/>
                 <MenuItem Header="PackItPro Settings..." Click="PackItProSettings_Click" Style="{StaticResource SubMenuItemStyle}"/>
+                <!-- NEW: Added handler -->
             </MenuItem>
             <MenuItem Header="Tools" Foreground="{StaticResource AppTextColor}" Style="{StaticResource MenuItemStyle}">
                 <MenuItem Header="Test Package..." Click="TestPackage_Click" Style="{StaticResource SubMenuItemStyle}"/>
+                <!-- NEW: Added handler -->
                 <MenuItem Header="View Cache..." Click="ViewCache_Click" Style="{StaticResource SubMenuItemStyle}"/>
+                <!-- NEW: Added handler -->
                 <MenuItem Header="Clear Cache" Click="ClearCache_Click" Style="{StaticResource SubMenuItemStyle}"/>
+                <!-- NEW: Added handler -->
                 <Separator Background="{StaticResource AppBorderColor}"/>
                 <MenuItem Header="Export Package List..." Click="ExportList_Click" Style="{StaticResource SubMenuItemStyle}"/>
+                <!-- NEW: Added handler -->
             </MenuItem>
             <MenuItem Header="Help" Foreground="{StaticResource AppTextColor}" Style="{StaticResource MenuItemStyle}">
                 <MenuItem Header="Documentation" Click="Documentation_Click" Style="{StaticResource SubMenuItemStyle}"/>
+                <!-- NEW: Added handler -->
                 <MenuItem Header="GitHub Repository" Click="GitHub_Click" Style="{StaticResource SubMenuItemStyle}"/>
+                <!-- NEW: Added handler -->
                 <MenuItem Header="Report Issue" Click="ReportIssue_Click" Style="{StaticResource SubMenuItemStyle}"/>
+                <!-- NEW: Added handler -->
                 <Separator Background="{StaticResource AppBorderColor}"/>
                 <MenuItem Header="Check for Updates" Click="CheckUpdates_Click" Style="{StaticResource SubMenuItemStyle}"/>
+                <!-- NEW: Added handler -->
                 <Separator Background="{StaticResource AppBorderColor}"/>
                 <MenuItem Header="About PackItPro" Click="About_Click" Style="{StaticResource SubMenuItemStyle}"/>
             </MenuItem>
         </Menu>
 
+        <!-- Main Content Area -->
         <Grid Grid.Row="1" Margin="0,10">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="3*"/>
                 <ColumnDefinition Width="2*"/>
             </Grid.ColumnDefinitions>
 
+            <!-- File List Area -->
             <Border Grid.Column="0" Margin="0,0,10,0" BorderBrush="{StaticResource AppBorderColor}"
-                    BorderThickness="1" CornerRadius="10"
+                    BorderThickness="1" CornerRadius="8"
                     Background="{StaticResource AppPanelColor}"
                     x:Name="DropAreaBorder"
                     AllowDrop="True"
@@ -368,6 +86,7 @@
                     DragLeave="DropArea_DragLeave">
 
                 <Grid>
+                    <!-- Empty State -->
                     <StackPanel x:Name="EmptyDropState"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
@@ -375,52 +94,36 @@
                         <TextBlock Text="📦" FontSize="48" HorizontalAlignment="Center" Foreground="{StaticResource AppTextTertiaryColor}"/>
                         <TextBlock Text="Drag and Drop Files Here" FontSize="18" Foreground="{StaticResource AppTextSecondaryColor}" HorizontalAlignment="Center" TextAlignment="Center" Margin="0,10,0,5"/>
                         <TextBlock Text="or click to browse" FontSize="14" Foreground="{StaticResource AppTextTertiaryColor}" HorizontalAlignment="Center"/>
-                        <Button Content="Browse Files" Style="{StaticResource Win11Button}" Click="BrowseFiles_Click" FontSize="16"  Margin="0,15,0,0" Height="36" Width="150"/>
+                        <Button Content="Browse Files" Style="{StaticResource Win11Button}" Click="BrowseFiles_Click" Margin="0,15,0,0" Height="42" FontSize="20"/>
                         <TextBlock Text="(Maximum 20 files)" FontSize="12" Foreground="{StaticResource AppTextQuaternaryColor}" HorizontalAlignment="Center" Margin="0,10,0,0"/>
                     </StackPanel>
 
+                    <!-- File List -->
                     <ListView x:Name="FileListView" Background="Transparent" BorderThickness="0" Margin="12" Visibility="Collapsed" ItemContainerStyle="{StaticResource FileItemStyle}">
                         <ListView.View>
                             <GridView>
-                                <GridViewColumn Header="📄" Width="35" HeaderContainerStyle="{StaticResource GridViewColumnHeaderStyle}">
-                                    <GridViewColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <TextBlock Text="{Binding FileIcon, Mode=OneWay}" Foreground="{StaticResource AppTextColor}" FontFamily="Segoe UI Emoji" HorizontalAlignment="Center"/>
-                                        </DataTemplate>
-                                    </GridViewColumn.CellTemplate>
-                                </GridViewColumn>
                                 <GridViewColumn Header="File Name" Width="200" HeaderContainerStyle="{StaticResource GridViewColumnHeaderStyle}">
                                     <GridViewColumn.CellTemplate>
                                         <DataTemplate>
-                                            <TextBlock Text="{Binding FileName, Mode=OneWay}" Foreground="{StaticResource AppTextColor}" FontFamily="Consolas"/>
+                                            <TextBlock Text="{Binding FileName, Mode=OneWay}" Foreground="White" FontFamily="Consolas"/>
                                         </DataTemplate>
                                     </GridViewColumn.CellTemplate>
                                 </GridViewColumn>
                                 <GridViewColumn Header="Size" Width="100" HeaderContainerStyle="{StaticResource GridViewColumnHeaderStyle}">
                                     <GridViewColumn.CellTemplate>
                                         <DataTemplate>
-                                            <TextBlock Text="{Binding Size, Mode=OneWay}" Foreground="{StaticResource AppTextColor}" FontFamily="Consolas"/>
+                                            <TextBlock Text="{Binding Size, Mode=OneWay}" Foreground="White" FontFamily="Consolas"/>
                                         </DataTemplate>
                                     </GridViewColumn.CellTemplate>
                                 </GridViewColumn>
                                 <GridViewColumn Header="Status" Width="120" HeaderContainerStyle="{StaticResource GridViewColumnHeaderStyle}">
                                     <GridViewColumn.CellTemplate>
                                         <DataTemplate>
-                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding StatusIcon}" Margin="0,0,6,0" Foreground="{StaticResource AppTextTertiaryColor}"/>
-                                                <TextBlock Text="{Binding Status, Mode=OneWay}" Foreground="{Binding StatusColor, Mode=OneWay}" FontFamily="Consolas"/>
-                                            </StackPanel>
-                                        </DataTemplate>
-                                    </GridViewColumn.CellTemplate>
-                                </GridViewColumn>
-                                <GridViewColumn Header="Actions" Width="70" HeaderContainerStyle="{StaticResource GridViewColumnHeaderStyle}">
-                                    <GridViewColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <Button Content="Remove"
-                                                    Command="{Binding RemoveCommand}"
-                                                    CommandParameter="{Binding}"
-                                                    Style="{StaticResource SecondaryButtonStyle}"
-                                                    Height="24" Padding="8,0"/>
+                                            <Grid>
+                                                <TextBlock Text="{Binding Status, Mode=OneWay}"
+                                                           Foreground="{Binding StatusColor, Mode=OneWay}"
+                                                           FontFamily="Consolas"/>
+                                            </Grid>
                                         </DataTemplate>
                                     </GridViewColumn.CellTemplate>
                                 </GridViewColumn>
@@ -430,6 +133,7 @@
                 </Grid>
             </Border>
 
+            <!-- Configuration & Pack Panel -->
             <Grid Grid.Column="1">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -437,13 +141,17 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <Border Grid.Row="0" Background="{StaticResource AppPanelColor}" CornerRadius="8" Padding="12" Margin="0,0,0,10">
+                <!-- Pack Settings -->
+                <Border Grid.Row="0" Background="{StaticResource AppPanelColor}" CornerRadius="8" Padding="15" Margin="0,0,0,10">
                     <StackPanel>
                         <TextBlock Text="PackItPro Settings" FontSize="16" Foreground="{StaticResource AppTextColor}" FontWeight="SemiBold" Margin="0,0,0,15"/>
 
                         <TextBlock Text="Output File Name:" Style="{StaticResource SettingLabelStyle}"/>
-                        <TextBox x:Name="OutputFileNameTextBox" Style="{StaticResource InputControlStyle}" Margin="0,0,0,8" Text="MyPackage"/>
+                        <TextBox x:Name="OutputFileNameTextBox" Style="{StaticResource InputControlStyle}" Margin="0,0,0,15" Text="MyPackage"/>
 
+                        <!-- REMOVED: Output Format textblocks (as per plan) -->
+
+                        <!-- VirusTotal Scan with Help Icon -->
                         <Grid Margin="0,0,0,12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
@@ -454,13 +162,14 @@
                             <Button Grid.Column="1" Style="{StaticResource InfoButtonStyle}">
                                 <Button.ToolTip>
                                     <ToolTip>
-                                        <TextBlock Text="Files will be checked against VirusTotal's database to ensure safety. If scanning fails, packaging continues with a warning." TextWrapping="Wrap" MaxWidth="280"/>
+                                        <TextBlock Text="Files will be checked against VirusTotal's database to ensure safety. If scanning fails, packaging continues with a warning." TextWrapping="Wrap" MaxWidth="250"/>
                                     </ToolTip>
                                 </Button.ToolTip>
                             </Button>
                         </Grid>
 
-                        <Grid Margin="0,0,0,4">
+                        <!-- Winget Updater with Help Icon -->
+                        <Grid Margin="0,0,0,12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
@@ -476,26 +185,57 @@
                             </Button>
                         </Grid>
 
+                        <!-- NEW: Verify Integrity Checkbox with Help Icon -->
+                        <Grid Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <CheckBox x:Name="VerifyIntegrityCheckBox" Grid.Column="0" Content="Verify file integrity" Style="{StaticResource SettingCheckBoxStyle}" IsChecked="True" ToolTip="Includes SHA256 checksums for tamper detection"/>
+                            <Button Grid.Column="1" Style="{StaticResource InfoButtonStyle}">
+                                <Button.ToolTip>
+                                    <ToolTip>
+                                        <TextBlock Text="Calculates and embeds SHA256 checksums for all files and the manifest. The stub installer will verify integrity before proceeding." TextWrapping="Wrap" MaxWidth="280"/>
+                                    </ToolTip>
+                                </Button.ToolTip>
+                            </Button>
+                        </Grid>
+
+                        <!-- Advanced Options (Collapsible) -->
                         <Expander x:Name="AdvancedOptionsExpander" Header="Advanced Options" Foreground="{StaticResource AppTextTertiaryColor}" Background="Transparent" BorderThickness="0" Margin="0,12,0,0" IsExpanded="False">
                             <StackPanel Margin="0,12,0,0">
+                                <TextBlock Text="Packaging Behavior" FontSize="14" Foreground="{StaticResource AppTextColor}" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                                <Border Height="1" Background="{StaticResource AppBorderColor}" Margin="0,0,0,8"/>
+
                                 <TextBlock Text="Compression" Style="{StaticResource SettingLabelStyle}"/>
-                                <ComboBox x:Name="CompressionComboBox" Style="{StaticResource InputControlStyle}" 
-                                          Margin="0,0,0,12" 
-                                          SelectedIndex="1"
-                                          Foreground="{StaticResource AppTextColor}"
-                                    Background="{StaticResource AppPanelColor}"
-                                    BorderBrush="{StaticResource AppBorderColor}"> 
+                                <ComboBox x:Name="CompressionComboBox" Style="{StaticResource InputControlStyle}" Margin="0,0,0,12" SelectedIndex="1">
                                     <ComboBoxItem Content="None (Fastest)"/>
                                     <ComboBoxItem Content="Fast (Recommended)"/>
                                     <ComboBoxItem Content="Maximum (Smallest)"/>
                                 </ComboBox>
-                                <CheckBox x:Name="UseLZMACompressionCheckBox" Content="Use LZMA Compression" Style="{StaticResource SettingCheckBoxStyle}" Checked="UseLZMACompressionCheckBox_Checked" Unchecked="UseLZMACompressionCheckBox_Unchecked"/>
-                                <CheckBox x:Name="OnlyScanExecutablesCheckBox" Content="Only Scan Executables" Style="{StaticResource SettingCheckBoxStyle}" Checked="OnlyScanExecutablesCheckBox_Checked" Unchecked="OnlyScanExecutablesCheckBox_Unchecked"/>
-                                <CheckBox x:Name="AutoRemoveInfectedFilesCheckBox" Content="Auto Remove Infected Files" Style="{StaticResource SettingCheckBoxStyle}" Checked="AutoRemoveInfectedFilesCheckBox_Checked" Unchecked="AutoRemoveInfectedFilesCheckBox_Unchecked"/>
                                 <CheckBox x:Name="RequireAdminCheckBox" Content="Require administrator rights" Style="{StaticResource SettingCheckBoxStyle}" IsChecked="False" Checked="RequireAdminCheckBox_Checked" Unchecked="RequireAdminCheckBox_Checked">
                                     <CheckBox.ToolTip>
                                         <ToolTip>
                                             <TextBlock Text="Requests administrator privileges for the entire installation process. May be required by some bundled installers." TextWrapping="Wrap" MaxWidth="280"/>
+                                        </ToolTip>
+                                    </CheckBox.ToolTip>
+                                </CheckBox>
+
+                                <TextBlock Text="Security Options" FontSize="14" Foreground="{StaticResource AppTextColor}" FontWeight="SemiBold" Margin="0,10,0,8"/>
+                                <Border Height="1" Background="{StaticResource AppBorderColor}" Margin="0,0,0,8"/>
+
+                                <CheckBox x:Name="OnlyScanExecutablesCheckBox" Content="Only scan executable files" Style="{StaticResource SettingCheckBoxStyle}" IsChecked="True" Checked="OnlyScanExecutablesCheckBox_Checked" Unchecked="OnlyScanExecutablesCheckBox_Checked">
+                                    <CheckBox.ToolTip>
+                                        <ToolTip>
+                                            <TextBlock Text="Only perform VirusTotal scan on files with extensions like .exe, .msi, .dll, etc. Skips other file types." TextWrapping="Wrap" MaxWidth="280"/>
+                                        </ToolTip>
+                                    </CheckBox.ToolTip>
+                                </CheckBox>
+                                <CheckBox x:Name="AutoRemoveInfectedFilesCheckBox" Content="Auto remove infected files" Style="{StaticResource SettingCheckBoxStyle}" IsChecked="True" Checked="AutoRemoveInfectedFilesCheckBox_Checked" Unchecked="AutoRemoveInfectedFilesCheckBox_Checked">
+                                    <CheckBox.ToolTip>
+                                        <ToolTip>
+                                            <TextBlock Text="Automatically removes files from the list if they are detected as infected by VirusTotal during scanning." TextWrapping="Wrap" MaxWidth="280"/>
                                         </ToolTip>
                                     </CheckBox.ToolTip>
                                 </CheckBox>
@@ -504,7 +244,8 @@
                     </StackPanel>
                 </Border>
 
-                <Border Grid.Row="1" Background="{StaticResource AppPanelColor}" CornerRadius="8" Padding="12" Margin="0,0,0,10">
+                <!-- Summary Panel -->
+                <Border Grid.Row="1" Background="{StaticResource AppPanelColor}" CornerRadius="8" Padding="15" Margin="0,0,0,10">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
@@ -532,13 +273,16 @@
                                 <TextBlock Grid.Column="1" x:Name="TotalSizeTextBlock" Text="0 KB" Style="{StaticResource SummaryValueStyle}"/>
                             </Grid>
 
+                            <!-- NEW: Handle potentially missing SafeFilesTextBlock/CleanFilesTextBlock gracefully in code-behind -->
                             <Grid Margin="0,0,0,5">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Grid.Column="0" Text="Safe Files:" Style="{StaticResource SummaryLabelStyle}"/>
-                                <TextBlock Grid.Column="1" x:Name="SafeFilesTextBlock" Text="0" Style="{StaticResource SummaryValueStyle}"/>
+                                <!-- NEW: Assuming CleanFilesTextBlock exists in XAML based on previous conversations -->
+                                <TextBlock Grid.Column="1" x:Name="CleanFilesTextBlock" Text="0" Style="{StaticResource SummaryValueStyle}"/>
+                                <!-- NEW: Changed name to match likely XAML -->
                             </Grid>
 
                             <Grid Margin="0,0,0,5">
@@ -549,16 +293,55 @@
                                 <TextBlock Grid.Column="0" Text="Status:" Style="{StaticResource SummaryLabelStyle}"/>
                                 <TextBlock Grid.Column="1" x:Name="StatusTextBlock" Text="Ready" Foreground="{StaticResource AppStatusCleanColor}" Style="{StaticResource SummaryValueStyle}"/>
                             </Grid>
+
+                            <!-- NEW: Check if PackageSizeTextBlock exists before trying to update it (Fixes error) -->
+                            <Grid Margin="0,0,0,5">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Package Size:" Style="{StaticResource SummaryLabelStyle}"/>
+                                <TextBlock Grid.Column="1" x:Name="PackageSizeTextBlock" Text="~0 KB" Style="{StaticResource SummaryValueStyle}"/>
+                            </Grid>
+
+                            <!-- NEW: Check if EstTimeTextBlock exists before trying to update it (Fixes error) -->
+                            <Grid Margin="0,0,0,5">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Est. Time:" Style="{StaticResource SummaryLabelStyle}"/>
+                                <TextBlock Grid.Column="1" x:Name="EstTimeTextBlock" Text="~0 min" Style="{StaticResource SummaryValueStyle}"/>
+                            </Grid>
+
+                            <!-- NEW: Check if RequiresAdminTextBlock exists before trying to update it (Fixes error) -->
+                            <Grid Margin="0,0,0,5">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Requires Admin:" Style="{StaticResource SummaryLabelStyle}"/>
+                                <TextBlock Grid.Column="1" x:Name="RequiresAdminTextBlock" Text="No" Style="{StaticResource SummaryValueStyle}"/>
+                            </Grid>
+
+                            <Border Style="{StaticResource SummarySeparatorStyle}"/>
+
+                            <TextBlock Text="About .packitexe files:" Foreground="{StaticResource AppTextTertiaryColor}" Margin="0,15,0,5" FontWeight="SemiBold"/>
+                            <TextBlock TextWrapping="Wrap" Foreground="{StaticResource AppTextSecondaryColor}" LineHeight="20" FontSize="12">
+                                The .packitexe format creates a single, self-contained executable that automatically installs all bundled applications. It includes VirusTotal scanning, compression, and optional Winget update support.
+                            </TextBlock>
                         </StackPanel>
                     </Grid>
                 </Border>
 
+                <!-- Pack Button -->
                 <Border Grid.Row="2" Background="{StaticResource AppPanelColor}" CornerRadius="8" Padding="15">
                     <Button x:Name="PackButton" Content="Pack Now" Style="{StaticResource Win11Button}" Height="40" FontSize="16" Click="PackNow_Click" IsEnabled="False"/>
                 </Border>
             </Grid>
         </Grid>
 
+        <!-- Status Message Area (Redesigned with inline progress bar) -->
         <Border Grid.Row="2"
                 Background="{StaticResource AppPanelColor}"
                 CornerRadius="6"
@@ -571,23 +354,104 @@
                 </Grid.RowDefinitions>
 
                 <Grid Grid.Row="0">
-                    <TextBlock x:Name="StatusMessageTextBlock" Text="Ready to pack files. Add files to continue." Foreground="{StaticResource AppTextSecondaryColor}" FontFamily="Consolas" FontSize="12" VerticalAlignment="Center"/>
-                    <TextBlock x:Name="ProgressPercentTextBlockSecondary" Text="0%" Foreground="{StaticResource AppTextTertiaryColor}" FontFamily="Consolas" FontSize="11" HorizontalAlignment="Right" VerticalAlignment="Center" Visibility="Collapsed"/>
+                    <TextBlock x:Name="StatusMessageTextBlock"
+                           Text="Ready to pack files. Add files to continue."
+                           Foreground="{StaticResource AppTextSecondaryColor}"
+                           FontFamily="Consolas"
+                           FontSize="12"
+                           VerticalAlignment="Center"/>
+                    <TextBlock x:Name="ProgressPercentTextBlockInline"
+                               Text="0%"
+                               Foreground="{StaticResource AppTextTertiaryColor}"
+                               FontFamily="Consolas"
+                               FontSize="11"
+                               HorizontalAlignment="Right"
+                               VerticalAlignment="Center"
+                               Visibility="Collapsed"/>
                 </Grid>
 
-                <!-- Inline progress bar hidden; main progress is at bottom to avoid duplication -->
-                <ProgressBar Grid.Row="1" x:Name="ProcessingProgressBar" Height="4" Minimum="0" Maximum="100" Value="0" Foreground="{StaticResource AppPrimaryColor}" Background="Transparent" VerticalAlignment="Bottom" Visibility="Collapsed" Style="{StaticResource RoundedProgressBarStyle}"/>
+                <ProgressBar Grid.Row="1"
+                         x:Name="ProcessingProgressBar"
+                         Height="4"
+                         Minimum="0"
+                         Maximum="100"
+                         Value="0"
+                         Foreground="{StaticResource AppPrimaryColor}"
+                         Background="Transparent"
+                         VerticalAlignment="Bottom"
+                         Visibility="Collapsed"
+                         Style="{StaticResource RoundedProgressBarStyle}"/>
+                <!-- NEW: Apply the custom style with rounded corners -->
             </Grid>
         </Border>
 
+        <!-- Error Panel (Initially Hidden) -->
+        <Border Grid.Row="2"
+                x:Name="ErrorPanel"
+                Background="{StaticResource AppStatusErrorColor}"
+                CornerRadius="8"
+                Padding="14,12"
+                Margin="0,8,0,8"
+                Visibility="Collapsed">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="⚠️" FontSize="16" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                <TextBlock Grid.Column="1" x:Name="ErrorMessageTextBlock" Text="Error message will appear here" Foreground="White" FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="10,0,0,0">
+                    <Button x:Name="RetryButton" Content="Retry" Click="Retry_Click" Style="{StaticResource Win11Button}" Height="26" Padding="12,4" FontSize="11" Margin="0,0,6,0" Visibility="Collapsed"/>
+                    <Button x:Name="DismissErrorButton" Content="✕" Click="DismissError_Click" Background="Transparent" Foreground="{StaticResource AppTextTertiaryColor}" BorderThickness="0" Height="26" Width="26" FontSize="14" FontWeight="Bold" Cursor="Hand">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource Win11Button}">
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border Background="{TemplateBinding Background}" CornerRadius="3">
+                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                                <Style.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="{StaticResource AppBorderColor}"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Bottom Progress Bar (Simplified) -->
         <Grid Grid.Row="3">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
-            <ProgressBar Grid.Column="0" x:Name="ProcessProgressBar" Height="6" Minimum="0" Maximum="100" Value="0" Foreground="{StaticResource AppPrimaryColor}" Background="#3A3A4D" Style="{StaticResource RoundedProgressBarStyle}"/>
-            <TextBlock Grid.Column="1" x:Name="ProgressPercentTextBlock" Text="0%" Foreground="{StaticResource AppTextSecondaryColor}" Margin="8,0,0,0" FontFamily="Consolas" VerticalAlignment="Center"/>
+            <ProgressBar Grid.Column="0"
+                         x:Name="ProcessProgressBar"
+                         Height="6"
+                         Minimum="0"
+                         Maximum="100"
+                         Value="0"
+                         Foreground="{StaticResource AppPrimaryColor}"
+                         Background="#3A3A4D"
+                         Style="{StaticResource RoundedProgressBarStyle}"/>
+
+            <TextBlock Grid.Column="1"
+                       x:Name="ProgressPercentTextBlock"
+                       Text="0%"
+                       Foreground="{StaticResource AppTextSecondaryColor}"
+                       Margin="8,0,0,0"
+                       FontFamily="Consolas"
+                       VerticalAlignment="Center"/>
+
         </Grid>
     </Grid>
 </Window>

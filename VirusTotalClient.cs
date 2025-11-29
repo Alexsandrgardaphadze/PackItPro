@@ -140,7 +140,7 @@ namespace PackItPro
             try
             {
                 var reportResponse = await _httpClient.GetAsync(
-                    $"https://www.virustotal.com/api/v3/files/{hash}"); // Fixed URL - Uses string hash
+                    $"https://www.virustotal.com/api/v3/files/{hash}");
 
                 if (reportResponse.IsSuccessStatusCode)
                 {
