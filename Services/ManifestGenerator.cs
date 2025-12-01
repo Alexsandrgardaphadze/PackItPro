@@ -5,7 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 
-namespace PackItPro
+namespace PackItPro.Services
 {
     public static class ManifestGenerator
     {

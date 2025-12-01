@@ -1,0 +1,29 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Color Palette -->
+    <SolidColorBrush x:Key="AppStatusPendingColor" Color="#FFA500"/>
+    <SolidColorBrush x:Key="AppStatusCleanColor" Color="#00C176"/>
+    <SolidColorBrush x:Key="AppStatusErrorColor" Color="#E74856"/>
+    <SolidColorBrush x:Key="AppStatusWarningColor" Color="#FFC107"/>
+    <SolidColorBrush x:Key="AppTextColor" Color="White"/>
+    <SolidColorBrush x:Key="AppTextSecondaryColor" Color="#CCCCCC"/>
+    <SolidColorBrush x:Key="AppTextTertiaryColor" Color="#9F9FAF"/>
+    <SolidColorBrush x:Key="AppTextQuaternaryColor" Color="#7F7F8F"/>
+    <SolidColorBrush x:Key="AppTextDisabledColor" Color="#909090"/>
+    <SolidColorBrush x:Key="AppBackgroundColor" Color="#1E1E2F"/>
+    <SolidColorBrush x:Key="AppPanelColor" Color="#252536"/>
+    <SolidColorBrush x:Key="AppPanelSecondaryColor" Color="#2C2C3E"/>
+    <SolidColorBrush x:Key="AppBorderColor" Color="#3F3F5A"/>
+    <SolidColorBrush x:Key="AppDropAreaHoverColor" Color="#1E90FF"/>
+    <SolidColorBrush x:Key="AppPrimaryColor" Color="#0078D7"/>
+    <SolidColorBrush x:Key="AppPrimaryHoverColor" Color="#1084D9"/>
+    <SolidColorBrush x:Key="AppPrimaryPressedColor" Color="#006CC1"/>
+    <SolidColorBrush x:Key="AppPrimaryDisabledColor" Color="#505069"/>
+    <!-- NEW: Secondary Palette -->
+    <SolidColorBrush x:Key="AppSecondaryColor" Color="#353545"/>
+    <SolidColorBrush x:Key="AppSecondaryHoverColor" Color="#454555"/>
+    <SolidColorBrush x:Key="AppSecondaryPressedColor" Color="#252535"/>
+    <SolidColorBrush x:Key="AppSecondaryDisabledColor" Color="#505069"/>
+
+</ResourceDictionary>

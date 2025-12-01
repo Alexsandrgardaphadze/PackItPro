@@ -12,7 +12,7 @@ using System.Text; // For Encoding
 using System.Text.Json;
 using System.Threading.Tasks;
 
-namespace PackItPro
+namespace PackItPro.Services
 {
     public static class Packager
     {

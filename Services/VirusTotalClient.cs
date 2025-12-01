@@ -1,5 +1,6 @@
 ﻿// VirusTotalClient.cs
 #nullable enable
+using PackItPro;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -13,7 +14,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace PackItPro
+namespace PackItPro.Services
 {
     // NEW: Separate class for VirusTotal operations
     public class VirusTotalClient : IDisposable

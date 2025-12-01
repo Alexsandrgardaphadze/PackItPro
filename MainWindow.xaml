@@ -4,6 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:PackItPro"
+        xmlns:views="clr-namespace:PackItPro.Views"
         mc:Ignorable="d"
         Title="PackItPro - Secure Package Builder" Height="650" Width="1050"
         Background="{StaticResource AppBackgroundColor}"
@@ -11,25 +12,7 @@
         ResizeMode="CanResize"
         MinWidth="900" MinHeight="600">
 
-    <Window.Resources>
-        <!-- ... (Keep all existing styles from the previous version) ... -->
-        <!-- Color Palette -->
-        <!-- ToolTip Style -->
-        <!-- Win11Button Style -->
-        <!-- SecondaryButtonStyle -->
-        <!-- RoundedProgressBarStyle -->
-        <!-- FileItemStyle -->
-        <!-- MenuItemStyle -->
-        <!-- SubMenuItemStyle -->
-        <!-- GridViewColumnHeaderStyle -->
-        <!-- SummaryLabelStyle -->
-        <!-- SummaryValueStyle -->
-        <!-- InputControlStyle -->
-        <!-- SettingLabelStyle -->
-        <!-- SettingCheckBoxStyle -->
-        <!-- InfoButtonStyle -->
-        <!-- SummarySeparatorStyle -->
-    </Window.Resources>
+    <!-- Resources are now in App.xaml, so this can be empty or contain window-specific resources -->
 
     <Grid Margin="10">
         <Grid.RowDefinitions>
@@ -38,14 +21,13 @@
             <RowDefinition Height="*"/>
             <!-- Main Content Area -->
             <RowDefinition Height="Auto"/>
-            <!-- Status + Pack Button Area -->
+            <!-- Status Area (StatusPanel will contain Pack Button & ErrorPanel) -->
             <RowDefinition Height="Auto"/>
-            <!-- Progress Bar -->
+            <!-- Bottom Progress Bar -->
         </Grid.RowDefinitions>
 
         <!-- Menu Bar -->
         <Menu Grid.Row="0" Background="{StaticResource AppBackgroundColor}" Padding="0,6" Margin="0,0,0,12">
-            <!-- ... (Keep existing menu structure) ... -->
             <MenuItem Header="File" Foreground="{StaticResource AppTextColor}" Style="{StaticResource MenuItemStyle}">
                 <MenuItem Header="Add Files..." Click="BrowseFiles_Click" InputGestureText="Ctrl+O" Style="{StaticResource SubMenuItemStyle}"/>
                 <MenuItem Header="Clear All Files" Click="ClearAllFiles_Click" InputGestureText="Ctrl+Del" Style="{StaticResource SubMenuItemStyle}"/>
@@ -85,380 +67,26 @@
                 <ColumnDefinition Width="2*"/>
             </Grid.ColumnDefinitions>
 
-            <!-- File List Area -->
-            <Border Grid.Column="0" Margin="0,0,10,0" BorderBrush="{StaticResource AppBorderColor}"
-                    BorderThickness="1" CornerRadius="8"
-                    Background="{StaticResource AppPanelColor}"
-                    x:Name="DropAreaBorder"
-                    AllowDrop="True"
-                    Drop="DropArea_Drop"
-                    DragEnter="DropArea_DragEnter"
-                    DragLeave="DropArea_DragLeave">
+            <!-- File List Panel -->
+            <views:FileListPanel Grid.Column="0" Margin="0,0,10,0" />
 
-                <Grid>
-                    <!-- Empty State -->
-                    <StackPanel x:Name="EmptyDropState"
-                                HorizontalAlignment="Center"
-                                VerticalAlignment="Center"
-                                Visibility="Visible">
-                        <TextBlock Text="📦" FontSize="48" HorizontalAlignment="Center" Foreground="{StaticResource AppTextTertiaryColor}"/>
-                        <TextBlock Text="Drag and Drop Files Here" FontSize="18" Foreground="{StaticResource AppTextSecondaryColor}" HorizontalAlignment="Center" TextAlignment="Center" Margin="0,10,0,5"/>
-                        <TextBlock Text="or click to browse" FontSize="14" Foreground="{StaticResource AppTextTertiaryColor}" HorizontalAlignment="Center"/>
-                        <Button Content="Browse Files" Style="{StaticResource Win11Button}" Click="BrowseFiles_Click" Margin="0,15,0,0" Height="42"/>
-                        <TextBlock Text="(Maximum 20 files)" FontSize="12" Foreground="{StaticResource AppTextQuaternaryColor}" HorizontalAlignment="Center" Margin="0,10,0,0"/>
-                    </StackPanel>
-
-                    <!-- File List -->
-                    <ListView x:Name="FileListView" Background="Transparent" BorderThickness="0" Margin="12" Visibility="Collapsed" ItemContainerStyle="{StaticResource FileItemStyle}">
-                        <ListView.View>
-                            <GridView>
-                                <GridViewColumn Header="📄" Width="35" HeaderContainerStyle="{StaticResource GridViewColumnHeaderStyle}">
-                                    <GridViewColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <TextBlock Text="{Binding FileIcon, Mode=OneWay}" Foreground="White" FontFamily="Segoe UI Emoji" HorizontalAlignment="Center"/>
-                                        </DataTemplate>
-                                    </GridViewColumn.CellTemplate>
-                                </GridViewColumn>
-                                <GridViewColumn Header="File Name" Width="200" HeaderContainerStyle="{StaticResource GridViewColumnHeaderStyle}">
-                                    <GridViewColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <TextBlock Text="{Binding FileName, Mode=OneWay}" Foreground="{StaticResource AppTextColor}" FontFamily="Consolas"/>
-                                        </DataTemplate>
-                                    </GridViewColumn.CellTemplate>
-                                </GridViewColumn>
-                                <GridViewColumn Header="Size" Width="100" HeaderContainerStyle="{StaticResource GridViewColumnHeaderStyle}">
-                                    <GridViewColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <TextBlock Text="{Binding Size, Mode=OneWay}" Foreground="{StaticResource AppTextColor}" FontFamily="Consolas"/>
-                                        </DataTemplate>
-                                    </GridViewColumn.CellTemplate>
-                                </GridViewColumn>
-                                <GridViewColumn Header="Status" Width="120" HeaderContainerStyle="{StaticResource GridViewColumnHeaderStyle}">
-                                    <GridViewColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <Grid>
-                                                <TextBlock Text="{Binding Status, Mode=OneWay}"
-                                                           Foreground="{Binding StatusColor, Mode=OneWay}"
-                                                           FontFamily="Consolas"/>
-                                            </Grid>
-                                        </DataTemplate>
-                                    </GridViewColumn.CellTemplate>
-                                </GridViewColumn>
-                            </GridView>
-                        </ListView.View>
-                    </ListView>
-                </Grid>
-            </Border>
-
-            <!-- Configuration & Pack Panel (RIGHT SIDE) -->
-            <!-- NEW: Wrap the right-side content in a ScrollViewer and use a Grid inside for better row sizing -->
-            <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
-                <Grid>
-                    <!-- NEW: Use Grid instead of StackPanel -->
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <!-- Pack Settings -->
-                        <RowDefinition Height="*"/>
-                        <!-- Summary Panel (expands to fill space) -->
-                        <!-- REMOVED: Pack Button row (was RowDefinition Height="Auto") -->
-                    </Grid.RowDefinitions>
-
-                    <!-- Pack Settings -->
-                    <Border Grid.Row="0" Background="{StaticResource AppPanelColor}" CornerRadius="8" Padding="15" Margin="0,0,0,10">
-                        <StackPanel>
-                            <!-- Pack settings content can still use StackPanel -->
-                            <TextBlock Text="PackItPro Settings" FontSize="16" Foreground="{StaticResource AppTextColor}" FontWeight="SemiBold" Margin="0,0,0,15"/>
-
-                            <TextBlock Text="Output File Name:" Style="{StaticResource SettingLabelStyle}"/>
-                            <TextBox x:Name="OutputFileNameTextBox" Style="{StaticResource InputControlStyle}" Margin="0,0,0,15" Text="MyPackage"/>
-
-                            <!-- REMOVED: Output Format textblocks (as per plan) -->
-
-                            <!-- VirusTotal Scan with Help Icon -->
-                            <Grid Margin="0,0,0,12">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-
-                                <CheckBox x:Name="ScanWithVirusTotalCheckBox" Grid.Column="0" Content="Scan with VirusTotal" Style="{StaticResource SettingCheckBoxStyle}" IsChecked="True" ToolTip="Checks files against VirusTotal database for malware"/>
-                                <Button Grid.Column="1" Style="{StaticResource InfoButtonStyle}">
-                                    <Button.ToolTip>
-                                        <ToolTip>
-                                            <TextBlock Text="Files will be checked against VirusTotal's database to ensure safety. If scanning fails, packaging continues with a warning." TextWrapping="Wrap" MaxWidth="250"/>
-                                        </ToolTip>
-                                    </Button.ToolTip>
-                                </Button>
-                            </Grid>
-
-                            <!-- Winget Updater with Help Icon -->
-                            <Grid Margin="0,0,0,12">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-
-                                <CheckBox x:Name="IncludeWingetUpdaterCheckBox" Grid.Column="0" Content="Include Winget Updater" Style="{StaticResource SettingCheckBoxStyle}" IsChecked="False" ToolTip="Adds update_all.bat script for automatic updates via Windows Package Manager (Winget)"/>
-                                <Button Grid.Column="1" Style="{StaticResource InfoButtonStyle}">
-                                    <Button.ToolTip>
-                                        <ToolTip>
-                                            <TextBlock Text="Adds update_all.bat script for automatic app updates via Windows Package Manager (Winget) after installation completes." TextWrapping="Wrap" MaxWidth="280"/>
-                                        </ToolTip>
-                                    </Button.ToolTip>
-                                </Button>
-                            </Grid>
-
-                            <!-- Advanced Options (Collapsible) -->
-                            <Expander x:Name="AdvancedOptionsExpander" Header="Advanced Options" Foreground="{StaticResource AppTextTertiaryColor}" Background="Transparent" BorderThickness="0" Margin="0,12,0,0" IsExpanded="False">
-                                <StackPanel Margin="0,12,0,0">
-                                    <TextBlock Text="Packaging Behavior" FontSize="14" Foreground="{StaticResource AppTextColor}" FontWeight="SemiBold" Margin="0,0,0,8"/>
-                                    <Border Height="1" Background="{StaticResource AppBorderColor}" Margin="0,0,0,8"/>
-
-                                    <TextBlock Text="Compression" Style="{StaticResource SettingLabelStyle}"/>
-                                    <ComboBox x:Name="CompressionComboBox" Style="{StaticResource InputControlStyle}" Margin="0,0,0,12" SelectedIndex="1">
-                                        <ComboBoxItem Content="None (Fastest)"/>
-                                        <ComboBoxItem Content="Fast (Recommended)"/>
-                                        <ComboBoxItem Content="Maximum (Smallest)"/>
-                                    </ComboBox>
-                                    <CheckBox x:Name="RequireAdminCheckBox" Content="Require administrator rights" Style="{StaticResource SettingCheckBoxStyle}" IsChecked="False" Checked="RequireAdminCheckBox_Checked" Unchecked="RequireAdminCheckBox_Checked">
-                                        <CheckBox.ToolTip>
-                                            <ToolTip>
-                                                <TextBlock Text="Requests administrator privileges for the entire installation process. May be required by some bundled installers." TextWrapping="Wrap" MaxWidth="280"/>
-                                            </ToolTip>
-                                        </CheckBox.ToolTip>
-                                    </CheckBox>
-
-                                    <TextBlock Text="Security Options" FontSize="14" Foreground="{StaticResource AppTextColor}" FontWeight="SemiBold" Margin="0,10,0,8"/>
-                                    <Border Height="1" Background="{StaticResource AppBorderColor}" Margin="0,0,0,8"/>
-
-                                    <CheckBox x:Name="OnlyScanExecutablesCheckBox" Content="Only scan executable files" Style="{StaticResource SettingCheckBoxStyle}" IsChecked="True" Checked="OnlyScanExecutablesCheckBox_Checked" Unchecked="OnlyScanExecutablesCheckBox_Checked">
-                                        <CheckBox.ToolTip>
-                                            <ToolTip>
-                                                <TextBlock Text="Only perform VirusTotal scan on files with extensions like .exe, .msi, .dll, etc. Skips other file types." TextWrapping="Wrap" MaxWidth="280"/>
-                                            </ToolTip>
-                                        </CheckBox.ToolTip>
-                                    </CheckBox>
-                                    <CheckBox x:Name="AutoRemoveInfectedFilesCheckBox" Content="Auto remove infected files" Style="{StaticResource SettingCheckBoxStyle}" IsChecked="True" Checked="AutoRemoveInfectedFilesCheckBox_Checked" Unchecked="AutoRemoveInfectedFilesCheckBox_Checked">
-                                        <CheckBox.ToolTip>
-                                            <ToolTip>
-                                                <TextBlock Text="Automatically removes files from the list if they are detected as infected by VirusTotal during scanning." TextWrapping="Wrap" MaxWidth="280"/>
-                                            </ToolTip>
-                                        </CheckBox.ToolTip>
-                                    </CheckBox>
-                                </StackPanel>
-                            </Expander>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- Summary Panel -->
-                    <Border Grid.Row="1" Background="{StaticResource AppPanelColor}" CornerRadius="8" Padding="15" Margin="0,0,0,10">
-                        <Grid>
-                            <!-- NEW: Use Grid inside Summary Panel too -->
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                            </Grid.RowDefinitions>
-
-                            <TextBlock Grid.Row="0" Text="Summary" FontSize="16" Foreground="{StaticResource AppTextColor}" FontWeight="SemiBold" Margin="0,0,0,15"/>
-
-                            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-                                <!-- NEW: Add ScrollViewer for summary content if it gets too long -->
-                                <StackPanel>
-                                    <!-- Summary content can use StackPanel -->
-                                    <Grid Margin="0,0,0,5">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="Files:" Style="{StaticResource SummaryLabelStyle}"/>
-                                        <TextBlock Grid.Column="1" x:Name="FileCountTextBlock" Text="0" Style="{StaticResource SummaryValueStyle}"/>
-                                    </Grid>
-
-                                    <Grid Margin="0,0,0,5">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="Total Size:" Style="{StaticResource SummaryLabelStyle}"/>
-                                        <TextBlock Grid.Column="1" x:Name="TotalSizeTextBlock" Text="0 KB" Style="{StaticResource SummaryValueStyle}"/>
-                                    </Grid>
-
-                                    <!-- NEW: Handle potentially missing SafeFilesTextBlock/CleanFilesTextBlock gracefully in code-behind -->
-                                    <Grid Margin="0,0,0,5">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="Safe Files:" Style="{StaticResource SummaryLabelStyle}"/>
-                                        <!-- NEW: Assuming CleanFilesTextBlock exists in XAML based on previous conversations -->
-                                        <TextBlock Grid.Column="1" x:Name="CleanFilesTextBlock" Text="0" Style="{StaticResource SummaryValueStyle}"/>
-                                        <!-- NEW: Changed name to match likely XAML -->
-                                    </Grid>
-
-                                    <Grid Margin="0,0,0,5">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="Status:" Style="{StaticResource SummaryLabelStyle}"/>
-                                        <TextBlock Grid.Column="1" x:Name="StatusTextBlock" Text="Ready" Foreground="{StaticResource AppStatusCleanColor}" Style="{StaticResource SummaryValueStyle}"/>
-                                    </Grid>
-
-                                    <!-- NEW: Check if PackageSizeTextBlock exists before trying to update it (Fixes error) -->
-                                    <Grid Margin="0,0,0,5">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="Package Size:" Style="{StaticResource SummaryLabelStyle}"/>
-                                        <TextBlock Grid.Column="1" x:Name="PackageSizeTextBlock" Text="~0 KB" Style="{StaticResource SummaryValueStyle}"/>
-                                    </Grid>
-
-                                    <!-- NEW: Check if EstTimeTextBlock exists before trying to update it (Fixes error) -->
-                                    <Grid Margin="0,0,0,5">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="Est. Time:" Style="{StaticResource SummaryLabelStyle}"/>
-                                        <TextBlock Grid.Column="1" x:Name="EstTimeTextBlock" Text="~0 min" Style="{StaticResource SummaryValueStyle}"/>
-                                    </Grid>
-
-                                    <!-- NEW: Check if RequiresAdminTextBlock exists before trying to update it (Fixes error) -->
-                                    <Grid Margin="0,0,0,5">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="Requires Admin:" Style="{StaticResource SummaryLabelStyle}"/>
-                                        <TextBlock Grid.Column="1" x:Name="RequiresAdminTextBlock" Text="No" Style="{StaticResource SummaryValueStyle}"/>
-                                    </Grid>
-
-                                    <Border Style="{StaticResource SummarySeparatorStyle}"/>
-
-                                    <!-- REMOVED: About .packitexe text block (as per plan) -->
-
-                                </StackPanel>
-                            </ScrollViewer>
-                        </Grid>
-                    </Border>
-
-                    <!-- REMOVED: Pack Button from here (it's now in its own row below) -->
-                </Grid>
-            </ScrollViewer>
-            <!-- END NEW: ScrollViewer for right panel -->
-
-        </Grid>
-
-        <!-- NEW: Combined Status Message and Pack Button Area (Row 2) -->
-        <Border Grid.Row="2"
-                Background="{StaticResource AppPanelColor}"
-                CornerRadius="6"
-                Padding="12,10"
-                Margin="0,0,0,8">
-            <Grid>
+            <!-- Right Side Panel (Settings + Summary) -->
+            <!-- This Grid replaces the old PackSettingsAndSummaryPanel -->
+            <Grid Grid.Column="1">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="4"/>
+                    <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
-
-                <!-- Status Text & Pack Button (Horizontally Aligned) -->
-                <Grid Grid.Row="0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <!-- For StatusMessageTextBlock -->
-                        <ColumnDefinition Width="Auto"/>
-                        <!-- For PackButton -->
-                    </Grid.ColumnDefinitions>
-
-                    <TextBlock x:Name="StatusMessageTextBlock"
-                           Text="Ready to pack files. Add files to continue."
-                           Foreground="{StaticResource AppTextSecondaryColor}"
-                           FontFamily="Consolas"
-                           FontSize="12"
-                           VerticalAlignment="Center"
-                           Grid.Column="0"/>
-                    <TextBlock x:Name="ProgressPercentTextBlockInline"
-                               Text="0%"
-                               Foreground="{StaticResource AppTextTertiaryColor}"
-                               FontFamily="Consolas"
-                               FontSize="11"
-                               HorizontalAlignment="Right"
-                               VerticalAlignment="Center"
-                               Visibility="Collapsed"
-                               Grid.Column="0"/>
-                    <!-- Keep percentage on the same side as status -->
-
-                    <!-- Pack Button on the RIGHT side of the status text -->
-                    <Button x:Name="PackButton"
-                            Grid.Column="1"
-                            Content="Pack Now"
-                            Style="{StaticResource Win11Button}"
-                            Height="36"
-                            FontSize="14"
-                            Click="PackNow_Click"
-                            IsEnabled="False"
-                            Width="395"
-                            Margin="10,0,5,0"/>
-                </Grid>
-
-                <!-- Inline Progress Bar -->
-                <ProgressBar Grid.Row="1"
-                         x:Name="ProcessingProgressBar"
-                         Height="4"
-                         Minimum="0"
-                         Maximum="100"
-                         Value="0"
-                         Foreground="{StaticResource AppPrimaryColor}"
-                         Background="Transparent"
-                         VerticalAlignment="Bottom"
-                         Visibility="Collapsed"
-                         Style="{StaticResource RoundedProgressBarStyle}"/>
-                <!-- NEW: Apply the custom style with rounded corners -->
+                <views:PackSettingsPanel Grid.Row="0" />
+                <views:SummaryPanel Grid.Row="1" />
             </Grid>
-        </Border>
+        </Grid>
 
-        <!-- Error Panel (Initially Hidden) -->
-        <Border Grid.Row="2"
-            x:Name="ErrorPanel"
-                Background="{StaticResource AppStatusErrorColor}"
-                CornerRadius="8"
-                Padding="14,12"
-                Margin="0,8,0,8"
-                Visibility="Collapsed">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="⚠️" FontSize="16" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                <TextBlock Grid.Column="1" x:Name="ErrorMessageTextBlock" Text="Error message will appear here" Foreground="White" FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center"/>
-                <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="10,0,0,0">
-                    <Button x:Name="RetryButton" Content="Retry" Click="Retry_Click" Style="{StaticResource Win11Button}" Height="26" Padding="12,4" FontSize="11" Margin="0,0,6,0" Visibility="Collapsed"/>
-                    <Button x:Name="DismissErrorButton" Content="✕" Click="DismissError_Click" Background="Transparent" Foreground="{StaticResource AppTextTertiaryColor}" BorderThickness="0" Height="26" Width="26" FontSize="14" FontWeight="Bold" Cursor="Hand">
-                        <Button.Style>
-                            <Style TargetType="Button" BasedOn="{StaticResource Win11Button}">
-                                <Setter Property="Template">
-                                    <Setter.Value>
-                                        <ControlTemplate TargetType="Button">
-                                            <Border Background="{TemplateBinding Background}" CornerRadius="3">
-                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                            </Border>
-                                        </ControlTemplate>
-                                    </Setter.Value>
-                                </Setter>
-                                <Style.Triggers>
-                                    <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter Property="Background" Value="{StaticResource AppBorderColor}"/>
-                                    </Trigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Button.Style>
-                    </Button>
-                </StackPanel>
-            </Grid>
-        </Border>
+        <!-- Status Area -->
+        <!-- This is the main StatusPanel. It should internally manage the Pack Button and the Error Panel. -->
+        <!-- If your StatusPanel.xaml does NOT contain the Pack Button, you will need to add it there. -->
+        <!-- For now, this assumes StatusPanel.xaml is the correct, single control for this area. -->
+        <views:StatusPanel Grid.Row="2" Margin="0,0,0,8" />
 
         <!-- Bottom Progress Bar (Simplified) -->
         <Grid Grid.Row="3">
@@ -484,7 +112,6 @@
                        Margin="8,0,0,0"
                        FontFamily="Consolas"
                        VerticalAlignment="Center"/>
-
         </Grid>
     </Grid>
 </Window>

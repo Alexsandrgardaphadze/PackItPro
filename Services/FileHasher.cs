@@ -5,7 +5,7 @@ using System.IO;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace PackItPro
+namespace PackItPro.Services
 {
     /// <summary>
     /// Utility class for computing SHA256 file and directory hashes in a

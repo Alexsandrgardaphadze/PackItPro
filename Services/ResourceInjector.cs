@@ -2,7 +2,7 @@
 using System;
 using System.IO;
 
-namespace PackItPro
+namespace PackItPro.Services
 {
     public static class ResourceInjector
     {

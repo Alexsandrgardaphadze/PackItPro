@@ -1,0 +1,82 @@
+﻿<UserControl x:Class="PackItPro.Views.PackSettingsPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:PackItPro.Views"
+             mc:Ignorable="d" 
+             d:DesignHeight="450" d:DesignWidth="800">
+    <Border Background="{StaticResource AppPanelColor}" CornerRadius="8" Padding="15" Margin="0,0,0,10">
+        <StackPanel>
+            <TextBlock Text="PackItPro Settings" FontSize="16" Foreground="{StaticResource AppTextColor}" FontWeight="SemiBold" Margin="0,0,0,15"/>
+            <TextBlock Text="Output File Name:" Style="{StaticResource SettingLabelStyle}"/>
+            <TextBox x:Name="OutputFileNameTextBox" Style="{StaticResource InputControlStyle}" Margin="0,0,0,15" Text="MyPackage"/>
+            <!-- VirusTotal Scan with Help Icon -->
+            <Grid Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <CheckBox x:Name="ScanWithVirusTotalCheckBox" Grid.Column="0" Content="Scan with VirusTotal" Style="{StaticResource SettingCheckBoxStyle}" IsChecked="True" ToolTip="Checks files against VirusTotal database for malware"/>
+                <Button Grid.Column="1" Style="{StaticResource InfoButtonStyle}">
+                    <Button.ToolTip>
+                        <ToolTip>
+                            <TextBlock Text="Files will be checked against VirusTotal's database to ensure safety. If scanning fails, packaging continues with a warning." TextWrapping="Wrap" MaxWidth="250"/>
+                        </ToolTip>
+                    </Button.ToolTip>
+                </Button>
+            </Grid>
+            <!-- Winget Updater with Help Icon -->
+            <Grid Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <CheckBox x:Name="IncludeWingetUpdaterCheckBox" Grid.Column="0" Content="Include Winget Updater" Style="{StaticResource SettingCheckBoxStyle}" IsChecked="False" ToolTip="Adds update_all.bat script for automatic updates via Windows Package Manager (Winget)"/>
+                <Button Grid.Column="1" Style="{StaticResource InfoButtonStyle}">
+                    <Button.ToolTip>
+                        <ToolTip>
+                            <TextBlock Text="Adds update_all.bat script for automatic app updates via Windows Package Manager (Winget) after installation completes." TextWrapping="Wrap" MaxWidth="280"/>
+                        </ToolTip>
+                    </Button.ToolTip>
+                </Button>
+            </Grid>
+            <!-- Advanced Options (Collapsible) -->
+            <Expander x:Name="AdvancedOptionsExpander" Header="Advanced Options" Foreground="{StaticResource AppTextTertiaryColor}" Background="Transparent" BorderThickness="0" Margin="0,12,0,0" IsExpanded="False">
+                <StackPanel Margin="0,12,0,0">
+                    <TextBlock Text="Packaging Behavior" FontSize="14" Foreground="{StaticResource AppTextColor}" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                    <Border Height="1" Background="{StaticResource AppBorderColor}" Margin="0,0,0,8"/>
+                    <TextBlock Text="Compression" Style="{StaticResource SettingLabelStyle}"/>
+                    <ComboBox x:Name="CompressionComboBox" Style="{StaticResource InputControlStyle}" Margin="0,0,0,12" SelectedIndex="1">
+                        <ComboBoxItem Content="None (Fastest)"/>
+                        <ComboBoxItem Content="Fast (Recommended)"/>
+                        <ComboBoxItem Content="Maximum (Smallest)"/>
+                    </ComboBox>
+                    <CheckBox x:Name="RequireAdminCheckBox" Content="Require administrator rights" Style="{StaticResource SettingCheckBoxStyle}" IsChecked="False" Checked="RequireAdminCheckBox_Checked" Unchecked="RequireAdminCheckBox_Checked">
+                        <CheckBox.ToolTip>
+                            <ToolTip>
+                                <TextBlock Text="Requests administrator privileges for the entire installation process. May be required by some bundled installers." TextWrapping="Wrap" MaxWidth="280"/>
+                            </ToolTip>
+                        </CheckBox.ToolTip>
+                    </CheckBox>
+                    <TextBlock Text="Security Options" FontSize="14" Foreground="{StaticResource AppTextColor}" FontWeight="SemiBold" Margin="0,10,0,8"/>
+                    <Border Height="1" Background="{StaticResource AppBorderColor}" Margin="0,0,0,8"/>
+                    <CheckBox x:Name="OnlyScanExecutablesCheckBox" Content="Only scan executable files" Style="{StaticResource SettingCheckBoxStyle}" IsChecked="True" Checked="OnlyScanExecutablesCheckBox_Checked" Unchecked="OnlyScanExecutablesCheckBox_Checked">
+                        <CheckBox.ToolTip>
+                            <ToolTip>
+                                <TextBlock Text="Only perform VirusTotal scan on files with extensions like .exe, .msi, .dll, etc. Skips other file types." TextWrapping="Wrap" MaxWidth="280"/>
+                            </ToolTip>
+                        </CheckBox.ToolTip>
+                    </CheckBox>
+                    <CheckBox x:Name="AutoRemoveInfectedFilesCheckBox" Content="Auto remove infected files" Style="{StaticResource SettingCheckBoxStyle}" IsChecked="True" Checked="AutoRemoveInfectedFilesCheckBox_Checked" Unchecked="AutoRemoveInfectedFilesCheckBox_Checked">
+                        <CheckBox.ToolTip>
+                            <ToolTip>
+                                <TextBlock Text="Automatically removes files from the list if they are detected as infected by VirusTotal during scanning." TextWrapping="Wrap" MaxWidth="280"/>
+                            </ToolTip>
+                        </CheckBox.ToolTip>
+                    </CheckBox>
+                </StackPanel>
+            </Expander>
+        </StackPanel>
+    </Border>
+</UserControl>

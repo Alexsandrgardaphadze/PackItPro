@@ -21,9 +21,9 @@ using System.Net.Http.Json;
 using Microsoft.Win32;
 using Microsoft.WindowsAPICodePack.Dialogs;
 using System.Security.Cryptography;
-
-// Uncommon or special-case
-// using static System.Windows.Forms.VisualStyles.VisualStyleElement.TrayNotify; // This line is likely incorrect and removed
+using PackItPro.Services;
+using PackItPro.Models;
+using PackItPro.ViewModels;
 
 
 namespace PackItPro
@@ -982,8 +982,6 @@ namespace PackItPro
                 LogError("Failed to save settings", ex);
             }
         }
-
-        // REMOVED: SaveVirusScanCache method (now handled by VirusTotalClient)
         #endregion
 
         #region Error Handling

@@ -1,7 +1,7 @@
 ﻿// AppSettings.cs
 using System;
 
-namespace PackItPro
+namespace PackItPro.Models
 {
     public class AppSettings
     {
