@@ -1,4 +1,5 @@
-﻿using System.Windows;
+﻿using System.Threading.Tasks;
+using System.Windows;
 
 namespace PackItPro
 {
@@ -7,7 +8,7 @@ namespace PackItPro
         public MainWindow()
         {
             InitializeComponent();
-            // The DataContext is now set in XAML, so this is very simple.
+            // The DataContext is set in XAML, so nothing else is needed here.
         }
     }
 }

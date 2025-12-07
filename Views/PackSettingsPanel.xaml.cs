@@ -24,5 +24,20 @@ namespace PackItPro.Views
         {
             InitializeComponent();
         }
+
+        private void RequireAdminCheckBox_Checked(object sender, RoutedEventArgs e)
+        {
+            // Event handler intentionally left minimal. Settings are bound to ViewModel.
+        }
+
+        private void OnlyScanExecutablesCheckBox_Checked(object sender, RoutedEventArgs e)
+        {
+            // Event handler intentionally left minimal. Settings are bound to ViewModel.
+        }
+
+        private void AutoRemoveInfectedFilesCheckBox_Checked(object sender, RoutedEventArgs e)
+        {
+            // Event handler intentionally left minimal. Settings are bound to ViewModel.
+        }
     }
 }

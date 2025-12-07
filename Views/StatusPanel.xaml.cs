@@ -24,5 +24,20 @@ namespace PackItPro.Views
         {
             InitializeComponent();
         }
+
+        private void PackNow_Click(object sender, RoutedEventArgs e)
+        {
+            // Intentionally minimal: actual command is bound in MainViewModel.
+        }
+
+        private void Retry_Click(object sender, RoutedEventArgs e)
+        {
+            // Intentionally minimal: actual logic is handled by ViewModel command.
+        }
+
+        private void DismissError_Click(object sender, RoutedEventArgs e)
+        {
+            // Intentionally minimal: actual logic is handled by ViewModel command.
+        }
     }
 }

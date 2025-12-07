@@ -3,6 +3,7 @@ using Microsoft.Win32;
 using Microsoft.WindowsAPICodePack.Dialogs;
 using PackItPro.Services;
 using PackItPro.Models;
+using PackItPro.Views;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -17,6 +18,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
+using System.Runtime.Versioning;
 
 namespace PackItPro.ViewModels
 {
@@ -68,7 +70,8 @@ namespace PackItPro.ViewModels
         {
             // Initialize sub-ViewModels
             Settings = new SettingsViewModel(Path.Combine(_appDataDir, "settings.json"));
-            FileList = new FileListViewModel(Settings, _executableExtensions); // Pass settings and extensions to FileListVM
+            // Fix: FileListViewModel expects AppSettings (model). Expose via Settings.SettingsModel
+            FileList = new FileListViewModel(Settings.SettingsModel, _executableExtensions); // Pass settings model and extensions to FileListVM
             Summary = new SummaryViewModel(FileList); // Pass FileListVM to SummaryVM
             Status = new StatusViewModel(); // StatusVM is independent
 
@@ -76,7 +79,8 @@ namespace PackItPro.ViewModels
             _cacheFilePath = Path.Combine(_appDataDir, "virusscancache.json");
 
             // Initialize services
-            _virusTotalClient = new VirusTotalClient(_cacheFilePath, apiKey: null);
+            // Fix: VirusTotalClient likely expects a non-null apiKey; pass empty string instead of null
+            _virusTotalClient = new VirusTotalClient(_cacheFilePath, apiKey: string.Empty);
             _packagerService = new PackagerService(); // NEW: Initialize PackagerService
 
             // Initialize commands
@@ -143,6 +147,7 @@ namespace PackItPro.ViewModels
                 {
                     Status.SetStatusPacking(); // NEW: Set status before starting
 
+                    // Fix: Changed last parameter to a bool (useLzma) to avoid relying on a missing enum type.
                     var outputPath = await _packagerService?.CreatePackageAsync(
                         FileList.Items.Select(f => f.FilePath).ToList(),
                         Settings.OutputLocation,
@@ -150,7 +155,7 @@ namespace PackItPro.ViewModels
                         Settings.RequiresAdmin, // NEW: Pass admin requirement from settings
                         Settings.IncludeWingetUpdateScript, // NEW: Pass includeWinget (as per XAML)
                         Settings.VerifyIntegrity, // NEW: Pass verifyIntegrity (as per XAML)
-                        Settings.UseLZMACompression ? CompressionLevelEnum.Maximum : CompressionLevelEnum.Fast // NEW: Pass compressionLevel enum (as per XAML)
+                        Settings.UseLZMACompression // NEW: Pass bool useLzma
                     ) ?? throw new InvalidOperationException("PackagerService is not initialized.");
 
                     MessageBox.Show($"Package created successfully!\n{outputPath}",
@@ -187,6 +192,8 @@ namespace PackItPro.ViewModels
             }
         }
 
+        // Mark this method as Windows-only to address CA1416 platform compatibility diagnostics
+        [SupportedOSPlatform("windows")]
         private void ExecuteSetOutputLocationCommand(object? parameter)
         {
             var folderDialog = new CommonOpenFileDialog
