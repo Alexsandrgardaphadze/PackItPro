@@ -35,7 +35,7 @@ namespace PackItPro.Services
             await Task.Yield();
 
             var safeName = string.IsNullOrWhiteSpace(packageName) ? "package" : packageName;
-            var fileName = $"{safeName}_{DateTime.Now:yyyyMMdd_HHmmss}.packitexe";
+            var fileName = $"{safeName}_{DateTime.Now:yyyyMMdd_HHmmss}.exe";
             var outPath = Path.Combine(outputLocation ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop), fileName);
 
             // Ensure directory exists

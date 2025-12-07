@@ -49,7 +49,7 @@ namespace PackItPro.ViewModels
         public void SetStatusReady()
         {
             OperationName = "Idle";
-            Message = "Ready to create .packitexe package";
+            Message = "Ready to create .exe package";
             ProgressPercentage = 0;
             IsPacking = false;
             IsScanning = false;
@@ -66,7 +66,7 @@ namespace PackItPro.ViewModels
         public void SetStatusPacking()
         {
             OperationName = "Packing";
-            Message = "Creating .packitexe package...";
+            Message = "Creating .exe package...";
             IsPacking = true;
             IsScanning = false; // Ensure scanning flag is clear
         }

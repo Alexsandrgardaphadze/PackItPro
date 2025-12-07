@@ -1,29 +1,82 @@
-﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+﻿<!-- Themes/Colors.xaml -->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+	<!-- ========================================
+         MODERN COLOR PALETTE - Enhanced Design
+         ======================================== -->
+	<!-- Background Colors with Depth -->
+	<SolidColorBrush x:Key="AppBackgroundColor" Color="#0f0f1e"/>
+	<SolidColorBrush x:Key="AppPanelColor" Color="#1a1a2e"/>
+	<SolidColorBrush x:Key="AppPanelHoverColor" Color="#1f1f33"/>
+	<SolidColorBrush x:Key="AppCardColor" Color="#16213e"/>
 
-    <!-- Color Palette -->
-    <SolidColorBrush x:Key="AppStatusPendingColor" Color="#FFA500"/>
-    <SolidColorBrush x:Key="AppStatusCleanColor" Color="#00C176"/>
-    <SolidColorBrush x:Key="AppStatusErrorColor" Color="#E74856"/>
-    <SolidColorBrush x:Key="AppStatusWarningColor" Color="#FFC107"/>
-    <SolidColorBrush x:Key="AppTextColor" Color="White"/>
-    <SolidColorBrush x:Key="AppTextSecondaryColor" Color="#CCCCCC"/>
-    <SolidColorBrush x:Key="AppTextTertiaryColor" Color="#9F9FAF"/>
-    <SolidColorBrush x:Key="AppTextQuaternaryColor" Color="#7F7F8F"/>
-    <SolidColorBrush x:Key="AppTextDisabledColor" Color="#909090"/>
-    <SolidColorBrush x:Key="AppBackgroundColor" Color="#1E1E2F"/>
-    <SolidColorBrush x:Key="AppPanelColor" Color="#252536"/>
-    <SolidColorBrush x:Key="AppPanelSecondaryColor" Color="#2C2C3E"/>
-    <SolidColorBrush x:Key="AppBorderColor" Color="#3F3F5A"/>
-    <SolidColorBrush x:Key="AppDropAreaHoverColor" Color="#1E90FF"/>
-    <SolidColorBrush x:Key="AppPrimaryColor" Color="#0078D7"/>
-    <SolidColorBrush x:Key="AppPrimaryHoverColor" Color="#1084D9"/>
-    <SolidColorBrush x:Key="AppPrimaryPressedColor" Color="#006CC1"/>
-    <SolidColorBrush x:Key="AppPrimaryDisabledColor" Color="#505069"/>
-    <!-- NEW: Secondary Palette -->
-    <SolidColorBrush x:Key="AppSecondaryColor" Color="#353545"/>
-    <SolidColorBrush x:Key="AppSecondaryHoverColor" Color="#454555"/>
-    <SolidColorBrush x:Key="AppSecondaryPressedColor" Color="#252535"/>
-    <SolidColorBrush x:Key="AppSecondaryDisabledColor" Color="#505069"/>
+	<!-- Accent Colors - Modern Blue/Purple Gradient -->
+	<SolidColorBrush x:Key="AppPrimaryColor" Color="#4f46e5"/>
+	<SolidColorBrush x:Key="AppPrimaryHoverColor" Color="#6366f1"/>
+	<SolidColorBrush x:Key="AppPrimaryPressedColor" Color="#4338ca"/>
+	<SolidColorBrush x:Key="AppSecondaryColor" Color="#7c3aed"/>
 
+	<!-- Status Colors - Semantic -->
+	<SolidColorBrush x:Key="AppStatusCleanColor" Color="#10b981"/>
+	<SolidColorBrush x:Key="AppStatusWarningColor" Color="#f59e0b"/>
+	<SolidColorBrush x:Key="AppStatusErrorColor" Color="#ef4444"/>
+	<SolidColorBrush x:Key="AppStatusPendingColor" Color="#3b82f6"/>
+	<SolidColorBrush x:Key="AppStatusInfoColor" Color="#06b6d4"/>
+
+	<!-- Text Colors with Hierarchy -->
+	<SolidColorBrush x:Key="AppTextColor" Color="#f1f5f9"/>
+	<SolidColorBrush x:Key="AppTextSecondaryColor" Color="#cbd5e1"/>
+	<SolidColorBrush x:Key="AppTextTertiaryColor" Color="#94a3b8"/>
+	<SolidColorBrush x:Key="AppTextQuaternaryColor" Color="#64748b"/>
+	<SolidColorBrush x:Key="AppTextDisabledColor" Color="#475569"/>
+
+	<!-- Border & Divider Colors -->
+	<SolidColorBrush x:Key="AppBorderColor" Color="#334155"/>
+	<SolidColorBrush x:Key="AppBorderLightColor" Color="#475569"/>
+	<SolidColorBrush x:Key="AppDividerColor" Color="#1e293b"/>
+
+	<!-- Interactive States -->
+	<SolidColorBrush x:Key="AppDropAreaHoverColor" Color="#6366f1"/>
+	<SolidColorBrush x:Key="AppHoverOverlayColor" Color="#1e1e3a"/>
+
+	<!-- Glassmorphism Effect Colors -->
+	<SolidColorBrush x:Key="AppGlassBackground" Color="#1a1a2e" Opacity="0.7"/>
+	<SolidColorBrush x:Key="AppGlassBorder" Color="#ffffff" Opacity="0.1"/>
+
+	<!-- Gradient Definitions -->
+	<LinearGradientBrush x:Key="AppPrimaryGradient" StartPoint="0,0" EndPoint="1,1">
+		<GradientStop Color="#4f46e5" Offset="0"/>
+		<GradientStop Color="#7c3aed" Offset="1"/>
+	</LinearGradientBrush>
+
+	<LinearGradientBrush x:Key="AppSuccessGradient" StartPoint="0,0" EndPoint="1,0">
+		<GradientStop Color="#10b981" Offset="0"/>
+		<GradientStop Color="#059669" Offset="1"/>
+	</LinearGradientBrush>
+
+	<LinearGradientBrush x:Key="AppDangerGradient" StartPoint="0,0" EndPoint="1,0">
+		<GradientStop Color="#ef4444" Offset="0"/>
+		<GradientStop Color="#dc2626" Offset="1"/>
+	</LinearGradientBrush>
+
+	<!-- Shadow Effects -->
+	<DropShadowEffect x:Key="AppCardShadow"
+                      Color="Black"
+                      Opacity="0.4"
+                      BlurRadius="20"
+                      ShadowDepth="5"
+                      Direction="270"/>
+
+	<DropShadowEffect x:Key="AppButtonShadow"
+                      Color="Black"
+                      Opacity="0.3"
+                      BlurRadius="10"
+                      ShadowDepth="3"
+                      Direction="270"/>
+
+	<DropShadowEffect x:Key="AppGlowEffect"
+                      Color="#4f46e5"
+                      Opacity="0.6"
+                      BlurRadius="15"
+                      ShadowDepth="0"/>
 </ResourceDictionary>

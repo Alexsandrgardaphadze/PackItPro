@@ -136,9 +136,9 @@ namespace PackItPro.ViewModels
 
             var saveDialog = new SaveFileDialog
             {
-                Filter = "PackItPro Executable (.packitexe)|*.packitexe",
+                Filter = "PackItPro Executable (.exe)|*.exe",
                 InitialDirectory = Settings.OutputLocation,
-                FileName = $"Package_{DateTime.Now:yyyyMMdd_HHmmss}.packitexe"
+                FileName = $"Package_{DateTime.Now:yyyyMMdd_HHmmss}.exe"
             };
 
             if (saveDialog.ShowDialog() == true)
@@ -147,8 +147,10 @@ namespace PackItPro.ViewModels
                 {
                     Status.SetStatusPacking(); // NEW: Set status before starting
 
-                    // Fix: Changed last parameter to a bool (useLzma) to avoid relying on a missing enum type.
-                    var outputPath = await _packagerService?.CreatePackageAsync(
+                    if (_packagerService == null)
+                        throw new InvalidOperationException("PackagerService is not initialized.");
+
+                    var outputPath = await _packagerService.CreatePackageAsync(
                         FileList.Items.Select(f => f.FilePath).ToList(),
                         Settings.OutputLocation,
                         Path.GetFileNameWithoutExtension(saveDialog.FileName),
@@ -156,7 +158,7 @@ namespace PackItPro.ViewModels
                         Settings.IncludeWingetUpdateScript, // NEW: Pass includeWinget (as per XAML)
                         Settings.VerifyIntegrity, // NEW: Pass verifyIntegrity (as per XAML)
                         Settings.UseLZMACompression // NEW: Pass bool useLzma
-                    ) ?? throw new InvalidOperationException("PackagerService is not initialized.");
+                    );
 
                     MessageBox.Show($"Package created successfully!\n{outputPath}",
                                   "Success", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -194,7 +196,7 @@ namespace PackItPro.ViewModels
 
         // Mark this method as Windows-only to address CA1416 platform compatibility diagnostics
         [SupportedOSPlatform("windows")]
-        private void ExecuteSetOutputLocationCommand(object? parameter)
+        private async void ExecuteSetOutputLocationCommand(object? parameter)
         {
             var folderDialog = new CommonOpenFileDialog
             {
@@ -213,7 +215,7 @@ namespace PackItPro.ViewModels
                     File.Delete(testFile);
 
                     Settings.OutputLocation = folderDialog.FileName;
-                    Settings.SaveSettingsAsync(); // Save settings after change
+                    await Settings.SaveSettingsAsync(); // Save settings after change (awaited)
                 }
                 catch (UnauthorizedAccessException)
                 {

@@ -1,235 +1,126 @@
-﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+﻿<!-- Themes/Controls.xaml -->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <!-- ToolTip Style -->
-    <Style TargetType="ToolTip">
-        <Setter Property="Background" Value="{StaticResource AppPanelColor}"/>
-        <Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
-        <Setter Property="BorderBrush" Value="{StaticResource AppBorderColor}"/>
-        <Setter Property="Padding" Value="8"/>
-    </Style>
+	<!-- Input Control Style -->
+	<Style x:Key="InputControlStyle" TargetType="Control">
+		<Setter Property="Background" Value="{StaticResource AppPanelColor}"/>
+		<Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
+		<Setter Property="BorderBrush" Value="{StaticResource AppBorderColor}"/>
+		<Setter Property="Padding" Value="10,8"/>
+		<Setter Property="FontFamily" Value="Consolas"/>
+		<Setter Property="FontSize" Value="13"/>
+	</Style>
 
-    <!-- Windows 11 Style Button -->
-    <Style x:Key="Win11Button" TargetType="Button">
-        <Setter Property="Background" Value="{StaticResource AppPrimaryColor}"/>
-        <Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
-        <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="Padding" Value="15,8"/>
-        <Setter Property="Cursor" Value="Hand"/>
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="Button">
-                    <Border Background="{TemplateBinding Background}" 
+	<!-- Setting CheckBox Style -->
+	<Style x:Key="SettingCheckBoxStyle" TargetType="CheckBox">
+		<Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
+		<Setter Property="Margin" Value="0,0,0,12"/>
+		<Setter Property="VerticalAlignment" Value="Center"/>
+	</Style>
+
+	<!-- Setting Label Style -->
+	<Style x:Key="SettingLabelStyle" TargetType="TextBlock">
+		<Setter Property="Foreground" Value="{StaticResource AppTextSecondaryColor}"/>
+		<Setter Property="FontSize" Value="12"/>
+		<Setter Property="FontWeight" Value="Medium"/>
+		<Setter Property="Margin" Value="0,0,0,8"/>
+	</Style>
+
+	<!-- Info Button Style -->
+	<Style x:Key="InfoButtonStyle" TargetType="Button">
+		<Setter Property="Content" Value="?"/>
+		<Setter Property="Width" Value="20"/>
+		<Setter Property="Height" Value="20"/>
+		<Setter Property="FontSize" Value="11"/>
+		<Setter Property="FontWeight" Value="Bold"/>
+		<Setter Property="Background" Value="{StaticResource AppPanelHoverColor}"/>
+		<Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
+		<Setter Property="BorderThickness" Value="0"/>
+		<Setter Property="Cursor" Value="Hand"/>
+		<Setter Property="HorizontalAlignment" Value="Left"/>
+		<Setter Property="Margin" Value="8,0,0,0"/>
+		<Setter Property="ToolTipService.InitialShowDelay" Value="0"/>
+		<Setter Property="Template">
+			<Setter.Value>
+				<ControlTemplate TargetType="Button">
+					<Border Background="{TemplateBinding Background}"
+                            CornerRadius="10"
+                            BorderThickness="1"
+                            BorderBrush="{StaticResource AppBorderLightColor}">
+						<ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+					</Border>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+	</Style>
+
+	<!-- Modern ComboBox -->
+	<Style x:Key="ModernComboBox" TargetType="ComboBox" BasedOn="{StaticResource InputControlStyle}">
+	</Style>
+
+	<!-- Modern Button (Win11Button) -->
+	<Style x:Key="Win11Button" TargetType="Button">
+		<Setter Property="Background" Value="{StaticResource AppPrimaryColor}"/>
+		<Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
+		<Setter Property="BorderThickness" Value="0"/>
+		<Setter Property="Padding" Value="15,8"/>
+		<Setter Property="Cursor" Value="Hand"/>
+		<Setter Property="FontWeight" Value="SemiBold"/>
+		<Setter Property="Template">
+			<Setter.Value>
+				<ControlTemplate TargetType="Button">
+					<Border Background="{TemplateBinding Background}"
                             BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="4">
-                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </Border>
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter Property="Background" Value="{StaticResource AppPrimaryHoverColor}"/>
-                        </Trigger>
-                        <Trigger Property="IsPressed" Value="True">
-                            <Setter Property="Background" Value="{StaticResource AppPrimaryPressedColor}"/>
-                        </Trigger>
-                        <Trigger Property="IsEnabled" Value="False">
-                            <Setter Property="Background" Value="{StaticResource AppPrimaryDisabledColor}"/>
-                            <Setter Property="Foreground" Value="{StaticResource AppTextDisabledColor}"/>
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
+                            CornerRadius="8">
+						<ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+					</Border>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+		<Style.Triggers>
+			<Trigger Property="IsMouseOver" Value="True">
+				<Setter Property="Background" Value="{StaticResource AppPrimaryHoverColor}"/>
+				<Setter Property="Effect" Value="{StaticResource AppButtonShadow}"/>
+			</Trigger>
+			<Trigger Property="IsPressed" Value="True">
+				<Setter Property="Background" Value="{StaticResource AppPrimaryPressedColor}"/>
+				<Setter Property="RenderTransform">
+					<Setter.Value>
+						<ScaleTransform ScaleX="0.98" ScaleY="0.98"/>
+					</Setter.Value>
+				</Setter>
+			</Trigger>
+			<Trigger Property="IsEnabled" Value="False">
+				<Setter Property="Opacity" Value="0.6"/>
+			</Trigger>
+		</Style.Triggers>
+	</Style>
 
-    <!-- Secondary Button Style -->
-    <Style x:Key="SecondaryButtonStyle" TargetType="Button" BasedOn="{StaticResource Win11Button}">
-        <Setter Property="Background" Value="{StaticResource AppSecondaryColor}"/>
-        <Setter Property="Foreground" Value="White"/>
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="Button">
-                    <Border Background="{TemplateBinding Background}" 
-                            BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="4">
-                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </Border>
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter Property="Background" Value="{StaticResource AppSecondaryHoverColor}"/>
-                        </Trigger>
-                        <Trigger Property="IsPressed" Value="True">
-                            <Setter Property="Background" Value="{StaticResource AppSecondaryPressedColor}"/>
-                        </Trigger>
-                        <Trigger Property="IsEnabled" Value="False">
-                            <Setter Property="Background" Value="{StaticResource AppSecondaryDisabledColor}"/>
-                            <Setter Property="Foreground" Value="{StaticResource AppTextDisabledColor}"/>
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
-
-    <!-- Rounded ProgressBar Style -->
-    <Style x:Key="RoundedProgressBarStyle" TargetType="ProgressBar">
-        <Setter Property="Height" Value="5"/>
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="ProgressBar">
-                    <Grid Name="TemplateRoot" SnapsToDevicePixels="True">
-                        <!-- Background Border (Track) with CornerRadius -->
-                        <Border x:Name="ProgressBarTrack" 
-                                Background="{TemplateBinding Background}" 
-                                CornerRadius="3" />
-                        <!-- Foreground Rectangle (Fill) with Clipping -->
-                        <Rectangle x:Name="PART_Track"/>
-                        <Decorator x:Name="PART_Indicator" 
-                                   HorizontalAlignment="Left" 
+	<!-- Rounded ProgressBar Style -->
+	<Style x:Key="RoundedProgressBarStyle" TargetType="ProgressBar">
+		<Setter Property="Height" Value="6"/>
+		<Setter Property="Template">
+			<Setter.Value>
+				<ControlTemplate TargetType="ProgressBar">
+					<Grid Name="TemplateRoot" SnapsToDevicePixels="True">
+						<Border x:Name="ProgressBarTrack"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="3"/>
+						<Rectangle x:Name="PART_Track"/>
+						<Decorator x:Name="PART_Indicator"
+                                   HorizontalAlignment="Left"
                                    VerticalAlignment="Stretch">
-                            <Grid>
-                                <Border x:Name="Indicator" 
-                                        Background="{TemplateBinding Foreground}" 
+							<Grid>
+								<Border x:Name="Indicator"
+                                        Background="{TemplateBinding Foreground}"
                                         CornerRadius="3"/>
-                            </Grid>
-                        </Decorator>
-                    </Grid>
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="Orientation" Value="Vertical">
-                            <Setter TargetName="TemplateRoot" Property="LayoutTransform">
-                                <Setter.Value>
-                                    <RotateTransform Angle="-90"/>
-                                </Setter.Value>
-                            </Setter>
-                        </Trigger>
-                        <Trigger Property="IsIndeterminate" Value="True">
-                            <Setter TargetName="Indicator" Property="Visibility" Value="Collapsed"/>
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
-
-    <!-- File Item Style -->
-    <Style x:Key="FileItemStyle" TargetType="ListViewItem">
-        <Setter Property="Padding" Value="8,6"/>
-        <Setter Property="Background" Value="{StaticResource AppPanelSecondaryColor}"/>
-        <Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
-        <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="Margin" Value="0,2"/>
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="ListViewItem">
-                    <Border Background="{TemplateBinding Background}" 
-                            BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="4"
-                            Padding="{TemplateBinding Padding}">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <ContentPresenter Grid.Column="0"/>
-                            <Button x:Name="button" Grid.Column="1" Content="✕" 
-                                    Foreground="{StaticResource AppTextTertiaryColor}"
-                                    Background="Transparent" 
-                                    BorderThickness="0"
-                                    Padding="5,0"
-                                    Margin="5,0,0,0"
-                                    Visibility="Hidden"/>
-                        </Grid>
-                    </Border>
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter Property="Background" Value="#353545"/>
-                            <Trigger.EnterActions>
-                                <BeginStoryboard>
-                                    <Storyboard>
-                                        <ObjectAnimationUsingKeyFrames Storyboard.TargetProperty="Visibility" Storyboard.TargetName="button">
-                                            <DiscreteObjectKeyFrame KeyTime="0:0:0" Value="{x:Static Visibility.Visible}"/>
-                                        </ObjectAnimationUsingKeyFrames>
-                                    </Storyboard>
-                                </BeginStoryboard>
-                            </Trigger.EnterActions>
-                            <Trigger.ExitActions>
-                                <BeginStoryboard>
-                                    <Storyboard>
-                                        <ObjectAnimationUsingKeyFrames Storyboard.TargetProperty="Visibility" Storyboard.TargetName="button">
-                                            <DiscreteObjectKeyFrame KeyTime="0:0:0" Value="{x:Static Visibility.Hidden}"/>
-                                        </ObjectAnimationUsingKeyFrames>
-                                    </Storyboard>
-                                </BeginStoryboard>
-                            </Trigger.ExitActions>
-                        </Trigger>
-                        <Trigger Property="IsSelected" Value="True">
-                            <Setter Property="Background" Value="#3A3A50"/>
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
-
-    <!-- Menu Item Styles -->
-    <Style x:Key="MenuItemStyle" TargetType="MenuItem">
-        <Setter Property="Background" Value="{StaticResource AppPanelColor}"/>
-        <Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="MenuItem">
-                    <Border x:Name="Border" Background="{TemplateBinding Background}">
-                        <Grid>
-                            <ContentPresenter ContentSource="Header" Margin="10,3"/>
-                            <Popup x:Name="Popup" IsOpen="{TemplateBinding IsSubmenuOpen}" 
-                                   Placement="Bottom" PopupAnimation="Fade">
-                                <Border x:Name="SubMenuBorder" Background="{StaticResource AppPanelColor}" 
-                                        BorderBrush="{StaticResource AppBorderColor}" BorderThickness="1" Padding="2">
-                                    <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle"/>
-                                </Border>
-                            </Popup>
-                        </Grid>
-                    </Border>
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter Property="Background" Value="#353545" TargetName="Border"/>
-                        </Trigger>
-                        <Trigger Property="IsHighlighted" Value="True">
-                            <Setter Property="Background" Value="#353545" TargetName="Border"/>
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
-
-    <Style x:Key="SubMenuItemStyle" TargetType="MenuItem">
-        <Setter Property="Background" Value="{StaticResource AppPanelColor}"/>
-        <Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="MenuItem">
-                    <Border x:Name="Border" Background="{TemplateBinding Background}" Padding="5,3">
-                        <ContentPresenter ContentSource="Header" Margin="10,3"/>
-                    </Border>
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter Property="Background" Value="#353545" TargetName="Border"/>
-                        </Trigger>
-                        <Trigger Property="IsHighlighted" Value="True">
-                            <Setter Property="Background" Value="#353545" TargetName="Border"/>
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
-
-    <!-- Header Style for GridViewColumn -->
-    <Style x:Key="GridViewColumnHeaderStyle" TargetType="GridViewColumnHeader">
-        <Setter Property="Background" Value="{StaticResource AppPanelSecondaryColor}"/>
-        <Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
-        <Setter Property="Padding" Value="10,5"/>
-        <Setter Property="HorizontalContentAlignment" Value="Left"/>
-    </Style>
+							</Grid>
+						</Decorator>
+					</Grid>
+				</ControlTemplate>
+			</Setter.Value>
+		</Setter>
+	</Style>
 
 </ResourceDictionary>
