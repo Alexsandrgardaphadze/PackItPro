@@ -13,5 +13,7 @@ namespace PackItPro.Models
         public bool IncludeWingetUpdateScript { get; set; } = false; // New setting
         public bool UseLZMACompression { get; set; } = true; // New setting
         public bool RequiresAdmin { get; set; } = false; // NEW: Add setting for overall package admin requirement
+        public bool VerifyIntegrity { get; set; } = true;
+
     }
 }

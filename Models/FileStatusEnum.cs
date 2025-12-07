@@ -6,3 +6,9 @@
     ScanFailed,
     Skipped
 }
+public enum CompressionLevelEnum
+{
+    Fast,
+    Normal,
+    Maximum
+}

@@ -2,6 +2,7 @@
 using Microsoft.Win32;
 using Microsoft.WindowsAPICodePack.Dialogs;
 using PackItPro.Services;
+using PackItPro.Models;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -15,7 +16,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Input; // For RelayCommand
+using System.Windows.Input;
 
 namespace PackItPro.ViewModels
 {
