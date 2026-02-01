@@ -10,8 +10,6 @@
                 <ResourceDictionary Source="/Themes/Controls.xaml" />
                 <ResourceDictionary Source="/Themes/Styles.xaml" />
                 <ResourceDictionary Source="/Themes/FallbackResources.xaml" />
-                <!-- Optional fallback (put it last) -->
-                <ResourceDictionary Source="/Themes/FallbackResources.xaml" />
             </ResourceDictionary.MergedDictionaries>
             <!-- Do NOT define converters again here -->
         </ResourceDictionary>

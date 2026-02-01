@@ -50,6 +50,17 @@ namespace PackItPro.ViewModels
         public ICommand ExportLogsCommand { get; }
         public ICommand ClearCacheCommand { get; }
         public ICommand ExitCommand { get; }
+        public ICommand PackItProSettingsCommand { get; }
+        public ICommand TestPackageCommand { get; }
+        public ICommand ViewCacheCommand { get; }
+        public ICommand ExportListCommand { get; }
+        public ICommand DocumentationCommand { get; }
+        public ICommand GitHubCommand { get; }
+        public ICommand ReportIssueCommand { get; }
+        public ICommand CheckUpdatesCommand { get; }
+        public ICommand AboutCommand { get; }
+
+
 
         public MainViewModel()
         {
@@ -73,6 +84,15 @@ namespace PackItPro.ViewModels
             ExportLogsCommand = new RelayCommand(ExecuteExportLogsCommand);
             ClearCacheCommand = new RelayCommand(ExecuteClearCacheCommand);
             ExitCommand = new RelayCommand(ExecuteExitCommand);
+            PackItProSettingsCommand = new RelayCommand(ExecutePackItProSettingsCommand);
+            TestPackageCommand = new RelayCommand(ExecuteTestPackageCommand);
+            ViewCacheCommand = new RelayCommand(ExecuteViewCacheCommand);
+            ExportListCommand = new RelayCommand(ExecuteExportListCommand);
+            DocumentationCommand = new RelayCommand(ExecuteDocumentationCommand);
+            GitHubCommand = new RelayCommand(ExecuteGitHubCommand);
+            ReportIssueCommand = new RelayCommand(ExecuteReportIssueCommand);
+            CheckUpdatesCommand = new RelayCommand(ExecuteCheckUpdatesCommand);
+            AboutCommand = new RelayCommand(ExecuteAboutCommand);
 
             // Subscribe to property changes for UI state updates
             FileList.PropertyChanged += (s, e) =>
@@ -108,12 +128,15 @@ namespace PackItPro.ViewModels
             {
                 // 1. Load settings first
                 await Settings.LoadSettingsAsync();
+                LogInfo("Settings loaded successfully");
 
                 // 2. Initialize VirusTotal client with loaded API key
                 _virusTotalClient = new VirusTotalClient(_cacheFilePath, Settings.VirusTotalApiKey);
+                LogInfo("VirusTotal client initialized");
 
                 // 3. Load scan cache
                 await _virusTotalClient.LoadCacheAsync();
+                LogInfo("Scan cache loaded");
 
                 _isInitialized = true;
                 Status.SetStatusReady();
@@ -139,6 +162,17 @@ namespace PackItPro.ViewModels
         private async void ExecutePackCommand(object? parameter)
         {
             if (!CanExecutePack(parameter)) return;
+
+            // Validate settings before proceeding
+            if (!Settings.ValidateSettings(out var errorMessage))
+            {
+                MessageBox.Show(
+                    $"Invalid settings:\n{errorMessage}",
+                    "Settings Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
 
             var saveDialog = new SaveFileDialog
             {
@@ -176,6 +210,17 @@ namespace PackItPro.ViewModels
             {
                 HandleStubMissingError();
             }
+            catch (IOException ex) when (ex.Message.Contains("in use"))
+            {
+                MessageBox.Show(
+                    $"Cannot package: A file is locked or in use by another application.\n\n" +
+                    $"Details: {ex.InnerException?.Message}\n\n" +
+                    $"Solution: Close any programs that have these files open and try again.",
+                    "File Locked",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                LogError("Packaging failed - file locked", ex);
+            }
             catch (InvalidOperationException ex) when (ex.Message.Contains("compare two elements"))
             {
                 HandleHashingError(ex);
@@ -209,12 +254,24 @@ namespace PackItPro.ViewModels
 
             if (dialog.ShowDialog() == true)
             {
-                FileList.AddFilesWithValidation(dialog.FileNames);
+                FileList.AddFilesWithValidation(dialog.FileNames, out var result);
+
+                // Show summary if files were skipped
+                if (result.SkippedCount > 0)
+                {
+                    var message = $"Added {result.SuccessCount} file(s).\n\n";
+                    message += $"Skipped {result.SkippedCount}:\n";
+                    message += string.Join("\n", result.SkipReasons.Take(3));
+                    if (result.SkipReasons.Count > 3)
+                        message += $"\n...and {result.SkipReasons.Count - 3} more";
+
+                    MessageBox.Show(message, "Files Added", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
 
                 // Auto-scan if enabled in settings
                 if (Settings.ScanWithVirusTotal && !string.IsNullOrWhiteSpace(Settings.VirusTotalApiKey))
                 {
-                    ExecuteScanFilesCommand(null); // Fire-and-forget with internal error handling
+                    ExecuteScanFilesCommand(null);
                 }
             }
         }
@@ -424,6 +481,162 @@ namespace PackItPro.ViewModels
         }
         #endregion
 
+        #region Additional Commands Execution
+        private void ExecutePackItProSettingsCommand(object? parameter)
+        {
+            MessageBox.Show(
+                "Settings dialog not yet implemented.\n\nUse Settings menu for now.",
+                "Settings",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+
+        private void ExecuteTestPackageCommand(object? parameter)
+        {
+            MessageBox.Show(
+                "Test package feature not yet implemented.",
+                "Test Package",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+
+        private void ExecuteViewCacheCommand(object? parameter)
+        {
+            MessageBox.Show(
+                "Cache viewer not yet implemented.",
+                "View Cache",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+
+        private void ExecuteExportListCommand(object? parameter)
+        {
+            if (FileList.Items.Count == 0)
+            {
+                MessageBox.Show(
+                    "No files to export.",
+                    "Export List",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            var dialog = new SaveFileDialog
+            {
+                Filter = "Text Files (*.txt)|*.txt|CSV Files (*.csv)|*.csv|All Files (*.*)|*.*",
+                FileName = $"PackItPro_FileList_{DateTime.Now:yyyyMMdd_HHmmss}.txt",
+                InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Desktop)
+            };
+
+            if (dialog.ShowDialog() == true)
+            {
+                try
+                {
+                    var content = string.Join("\n", FileList.Items.Select(f => $"{f.FileName} - {f.Size}"));
+                    File.WriteAllText(dialog.FileName, content);
+                    MessageBox.Show(
+                        $"File list exported to:\n{dialog.FileName}",
+                        "Export Successful",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                }
+                catch (Exception ex)
+                {
+                    LogError("File list export failed", ex);
+                    MessageBox.Show(
+                        $"Failed to export list:\n{ex.Message}",
+                        "Export Error",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
+                }
+            }
+        }
+
+        private void ExecuteDocumentationCommand(object? parameter)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "https://github.com/Alexsandrgardaphadze/PackItPro/wiki",
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                LogError("Failed to open documentation", ex);
+                MessageBox.Show(
+                    "Could not open documentation.\nVisit: https://github.com/Alexsandrgardaphadze/PackItPro/wiki",
+                    "Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
+        private void ExecuteGitHubCommand(object? parameter)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "https://github.com/Alexsandrgardaphadze/PackItPro",
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                LogError("Failed to open GitHub", ex);
+                MessageBox.Show(
+                    "Could not open GitHub repository.\nVisit: https://github.com/Alexsandrgardaphadze/PackItPro",
+                    "Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
+        private void ExecuteReportIssueCommand(object? parameter)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "https://github.com/Alexsandrgardaphadze/PackItPro/issues",
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                LogError("Failed to open issue tracker", ex);
+                MessageBox.Show(
+                    "Could not open issue tracker.\nVisit: https://github.com/Alexsandrgardaphadze/PackItPro/issues",
+                    "Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
+        private void ExecuteCheckUpdatesCommand(object? parameter)
+        {
+            MessageBox.Show(
+                "Update check feature not yet implemented.",
+                "Check for Updates",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+
+        private void ExecuteAboutCommand(object? parameter)
+        {
+            MessageBox.Show(
+                "PackItPro v1.0\n\n" +
+                "A secure package builder for bundling multiple applications.\n\n" +
+                "© 2024 All rights reserved.\n\n" +
+                "GitHub: https://github.com/Alexsandrgardaphadze/PackItPro",
+                "About PackItPro",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        #endregion
+
         #region VirusTotal Scanning Logic
         private async Task ExecuteScanFilesWithVirusTotal()
         {
@@ -453,6 +666,7 @@ namespace PackItPro.ViewModels
 
             Status.Message = $"Scanning {totalFiles} file(s) with VirusTotal...";
             int processed = 0;
+            int failedCount = 0;
             var infectedFiles = new List<FileItemViewModel>();
 
             foreach (var item in FileList.Items)
@@ -485,6 +699,7 @@ namespace PackItPro.ViewModels
                 {
                     LogError($"Scan failed for {item.FileName}", ex);
                     item.Status = FileStatusEnum.ScanFailed;
+                    failedCount++;
                 }
                 finally
                 {
@@ -515,6 +730,15 @@ namespace PackItPro.ViewModels
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
             }
+            else if (failedCount > 0)
+            {
+                MessageBox.Show(
+                    $"Scan completed with errors:\n{failedCount} file(s) failed to scan.\n\n" +
+                    $"Check logs for details.",
+                    "Scan Completed with Errors",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
             else
             {
                 MessageBox.Show(
@@ -526,7 +750,7 @@ namespace PackItPro.ViewModels
 
             // Save updated cache
             await _virusTotalClient.SaveCacheAsync();
-            Status.Message = "Scan completed successfully";
+            Status.Message = failedCount > 0 ? "Scan completed with errors" : "Scan completed successfully";
         }
         #endregion
 

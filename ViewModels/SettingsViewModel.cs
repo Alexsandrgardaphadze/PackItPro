@@ -137,6 +137,39 @@ namespace PackItPro.ViewModels
             }
         }
 
+        public bool ValidateSettings(out string errorMessage)
+        {
+            errorMessage = "";
+
+            // Check output location
+            if (string.IsNullOrWhiteSpace(OutputLocation))
+            {
+                errorMessage = "Output location not set.";
+                return false;
+            }
+
+            if (!Directory.Exists(OutputLocation))
+            {
+                errorMessage = $"Output location does not exist: {OutputLocation}";
+                return false;
+            }
+
+            // Try creating a temp file to verify write access
+            try
+            {
+                var testFile = Path.Combine(OutputLocation, $".test_{Guid.NewGuid()}");
+                File.WriteAllText(testFile, "test");
+                File.Delete(testFile);
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"No write permission in output location: {ex.Message}";
+                return false;
+            }
+
+            return true;
+        }
+
         public event PropertyChangedEventHandler? PropertyChanged;
         protected virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string? propertyName = null) =>
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));

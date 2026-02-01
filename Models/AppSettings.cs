@@ -16,5 +16,6 @@ namespace PackItPro.Models
         public bool RequiresAdmin { get; set; } = false;
         public bool VerifyIntegrity { get; set; } = true;
         public bool ScanWithVirusTotal { get; set; } = true; // NEW
+        public int MaxFilesInList { get; set; } = 20; // NEW: Configurable file limit
     }
 }

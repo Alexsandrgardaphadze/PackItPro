@@ -1,5 +1,6 @@
 ﻿using System.Threading.Tasks;
 using System.Windows;
+using PackItPro.ViewModels;
 
 namespace PackItPro
 {
@@ -8,7 +9,15 @@ namespace PackItPro
         public MainWindow()
         {
             InitializeComponent();
-            // The DataContext is set in XAML, so nothing else is needed here.
+        }
+
+        private async void Window_Loaded(object sender, RoutedEventArgs e)
+        {
+            // Initialize the MainViewModel after window is loaded
+            if (this.DataContext is MainViewModel vm)
+            {
+                await vm.InitializeAsync();
+            }
         }
     }
 }

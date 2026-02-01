@@ -22,7 +22,21 @@ namespace PackItPro.ViewModels
 
         // Properties derived from the list
         public int Count => _items.Count;
-        public long TotalSize => _items.Sum(f => new FileInfo(f.FilePath).Length); // NEW: Handle exceptions in UI code-behind if needed
+        public long TotalSize
+        {
+            get
+            {
+                try
+                {
+                    return _items.Sum(f => File.Exists(f.FilePath) ? new FileInfo(f.FilePath).Length : 0);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[FileListViewModel] Error calculating TotalSize: {ex.Message}");
+                    return 0; // Fallback if any file access error occurs
+                }
+            }
+        } // NEW: Handle exceptions in UI code-behind if needed
         public int CleanCount => _items.Count(f => f.Status == FileStatusEnum.Clean);
         public int InfectedCount => _items.Count(f => f.Status == FileStatusEnum.Infected);
         public int FailedCount => _items.Count(f => f.Status == FileStatusEnum.ScanFailed);
@@ -48,33 +62,69 @@ namespace PackItPro.ViewModels
         public ICommand ClearAllFilesCommand { get; }
         // public ICommand RemoveFileCommand { get; } // If defined per item, no need here.
 
-        // NEW: Method to add files with validation (logic moved from MainWindow.xaml.cs)
-        public void AddFilesWithValidation(string[] paths)
+        // NEW: Result model for validation
+        public class AddFilesResult
         {
+            public int SuccessCount { get; set; }
+            public int SkippedCount { get; set; }
+            public List<string> SkipReasons { get; } = new();
+        }
+
+        // NEW: Method to add files with validation results
+        public void AddFilesWithValidation(string[] paths, out AddFilesResult result)
+        {
+            result = new AddFilesResult();
+            var skipReasons = new List<string>();
+
+            if (_items.Count >= _settings.MaxFilesInList)
+            {
+                result.SkippedCount = paths.Length;
+                result.SkipReasons.Add($"File limit reached ({_settings.MaxFilesInList} files maximum)");
+                return;
+            }
+
             var validFiles = paths
-                .Where(p => File.Exists(p))
-                .Select(p => new FileInfo(p))
+                .Where(p => 
+                {
+                    if (!File.Exists(p))
+                    {
+                        skipReasons.Add($"File not found: {Path.GetFileName(p)}");
+                        return false;
+                    }
+                    return true;
+                })
+                .Select(p =>
+                {
+                    try
+                    {
+                        return new FileInfo(p);
+                    }
+                    catch (Exception ex)
+                    {
+                        skipReasons.Add($"Cannot access file: {Path.GetFileName(p)} ({ex.Message})");
+                        return null;
+                    }
+                })
+                .Where(fi => fi != null)
                 .Where(fi =>
                 {
-                    if (fi.Length == 0)
+                    if (fi!.Length == 0)
                     {
-                        MessageBox.Show($"Skipped zero-byte file: {fi.Name}",
-                            "Invalid File", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        skipReasons.Add($"Zero-byte file: {fi.Name}");
                         return false;
                     }
 
-                    // NEW: Check file extension against allowed list using settings from the model
+                    // Only filter by extension if OnlyScanExecutables is TRUE
                     if (_settings.OnlyScanExecutables && !_executableExtensions.Contains(fi.Extension))
                     {
-                        MessageBox.Show($"Skipped non-executable file (or unsupported type): {fi.Name}",
-                            "File Type Not Allowed", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        skipReasons.Add($"Non-executable file: {fi.Name} ({fi.Extension})");
                         return false;
                     }
 
                     return true;
                 })
-                .Select(fi => fi.FullName)
-                .Take(20 - _items.Count)
+                .Select(fi => fi!.FullName)
+                .Take(_settings.MaxFilesInList - _items.Count)
                 .ToList();
 
             foreach (var file in validFiles)
@@ -85,24 +135,56 @@ namespace PackItPro.ViewModels
                     FileName = Path.GetFileName(file),
                     FilePath = file,
                     Size = FormatBytes(fileInfo.Length),
-                    Status = FileStatusEnum.Pending, // NEW: Use enum
-                    // StatusColor will be handled by the converter in XAML
-                    // RemoveCommand will be set after initialization
-                    Positives = 0, // Initialize scan results
+                    Status = FileStatusEnum.Pending,
+                    Positives = 0,
                     TotalScans = 0
                 };
-                // NEW: Set the command to remove this specific item from the list
                 fileItem.RemoveCommand = new RelayCommand((param) => ExecuteRemoveFile(fileItem));
                 _items.Add(fileItem);
             }
 
-            if (paths.Length > validFiles.Count)
-            {
-                MessageBox.Show($"Added {validFiles.Count} files (limit reached or invalid files skipped)",
-                    "Information", MessageBoxButton.OK, MessageBoxImage.Information);
-            }
+            result.SuccessCount = validFiles.Count;
+            result.SkippedCount = skipReasons.Count;
+            result.SkipReasons.AddRange(skipReasons);
 
             // Notify properties that depend on the list count/contents
+            NotifyListChanged();
+        }
+
+        // Backward compatibility overload
+        public void AddFilesWithValidation(string[] paths)
+        {
+            AddFilesWithValidation(paths, out _);
+        }
+
+        private void ExecuteAddFiles(object? parameter)
+        {
+            // Handle both cases: direct string[] (from drag-drop) and null (from button)
+            if (parameter is string[] filePaths)
+            {
+                AddFilesWithValidation(filePaths);
+            }
+            // If no parameter, the button should trigger a file browser in MainViewModel instead
+        }
+
+        private void ExecuteClearAllFiles(object? parameter)
+        {
+            _items.Clear();
+            NotifyListChanged();
+        }
+
+        private void ExecuteRemoveFile(FileItemViewModel item)
+        {
+            _items.Remove(item);
+            NotifyListChanged();
+        }
+
+        /// <summary>
+        /// Notifies UI of all list-dependent property changes.
+        /// Call after any operation that modifies the file list.
+        /// </summary>
+        private void NotifyListChanged()
+        {
             OnPropertyChanged(nameof(Count));
             OnPropertyChanged(nameof(TotalSize));
             OnPropertyChanged(nameof(HasFiles));
@@ -111,26 +193,6 @@ namespace PackItPro.ViewModels
             OnPropertyChanged(nameof(InfectedCount));
             OnPropertyChanged(nameof(FailedCount));
             OnPropertyChanged(nameof(SkippedCount));
-        }
-
-        private void ExecuteAddFiles(object? parameter)
-        {
-            // This should trigger the file dialog in the MainViewModel or be handled by a service
-            // For now, just a placeholder command
-            if (parameter is string[] filePaths)
-            {
-                AddFilesWithValidation(filePaths);
-            }
-        }
-
-        private void ExecuteClearAllFiles(object? parameter)
-        {
-            _items.Clear();
-        }
-
-        private void ExecuteRemoveFile(FileItemViewModel item)
-        {
-            _items.Remove(item);
         }
 
         private string FormatBytes(long bytes)

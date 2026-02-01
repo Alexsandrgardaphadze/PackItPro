@@ -1,15 +1,37 @@
-﻿<UserControl x:Class="PackItPro.Views.FileListPanel"
+﻿<!-- Views/FileListPanel.xaml - FULL FIXED VERSION WITH STATUS CONVERTER -->
+<UserControl x:Class="PackItPro.Views.FileListPanel"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:converters="clr-namespace:PackItPro.Converters"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
 
+    <!-- RESOURCES -->
+    <UserControl.Resources>
+        <!-- Pulsing animation for empty state icon -->
+        <Storyboard x:Key="PulseAnimation" RepeatBehavior="Forever">
+            <DoubleAnimation Storyboard.TargetName="EmptyStateIcon"
+                           Storyboard.TargetProperty="Opacity"
+                           From="0.4" To="1.0" 
+                           Duration="0:0:2"
+                           AutoReverse="True">
+                <DoubleAnimation.EasingFunction>
+                    <SineEase EasingMode="EaseInOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+        </Storyboard>
+
+        <!-- STATUS TO BACKGROUND CONVERTER -->
+        <converters:StatusToBackgroundConverter x:Key="StatusToBackground"/>
+    </UserControl.Resources>
+
+    <!-- MAIN BORDER -->
     <Border Margin="0,0,10,0"
             BorderBrush="{StaticResource AppBorderColor}"
             BorderThickness="1"
-            CornerRadius="8"
+            CornerRadius="12"
             Background="{StaticResource AppPanelColor}"
             AllowDrop="True"
             Drop="UserControl_Drop"
@@ -17,64 +39,116 @@
             DragLeave="UserControl_DragLeave">
 
         <Grid>
-            <!-- Empty State -->
-            <StackPanel Name="EmptyDropState"
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Center"
-                        Visibility="Visible">
-                <TextBlock Text="📦" FontSize="48" HorizontalAlignment="Center" Foreground="{StaticResource AppTextTertiaryColor}"/>
-                <TextBlock Text="Drag and Drop Files Here" FontSize="18" Foreground="{StaticResource AppTextSecondaryColor}" HorizontalAlignment="Center" TextAlignment="Center" Margin="0,10,0,5"/>
-                <TextBlock Text="or click to browse" FontSize="14" Foreground="{StaticResource AppTextTertiaryColor}" HorizontalAlignment="Center"/>
-                <Button Content="Browse Files" 
-                        Style="{StaticResource Win11Button}" 
-                        Command="{Binding AddFilesCommand}"
-                        Margin="0,15,0,0" Height="42"/>
-                <TextBlock Text="(Maximum 20 files)" FontSize="12" Foreground="{StaticResource AppTextQuaternaryColor}" HorizontalAlignment="Center" Margin="0,10,0,0"/>
-            </StackPanel>
+            <!-- Subtle gradient overlay for depth -->
+            <Border CornerRadius="12" Opacity="0.03">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop Color="White" Offset="0"/>
+                        <GradientStop Color="Transparent" Offset="1"/>
+                    </LinearGradientBrush>
+                </Border.Background>
+            </Border>
 
-            <!-- File List -->
+            <!-- EMPTY STATE -->
+            <Grid Name="EmptyDropState" 
+                  Visibility="{Binding HasFiles, Converter={StaticResource InverseBoolToVisibility}}">
+                <Grid.Triggers>
+                    <EventTrigger RoutedEvent="Loaded">
+                        <BeginStoryboard Storyboard="{StaticResource PulseAnimation}"/>
+                    </EventTrigger>
+                </Grid.Triggers>
+
+                <!-- Main Content -->
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="30">
+                    <Border x:Name="EmptyStateIcon" Width="90" Height="90"
+                            Background="{StaticResource AppPanelHoverColor}" CornerRadius="45"
+                            HorizontalAlignment="Center" Margin="0,0,0,20">
+                        <TextBlock Text="📦" FontSize="48" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   Foreground="{StaticResource AppPrimaryColor}"/>
+                    </Border>
+
+                    <TextBlock Text="Drop Your Files Here" FontSize="20" FontWeight="SemiBold"
+                               Foreground="{StaticResource AppTextColor}" HorizontalAlignment="Center" TextAlignment="Center"
+                               FontFamily="Segoe UI" Margin="0,0,0,6"/>
+
+                    <TextBlock FontSize="13" Foreground="{StaticResource AppTextTertiaryColor}" 
+                               HorizontalAlignment="Center" TextAlignment="Center" LineHeight="20" FontFamily="Segoe UI"
+                               Margin="0,0,0,18">
+                        <Run Text="Drag and drop files or folders here"/>
+                        <LineBreak/>
+                        <Run Text="Maximum 20 files per package" FontSize="11"/>
+                    </TextBlock>
+
+                    <Button Content="Browse Files" Style="{StaticResource Win11Button}" 
+                            Command="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=DataContext.BrowseFilesCommand}"
+                            Height="40" Padding="24,0" FontSize="14" FontWeight="SemiBold" Cursor="Hand"/>
+                </StackPanel>
+            </Grid>
+
+            <!-- FILE LIST -->
             <ListView Name="FileListView"
                       Background="Transparent"
                       BorderThickness="0"
-                      Margin="12"
-                      Visibility="Collapsed"
+                      Margin="15"
+                      Visibility="{Binding HasFiles, Converter={StaticResource BoolToVisibility}}"
                       ItemsSource="{Binding Items}"
-                      ItemContainerStyle="{StaticResource FileItemStyle}">
+                      ItemContainerStyle="{StaticResource FileItemStyle}"
+                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                 <ListView.View>
                     <GridView>
+                        <!-- Icon Column -->
                         <GridViewColumn Header="📄" Width="35" HeaderContainerStyle="{StaticResource GridViewColumnHeaderStyle}">
                             <GridViewColumn.CellTemplate>
                                 <DataTemplate>
-                                    <TextBlock Text="{Binding FileIcon, Mode=OneWay}" Foreground="White" FontFamily="Segoe UI Emoji" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="{Binding FileIcon}" FontSize="16" FontFamily="Segoe UI Emoji" 
+                                               HorizontalAlignment="Center" Foreground="{StaticResource AppTextColor}"/>
                                 </DataTemplate>
                             </GridViewColumn.CellTemplate>
                         </GridViewColumn>
-                        <GridViewColumn Header="File Name" Width="200" HeaderContainerStyle="{StaticResource GridViewColumnHeaderStyle}">
+
+                        <!-- File Name Column -->
+                        <GridViewColumn Header="File Name" Width="250" HeaderContainerStyle="{StaticResource GridViewColumnHeaderStyle}">
                             <GridViewColumn.CellTemplate>
                                 <DataTemplate>
-                                    <TextBlock Text="{Binding FileName, Mode=OneWay}" 
-                                               Foreground="{StaticResource AppTextColor}" 
-                                               FontFamily="Consolas"/>
+                                    <TextBlock Text="{Binding FileName}" FontSize="12" FontFamily="Segoe UI"
+                                               TextTrimming="CharacterEllipsis" ToolTip="{Binding FileName}" 
+                                               Foreground="{StaticResource AppTextColor}"/>
                                 </DataTemplate>
                             </GridViewColumn.CellTemplate>
                         </GridViewColumn>
-                        <GridViewColumn Header="Size" Width="100" HeaderContainerStyle="{StaticResource GridViewColumnHeaderStyle}">
+
+                        <!-- Size Column -->
+                        <GridViewColumn Header="Size" Width="90" HeaderContainerStyle="{StaticResource GridViewColumnHeaderStyle}">
                             <GridViewColumn.CellTemplate>
                                 <DataTemplate>
-                                    <TextBlock Text="{Binding Size, Mode=OneWay}" 
-                                               Foreground="{StaticResource AppTextColor}" 
-                                               FontFamily="Consolas"/>
+                                    <TextBlock Text="{Binding Size}" FontSize="11" FontFamily="Consolas"
+                                               Foreground="{StaticResource AppTextSecondaryColor}"/>
                                 </DataTemplate>
                             </GridViewColumn.CellTemplate>
                         </GridViewColumn>
+
+                        <!-- Status Column -->
                         <GridViewColumn Header="Status" Width="120" HeaderContainerStyle="{StaticResource GridViewColumnHeaderStyle}">
                             <GridViewColumn.CellTemplate>
                                 <DataTemplate>
-                                    <Grid>
-                                        <TextBlock Text="{Binding Status, Mode=OneWay}"
-                                                   Foreground="{Binding StatusColor, Mode=OneWay}"
-                                                   FontFamily="Consolas"/>
-                                    </Grid>
+                                    <Border Background="{Binding Status, Converter={StaticResource StatusToBackground}}"
+                                            CornerRadius="4" Padding="6,3" HorizontalAlignment="Left">
+                                        <TextBlock Text="{Binding Status}" FontSize="10" FontWeight="SemiBold" 
+                                                   Foreground="Black" FontFamily="Segoe UI"/>
+                                    </Border>
+                                </DataTemplate>
+                            </GridViewColumn.CellTemplate>
+                        </GridViewColumn>
+
+                        <!-- Remove Button Column -->
+                        <GridViewColumn Header="" Width="35" HeaderContainerStyle="{StaticResource GridViewColumnHeaderStyle}">
+                            <GridViewColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Button Content="✕" Width="22" Height="22" FontSize="11" FontWeight="Bold"
+                                            Foreground="{StaticResource AppTextTertiaryColor}" Background="Transparent"
+                                            BorderThickness="0" Cursor="Hand"
+                                            Command="{Binding DataContext.RemoveFileCommand, RelativeSource={RelativeSource AncestorType=ListView}}"
+                                            CommandParameter="{Binding}"/>
                                 </DataTemplate>
                             </GridViewColumn.CellTemplate>
                         </GridViewColumn>

@@ -73,6 +73,22 @@ namespace PackItPro.ViewModels
             _ => "❓"
         };
 
+        public System.Windows.Media.SolidColorBrush StatusColor
+        {
+            get
+            {
+                return Status switch
+                {
+                    FileStatusEnum.Clean => new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x10, 0xB9, 0x81)),
+                    FileStatusEnum.Infected => new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xEF, 0x44, 0x44)),
+                    FileStatusEnum.ScanFailed => new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xF5, 0x9E, 0x0B)),
+                    FileStatusEnum.Skipped => new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x3B, 0x82, 0xF6)),
+                    FileStatusEnum.Pending => new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x3B, 0x82, 0xF6)),
+                    _ => new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x94, 0xA3, 0xB8))
+                };
+            }
+        }
+
         public event PropertyChangedEventHandler? PropertyChanged;
         protected virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string? propertyName = null) =>
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));

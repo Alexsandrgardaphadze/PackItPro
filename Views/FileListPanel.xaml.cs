@@ -1,6 +1,7 @@
 ﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Linq;
 
 
 namespace PackItPro.Views
@@ -53,9 +54,32 @@ namespace PackItPro.Views
                 // Now, forward the files to the ViewModel's command.
                 if (this.DataContext is ViewModels.FileListViewModel viewModel)
                 {
-                    // We can invoke the command directly and pass the files as a parameter.
-                    // The command logic will be inside the ViewModel.
-                    viewModel.AddFilesCommand?.Execute(files);
+                    viewModel.AddFilesWithValidation(files, out var result);
+
+                    // Show feedback to user
+                    if (result.SuccessCount > 0)
+                    {
+                        string message = $"✓ Added {result.SuccessCount} file(s)";
+                        if (result.SkippedCount > 0)
+                        {
+                            message += $"\n\n⚠ Skipped {result.SkippedCount}:\n";
+                            message += string.Join("\n", result.SkipReasons.Take(5));
+                            if (result.SkipReasons.Count > 5)
+                                message += $"\n...and {result.SkipReasons.Count - 5} more";
+                        }
+
+                        MessageBox.Show(message, "Files Added", System.Windows.MessageBoxButton.OK, 
+                            result.SkippedCount > 0 ? System.Windows.MessageBoxImage.Warning : System.Windows.MessageBoxImage.Information);
+                    }
+                    else if (result.SkippedCount > 0)
+                    {
+                        MessageBox.Show(
+                            $"⚠ All files were skipped:\n\n{string.Join("\n", result.SkipReasons.Take(5))}" +
+                            (result.SkipReasons.Count > 5 ? $"\n...and {result.SkipReasons.Count - 5} more" : ""),
+                            "No Files Added",
+                            System.Windows.MessageBoxButton.OK,
+                            System.Windows.MessageBoxImage.Warning);
+                    }
                 }
             }
         }

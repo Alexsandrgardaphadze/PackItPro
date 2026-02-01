@@ -30,7 +30,20 @@ namespace PackItPro.Services
                 // Copy files (use overwrite to avoid "already exists" error)
                 foreach (var file in filePaths)
                 {
-                    File.Copy(file, Path.Combine(tempDir, Path.GetFileName(file)), overwrite: true);
+                    try
+                    {
+                        // Verify file is accessible before copying
+                        using (var fs = File.Open(file, FileMode.Open, FileAccess.Read))
+                        {
+                            // File is accessible
+                        }
+                        
+                        File.Copy(file, Path.Combine(tempDir, Path.GetFileName(file)), overwrite: true);
+                    }
+                    catch (IOException ex) when (ex.Message.Contains("in use"))
+                    {
+                        throw new IOException($"File is locked (open in another application): {Path.GetFileName(file)}", ex);
+                    }
                 }
 
                 var manifestJson = ManifestGenerator.Generate(filePaths, packageName, requiresAdmin, includeWingetUpdateScript: false);

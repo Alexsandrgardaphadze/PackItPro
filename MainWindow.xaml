@@ -11,7 +11,9 @@
         Background="{StaticResource AppBackgroundColor}"
         WindowStartupLocation="CenterScreen"
         ResizeMode="CanResize"
-        MinWidth="900" MinHeight="600">
+        MinWidth="900" MinHeight="600"
+        Loaded="Window_Loaded">
+
     <Window.DataContext>
         <vm:MainViewModel />
     </Window.DataContext>
