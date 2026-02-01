@@ -4,6 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:views="clr-namespace:PackItPro.Views"
+        xmlns:vm="clr-namespace:PackItPro.ViewModels"
         mc:Ignorable="d"
         Title="PackItPro - Secure Package Builder" 
         Height="650" Width="1050"
@@ -11,6 +12,9 @@
         WindowStartupLocation="CenterScreen"
         ResizeMode="CanResize"
         MinWidth="900" MinHeight="600">
+    <Window.DataContext>
+        <vm:MainViewModel />
+    </Window.DataContext>
 
     <Grid Margin="10">
         <Grid.RowDefinitions>
@@ -20,36 +24,36 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Menu Bar -->
+        <!-- Menu Bar - Bind commands directly to MainViewModel -->
         <Menu Grid.Row="0" Background="{StaticResource AppBackgroundColor}" Padding="0,6" Margin="0,0,0,12">
             <MenuItem Header="File" Foreground="{StaticResource AppTextColor}" Style="{StaticResource MenuItemStyle}">
-                <MenuItem Header="Add Files..." Click="BrowseFiles_Click" InputGestureText="Ctrl+O" Style="{StaticResource SubMenuItemStyle}"/>
-                <MenuItem Header="Clear All Files" Click="ClearAllFiles_Click" InputGestureText="Ctrl+Del" Style="{StaticResource SubMenuItemStyle}"/>
+                <MenuItem Header="Add Files..." Command="{Binding BrowseFilesCommand}" Style="{StaticResource SubMenuItemStyle}"/>
+                <MenuItem Header="Clear All Files" Command="{Binding ClearAllFilesCommand}" Style="{StaticResource SubMenuItemStyle}"/>
                 <Separator Background="{StaticResource AppBorderColor}"/>
-                <MenuItem Header="Export Logs..." Click="ExportLogs_Click" Style="{StaticResource SubMenuItemStyle}"/>
+                <MenuItem Header="Export Logs..." Command="{Binding ExportLogsCommand}" Style="{StaticResource SubMenuItemStyle}"/>
                 <Separator Background="{StaticResource AppBorderColor}"/>
-                <MenuItem Header="Exit" Click="Exit_Click" InputGestureText="Alt+F4" Style="{StaticResource SubMenuItemStyle}"/>
+                <MenuItem Header="Exit" Command="{Binding ExitCommand}" Style="{StaticResource SubMenuItemStyle}"/>
             </MenuItem>
             <MenuItem Header="Settings" Foreground="{StaticResource AppTextColor}" Style="{StaticResource MenuItemStyle}">
-                <MenuItem Header="Output Location..." Click="SetOutputLocation_Click" Style="{StaticResource SubMenuItemStyle}"/>
-                <MenuItem Header="VirusTotal API Key..." Click="SetVirusApiKey_Click" Style="{StaticResource SubMenuItemStyle}"/>
-                <MenuItem Header="PackItPro Settings..." Click="PackItProSettings_Click" Style="{StaticResource SubMenuItemStyle}"/>
+                <MenuItem Header="Output Location..." Command="{Binding SetOutputLocationCommand}" Style="{StaticResource SubMenuItemStyle}"/>
+                <MenuItem Header="VirusTotal API Key..." Command="{Binding SetVirusApiKeyCommand}" Style="{StaticResource SubMenuItemStyle}"/>
+                <MenuItem Header="PackItPro Settings..." Command="{Binding PackItProSettingsCommand}" Style="{StaticResource SubMenuItemStyle}"/>
             </MenuItem>
             <MenuItem Header="Tools" Foreground="{StaticResource AppTextColor}" Style="{StaticResource MenuItemStyle}">
-                <MenuItem Header="Test Package..." Click="TestPackage_Click" Style="{StaticResource SubMenuItemStyle}"/>
-                <MenuItem Header="View Cache..." Click="ViewCache_Click" Style="{StaticResource SubMenuItemStyle}"/>
-                <MenuItem Header="Clear Cache" Click="ClearCache_Click" Style="{StaticResource SubMenuItemStyle}"/>
+                <MenuItem Header="Test Package..." Command="{Binding TestPackageCommand}" Style="{StaticResource SubMenuItemStyle}"/>
+                <MenuItem Header="View Cache..." Command="{Binding ViewCacheCommand}" Style="{StaticResource SubMenuItemStyle}"/>
+                <MenuItem Header="Clear Cache" Command="{Binding ClearCacheCommand}" Style="{StaticResource SubMenuItemStyle}"/>
                 <Separator Background="{StaticResource AppBorderColor}"/>
-                <MenuItem Header="Export Package List..." Click="ExportList_Click" Style="{StaticResource SubMenuItemStyle}"/>
+                <MenuItem Header="Export List..." Command="{Binding ExportListCommand}" Style="{StaticResource SubMenuItemStyle}"/>
             </MenuItem>
             <MenuItem Header="Help" Foreground="{StaticResource AppTextColor}" Style="{StaticResource MenuItemStyle}">
-                <MenuItem Header="Documentation" Click="Documentation_Click" Style="{StaticResource SubMenuItemStyle}"/>
-                <MenuItem Header="GitHub Repository" Click="GitHub_Click" Style="{StaticResource SubMenuItemStyle}"/>
-                <MenuItem Header="Report Issue" Click="ReportIssue_Click" Style="{StaticResource SubMenuItemStyle}"/>
+                <MenuItem Header="Documentation" Command="{Binding DocumentationCommand}" Style="{StaticResource SubMenuItemStyle}"/>
+                <MenuItem Header="GitHub Repository" Command="{Binding GitHubCommand}" Style="{StaticResource SubMenuItemStyle}"/>
+                <MenuItem Header="Report Issue" Command="{Binding ReportIssueCommand}" Style="{StaticResource SubMenuItemStyle}"/>
                 <Separator Background="{StaticResource AppBorderColor}"/>
-                <MenuItem Header="Check for Updates" Click="CheckUpdates_Click" Style="{StaticResource SubMenuItemStyle}"/>
+                <MenuItem Header="Check for Updates" Command="{Binding CheckUpdatesCommand}" Style="{StaticResource SubMenuItemStyle}"/>
                 <Separator Background="{StaticResource AppBorderColor}"/>
-                <MenuItem Header="About PackItPro" Click="About_Click" Style="{StaticResource SubMenuItemStyle}"/>
+                <MenuItem Header="About PackItPro" Command="{Binding AboutCommand}" Style="{StaticResource SubMenuItemStyle}"/>
             </MenuItem>
         </Menu>
 
@@ -59,33 +63,25 @@
                 <ColumnDefinition Width="3*"/>
                 <ColumnDefinition Width="2*"/>
             </Grid.ColumnDefinitions>
-
-            <!-- File List Panel -->
-            <views:FileListPanel Grid.Column="0" Margin="0,0,10,0" />
-
-            <!-- Right Side -->
+            <!-- File List Panel - Bind its DataContext to the FileList sub-ViewModel -->
+            <views:FileListPanel Grid.Column="0" Margin="0,0,10,0" DataContext="{Binding FileList}" />
+            <!-- Right side with Settings and Summary -->
             <Grid Grid.Column="1">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
-                <views:PackSettingsPanel Grid.Row="0" />
-                <views:SummaryPanel Grid.Row="1" />
+                <views:PackSettingsPanel Grid.Row="0" DataContext="{Binding Settings}" />
+                <views:SummaryPanel Grid.Row="1" DataContext="{Binding Summary}" />
             </Grid>
         </Grid>
 
-        <!-- Status Area -->
-        <views:StatusPanel Grid.Row="2" Margin="0,0,0,8" />
+        <!-- Status Area - Bind to the Status sub-ViewModel -->
+        <views:StatusPanel Grid.Row="2" Margin="0,0,0,8" DataContext="{Binding Status}" />
 
         <!-- Bottom Progress Bar -->
         <ProgressBar Grid.Row="3"
-                     x:Name="ProcessProgressBar"
-                     Height="6"
-                     Minimum="0"
-                     Maximum="100"
-                     Value="0"
-                     Foreground="{StaticResource AppPrimaryColor}"
-                     Background="#3A3A4D"
+                     Value="{Binding Status.ProgressPercentage}"
                      Style="{StaticResource RoundedProgressBarStyle}"/>
     </Grid>
 </Window>

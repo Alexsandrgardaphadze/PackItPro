@@ -1,0 +1,22 @@
+﻿<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Status colors -->
+    <SolidColorBrush x:Key="AppStatusCleanColor" Color="#4CAF50"/>
+    <SolidColorBrush x:Key="AppStatusErrorColor" Color="#F44336"/>
+    <SolidColorBrush x:Key="AppStatusPendingColor" Color="#FF9800"/>
+
+    <!-- Drop area -->
+    <SolidColorBrush x:Key="AppDropAreaHoverColor" Color="#333333"/>
+
+    <!-- Text -->
+    <SolidColorBrush x:Key="AppTextQuaternaryColor" Color="#999999"/>
+
+    <!-- Expander fallback style -->
+    <Style x:Key="ExpanderHeaderStyle" TargetType="ToggleButton">
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Padding" Value="6"/>
+    </Style>
+
+</ResourceDictionary>

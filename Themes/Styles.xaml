@@ -210,8 +210,72 @@
 		</Setter>
 	</Style>
 
+    
 	<!-- EXPANDER STYLE -->
-	<Style TargetType="Expander">
+    <Style x:Key="ExpanderHeaderStyle" TargetType="ToggleButton">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{StaticResource AppTextSecondaryColor}"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="HorizontalAlignment" Value="Stretch"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Border Background="{TemplateBinding Background}"
+                        Padding="{TemplateBinding Padding}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <ContentPresenter Grid.Column="0" VerticalAlignment="Center"/>
+                            <Path Grid.Column="1"
+                              x:Name="Arrow"
+                              Data="M 0,0 L 4,4 L 8,0 Z"
+                              Fill="{TemplateBinding Foreground}"
+                              VerticalAlignment="Center"
+                              RenderTransformOrigin="0.5,0.5">
+                                <Path.RenderTransform>
+                                    <RotateTransform Angle="0"/>
+                                </Path.RenderTransform>
+                            </Path>
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="Arrow"
+                                                   Storyboard.TargetProperty="(Path.RenderTransform).(RotateTransform.Angle)"
+                                                   To="180"
+                                                   Duration="0:0:0.2"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="Arrow"
+                                                   Storyboard.TargetProperty="(Path.RenderTransform).(RotateTransform.Angle)"
+                                                   To="0"
+                                                   Duration="0:0:0.2"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Foreground" Value="{StaticResource AppPrimaryColor}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+    
+    
+    <Style TargetType="Expander">
 		<Setter Property="Background" Value="Transparent"/>
 		<Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
 		<Setter Property="BorderThickness" Value="0"/>
@@ -242,66 +306,6 @@
 		</Setter>
 	</Style>
 
-	<Style x:Key="ExpanderHeaderStyle" TargetType="ToggleButton">
-		<Setter Property="Background" Value="Transparent"/>
-		<Setter Property="Foreground" Value="{StaticResource AppTextSecondaryColor}"/>
-		<Setter Property="FontSize" Value="14"/>
-		<Setter Property="FontWeight" Value="SemiBold"/>
-		<Setter Property="HorizontalAlignment" Value="Stretch"/>
-		<Setter Property="Padding" Value="0"/>
-		<Setter Property="Template">
-			<Setter.Value>
-				<ControlTemplate TargetType="ToggleButton">
-					<Border Background="{TemplateBinding Background}"
-                            Padding="{TemplateBinding Padding}">
-						<Grid>
-							<Grid.ColumnDefinitions>
-								<ColumnDefinition Width="*"/>
-								<ColumnDefinition Width="Auto"/>
-							</Grid.ColumnDefinitions>
-							<ContentPresenter Grid.Column="0" VerticalAlignment="Center"/>
-							<Path Grid.Column="1"
-                                  x:Name="Arrow"
-                                  Data="M 0,0 L 4,4 L 8,0 Z"
-                                  Fill="{TemplateBinding Foreground}"
-                                  VerticalAlignment="Center"
-                                  RenderTransformOrigin="0.5,0.5">
-								<Path.RenderTransform>
-									<RotateTransform Angle="0"/>
-								</Path.RenderTransform>
-							</Path>
-						</Grid>
-					</Border>
-					<ControlTemplate.Triggers>
-						<Trigger Property="IsChecked" Value="True">
-							<Trigger.EnterActions>
-								<BeginStoryboard>
-									<Storyboard>
-										<DoubleAnimation Storyboard.TargetName="Arrow"
-                                                       Storyboard.TargetProperty="(Path.RenderTransform).(RotateTransform.Angle)"
-                                                       To="180"
-                                                       Duration="0:0:0.2"/>
-									</Storyboard>
-								</BeginStoryboard>
-							</Trigger.EnterActions>
-							<Trigger.ExitActions>
-								<BeginStoryboard>
-									<Storyboard>
-										<DoubleAnimation Storyboard.TargetName="Arrow"
-                                                       Storyboard.TargetProperty="(Path.RenderTransform).(RotateTransform.Angle)"
-                                                       To="0"
-                                                       Duration="0:0:0.2"/>
-									</Storyboard>
-								</BeginStoryboard>
-							</Trigger.ExitActions>
-						</Trigger>
-						<Trigger Property="IsMouseOver" Value="True">
-							<Setter Property="Foreground" Value="{StaticResource AppPrimaryColor}"/>
-						</Trigger>
-					</ControlTemplate.Triggers>
-				</ControlTemplate>
-			</Setter.Value>
-		</Setter>
-	</Style>
+	
 
 </ResourceDictionary>
