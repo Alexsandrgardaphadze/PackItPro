@@ -1,25 +1,30 @@
-﻿// ViewModels/SettingsViewModel.cs
+﻿// PackItPro/ViewModels/SettingsViewModel.cs
 using PackItPro.Models;
 using System;
-using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
 using System.Text.Json;
+using System.Threading.Tasks;
 
 namespace PackItPro.ViewModels
 {
     public class SettingsViewModel : INotifyPropertyChanged
     {
-        // NEW: Expose the underlying model
         public AppSettings SettingsModel { get; }
 
         private readonly string _settingsFilePath;
 
-        // Properties exposed for binding (delegating to SettingsModel)
+        // ✅ EXPOSE ALL REQUIRED PROPERTIES (delegating to SettingsModel)
         public string OutputLocation
         {
             get => SettingsModel.OutputLocation;
             set { SettingsModel.OutputLocation = value; OnPropertyChanged(); }
+        }
+
+        public string OutputFileName  // ✅ NEW
+        {
+            get => SettingsModel.OutputFileName;
+            set { SettingsModel.OutputFileName = value; OnPropertyChanged(); }
         }
 
         public string VirusTotalApiKey
@@ -70,25 +75,31 @@ namespace PackItPro.ViewModels
             set { SettingsModel.VerifyIntegrity = value; OnPropertyChanged(); }
         }
 
-        public SettingsViewModel(string settingsFilePath)
+        public bool ScanWithVirusTotal  // ✅ NEW
         {
-            SettingsModel = new AppSettings(); // Initialize the model
-            _settingsFilePath = settingsFilePath;
+            get => SettingsModel.ScanWithVirusTotal;
+            set { SettingsModel.ScanWithVirusTotal = value; OnPropertyChanged(); }
         }
 
-        // NEW: Load settings from file
+        public SettingsViewModel(string settingsFilePath)
+        {
+            SettingsModel = new AppSettings();
+            _settingsFilePath = settingsFilePath ?? throw new ArgumentNullException(nameof(settingsFilePath));
+        }
+
         public async Task LoadSettingsAsync()
         {
             try
             {
-                if (File.Exists(_settingsFilePath))
+                if (!string.IsNullOrEmpty(_settingsFilePath) && File.Exists(_settingsFilePath))
                 {
                     var json = await File.ReadAllTextAsync(_settingsFilePath);
                     var loadedSettings = JsonSerializer.Deserialize<AppSettings>(json);
                     if (loadedSettings != null)
                     {
-                        // Copy loaded settings to the model instance held by this ViewModel
+                        // ✅ Copy ALL properties (including new ones)
                         SettingsModel.OutputLocation = loadedSettings.OutputLocation;
+                        SettingsModel.OutputFileName = loadedSettings.OutputFileName;
                         SettingsModel.VirusTotalApiKey = loadedSettings.VirusTotalApiKey;
                         SettingsModel.OnlyScanExecutables = loadedSettings.OnlyScanExecutables;
                         SettingsModel.AutoRemoveInfectedFiles = loadedSettings.AutoRemoveInfectedFiles;
@@ -97,36 +108,32 @@ namespace PackItPro.ViewModels
                         SettingsModel.UseLZMACompression = loadedSettings.UseLZMACompression;
                         SettingsModel.RequiresAdmin = loadedSettings.RequiresAdmin;
                         SettingsModel.VerifyIntegrity = loadedSettings.VerifyIntegrity;
+                        SettingsModel.ScanWithVirusTotal = loadedSettings.ScanWithVirusTotal;
                     }
                 }
             }
             catch (Exception ex)
             {
-                // Log error or handle default settings
-                Console.WriteLine($"[SettingsViewModel] LoadSettingsAsync failed: {ex.Message}");
-                // Optionally reset SettingsModel to defaults if loading fails
-                // SettingsModel = new AppSettings(); // This would require changing SettingsModel to a property setter
+                System.Diagnostics.Debug.WriteLine($"[SettingsViewModel] Load failed: {ex.Message}");
             }
         }
 
-        // NEW: Save settings to file
         public async Task SaveSettingsAsync()
         {
             try
             {
+                if (string.IsNullOrEmpty(_settingsFilePath)) return;
+
                 var dirPath = Path.GetDirectoryName(_settingsFilePath);
                 if (!string.IsNullOrEmpty(dirPath) && !Directory.Exists(dirPath))
-                {
                     Directory.CreateDirectory(dirPath);
-                }
 
                 var json = JsonSerializer.Serialize(SettingsModel, new JsonSerializerOptions { WriteIndented = true });
                 await File.WriteAllTextAsync(_settingsFilePath, json);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[SettingsViewModel] SaveSettingsAsync failed: {ex.Message}");
-                // Optionally throw or handle error
+                System.Diagnostics.Debug.WriteLine($"[SettingsViewModel] Save failed: {ex.Message}");
             }
         }
 

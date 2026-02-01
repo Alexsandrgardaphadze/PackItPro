@@ -1,6 +1,5 @@
-﻿// ViewModels/MainViewModel.cs
+﻿// PackItPro/ViewModels/MainViewModel.cs
 using Microsoft.Win32;
-using Microsoft.WindowsAPICodePack.Dialogs;
 using PackItPro.Services;
 using PackItPro.Models;
 using PackItPro.Views;
@@ -10,125 +9,132 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Net.Http;
-using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
-using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
-using System.Runtime.Versioning;
 
 namespace PackItPro.ViewModels
 {
     public class MainViewModel : INotifyPropertyChanged, IDisposable
     {
         #region Fields and Initialization
-        private readonly string _appDataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PackItPro");
+        private readonly string _appDataDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "PackItPro");
+
         private readonly string _cacheFilePath;
-        private readonly SemaphoreSlim _scanSemaphore = new(4);
         private readonly HashSet<string> _executableExtensions = new(StringComparer.OrdinalIgnoreCase)
         {
-        ".exe", ".dll", ".bat", ".cmd", ".ps1", ".vbs", ".js", ".jar", ".msi", ".com",
-        ".scr", ".pif", ".gadget", ".application", ".msc", ".cpl", ".hta", ".reg",
-        ".vb", ".vbe", ".jse", ".ws", ".wsf", ".wsc", ".wsh", ".lnk", ".inf", ".scf"
+            ".exe", ".dll", ".bat", ".cmd", ".ps1", ".vbs", ".js", ".jar", ".msi", ".com",
+            ".scr", ".pif", ".gadget", ".application", ".msc", ".cpl", ".hta", ".reg",
+            ".vb", ".vbe", ".jse", ".ws", ".wsf", ".wsc", ".wsh", ".lnk", ".inf", ".scf"
         };
 
-        private HttpClient _httpClient = new(); // TODO: Consider using IHttpClientFactory or a singleton pattern for better lifecycle management
         private VirusTotalClient? _virusTotalClient;
-        private PackagerService? _packagerService; // NEW: Instance of PackagerService
+        private bool _isInitialized;
 
-        // Properties holding sub-ViewModels
+        // Sub-ViewModels (hierarchical MVVM structure)
         public FileListViewModel FileList { get; }
         public SettingsViewModel Settings { get; }
         public SummaryViewModel Summary { get; }
         public StatusViewModel Status { get; }
 
-        // Commands exposed for binding
+        // Commands (all properly typed and validated)
         public ICommand PackCommand { get; }
         public ICommand BrowseFilesCommand { get; }
         public ICommand SetOutputLocationCommand { get; }
         public ICommand SetVirusApiKeyCommand { get; }
-        public ICommand ExportLogsCommand { get; }
-        public ICommand ViewCacheCommand { get; }
-        public ICommand ClearCacheCommand { get; }
-        public ICommand TestPackageCommand { get; }
-        public ICommand ExportListCommand { get; }
-        public ICommand DocumentationCommand { get; }
-        public ICommand GitHubCommand { get; }
-        public ICommand ReportIssueCommand { get; }
-        public ICommand CheckUpdatesCommand { get; }
-        public ICommand PackItProSettingsCommand { get; }
-        public ICommand AboutCommand { get; }
-        public ICommand ExitCommand { get; }
+        public ICommand ScanFilesCommand { get; }
         public ICommand ClearAllFilesCommand { get; }
-        public ICommand RetryCommand { get; }
-        public ICommand DismissErrorCommand { get; }
+        public ICommand ExportLogsCommand { get; }
+        public ICommand ClearCacheCommand { get; }
+        public ICommand ExitCommand { get; }
 
         public MainViewModel()
         {
+            // Initialize paths first
+            _cacheFilePath = Path.Combine(_appDataDir, "virusscancache.json");
+            EnsureAppDataDirectoryExists();
+
             // Initialize sub-ViewModels
             Settings = new SettingsViewModel(Path.Combine(_appDataDir, "settings.json"));
-            // Fix: FileListViewModel expects AppSettings (model). Expose via Settings.SettingsModel
-            FileList = new FileListViewModel(Settings.SettingsModel, _executableExtensions); // Pass settings model and extensions to FileListVM
-            Summary = new SummaryViewModel(FileList); // Pass FileListVM to SummaryVM
-            Status = new StatusViewModel(); // StatusVM is independent
+            FileList = new FileListViewModel(Settings.SettingsModel, _executableExtensions);
+            Summary = new SummaryViewModel(FileList);
+            Status = new StatusViewModel();
 
-            // Initialize paths
-            _cacheFilePath = Path.Combine(_appDataDir, "virusscancache.json");
-
-            // Initialize services
-            // Fix: VirusTotalClient likely expects a non-null apiKey; pass empty string instead of null
-            _virusTotalClient = new VirusTotalClient(_cacheFilePath, apiKey: string.Empty);
-            _packagerService = new PackagerService(); // NEW: Initialize PackagerService
-
-            // Initialize commands
+            // Initialize commands with proper can-execute logic
             PackCommand = new RelayCommand(ExecutePackCommand, CanExecutePack);
             BrowseFilesCommand = new RelayCommand(ExecuteBrowseFilesCommand);
             SetOutputLocationCommand = new RelayCommand(ExecuteSetOutputLocationCommand);
             SetVirusApiKeyCommand = new RelayCommand(ExecuteSetVirusApiKeyCommand);
+            ScanFilesCommand = new RelayCommand(ExecuteScanFilesCommand, CanExecuteScan);
+            ClearAllFilesCommand = new RelayCommand(ExecuteClearAllFilesCommand, CanExecuteClearAll);
             ExportLogsCommand = new RelayCommand(ExecuteExportLogsCommand);
-            ViewCacheCommand = new RelayCommand(ExecuteViewCacheCommand);
             ClearCacheCommand = new RelayCommand(ExecuteClearCacheCommand);
-            TestPackageCommand = new RelayCommand(ExecuteTestPackageCommand);
-            ExportListCommand = new RelayCommand(ExecuteExportListCommand);
-            DocumentationCommand = new RelayCommand(ExecuteDocumentationCommand);
-            GitHubCommand = new RelayCommand(ExecuteGitHubCommand);
-            ReportIssueCommand = new RelayCommand(ExecuteReportIssueCommand);
-            CheckUpdatesCommand = new RelayCommand(ExecuteCheckUpdatesCommand);
-            PackItProSettingsCommand = new RelayCommand(ExecutePackItProSettingsCommand);
-            AboutCommand = new RelayCommand(ExecuteAboutCommand);
             ExitCommand = new RelayCommand(ExecuteExitCommand);
-            ClearAllFilesCommand = FileList.ClearAllFilesCommand; // Reuse command from FileListVM
-            RetryCommand = new RelayCommand(ExecuteRetryCommand);
-            DismissErrorCommand = new RelayCommand(ExecuteDismissErrorCommand);
 
-            // Ensure directory exists
-            if (!Directory.Exists(_appDataDir))
+            // Subscribe to property changes for UI state updates
+            FileList.PropertyChanged += (s, e) =>
             {
+                if (e.PropertyName == nameof(FileList.HasFiles))
+                    ((RelayCommand)PackCommand).RaiseCanExecuteChanged();
+            };
+
+            Status.PropertyChanged += (s, e) =>
+{
+    if (e.PropertyName == nameof(Status.IsBusy))
+    {
+        if (PackCommand is RelayCommand packRelayCommand)
+            packRelayCommand.RaiseCanExecuteChanged();
+
+        if (ScanFilesCommand is RelayCommand scanRelayCommand)
+            scanRelayCommand.RaiseCanExecuteChanged();
+    }
+};
+        }
+
+        private void EnsureAppDataDirectoryExists()
+        {
+            if (!Directory.Exists(_appDataDir))
                 Directory.CreateDirectory(_appDataDir);
-            }
         }
 
         public async Task InitializeAsync()
         {
-            // Load settings first
-            await Settings.LoadSettingsAsync();
+            if (_isInitialized) return;
 
-            // Initialize VirusTotalClient with the loaded API key
-            _virusTotalClient?.SetApiKey(Settings.VirusTotalApiKey);
-
-            // Load VirusTotal cache using the client instance that was created after settings are loaded
-            if (_virusTotalClient != null)
+            try
             {
+                // 1. Load settings first
+                await Settings.LoadSettingsAsync();
+
+                // 2. Initialize VirusTotal client with loaded API key
+                _virusTotalClient = new VirusTotalClient(_cacheFilePath, Settings.VirusTotalApiKey);
+
+                // 3. Load scan cache
                 await _virusTotalClient.LoadCacheAsync();
+
+                _isInitialized = true;
+                Status.SetStatusReady();
+                LogInfo("MainViewModel initialized successfully");
+            }
+            catch (Exception ex)
+            {
+                LogError("Initialization failed", ex);
+                Status.Message = "Failed to initialize application. Check logs for details.";
+                MessageBox.Show(
+                    "Application failed to initialize properly.\nSee logs for details.",
+                    "Initialization Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
             }
         }
         #endregion
 
-        #region Command Implementations
-        private bool CanExecutePack(object? parameter) => FileList.HasFiles && !Status.IsBusy; // Disable if no files or busy
+        #region Command Execution (Async-Safe)
+        private bool CanExecutePack(object? parameter) =>
+            FileList.HasFiles && !Status.IsBusy && !string.IsNullOrWhiteSpace(Settings.OutputLocation);
 
         private async void ExecutePackCommand(object? parameter)
         {
@@ -136,98 +142,123 @@ namespace PackItPro.ViewModels
 
             var saveDialog = new SaveFileDialog
             {
-                Filter = "PackItPro Executable (.exe)|*.exe",
+                Filter = "PackItPro Executable (*.exe)|*.exe",
                 InitialDirectory = Settings.OutputLocation,
-                FileName = $"Package_{DateTime.Now:yyyyMMdd_HHmmss}.exe"
+                FileName = $"{Settings.OutputFileName ?? "Package"}_{DateTime.Now:yyyyMMdd_HHmmss}.exe",
+                DefaultExt = "exe",
+                AddExtension = true
             };
 
-            if (saveDialog.ShowDialog() == true)
+            if (saveDialog.ShowDialog() != true) return;
+
+            try
             {
-                try
-                {
-                    Status.SetStatusPacking(); // NEW: Set status before starting
+                Status.SetStatusPacking();
+                Status.Message = "Creating package...";
 
-                    if (_packagerService == null)
-                        throw new InvalidOperationException("PackagerService is not initialized.");
+                // ✅ CRITICAL FIX: Use REAL Packager instead of placeholder PackagerService
+                var outputPath = await Packager.CreatePackageAsync(
+                    FileList.Items.Select(f => f.FilePath).ToList(),
+                    Path.GetDirectoryName(saveDialog.FileName) ?? Settings.OutputLocation,
+                    Path.GetFileNameWithoutExtension(saveDialog.FileName),
+                    Settings.RequiresAdmin,
+                    Settings.UseLZMACompression
+                );
 
-                    var outputPath = await _packagerService.CreatePackageAsync(
-                        FileList.Items.Select(f => f.FilePath).ToList(),
-                        Settings.OutputLocation,
-                        Path.GetFileNameWithoutExtension(saveDialog.FileName),
-                        Settings.RequiresAdmin, // NEW: Pass admin requirement from settings
-                        Settings.IncludeWingetUpdateScript, // NEW: Pass includeWinget (as per XAML)
-                        Settings.VerifyIntegrity, // NEW: Pass verifyIntegrity (as per XAML)
-                        Settings.UseLZMACompression // NEW: Pass bool useLzma
-                    );
-
-                    MessageBox.Show($"Package created successfully!\n{outputPath}",
-                                  "Success", MessageBoxButton.OK, MessageBoxImage.Information);
-                }
-                catch (Exception ex)
-                {
-                    LogError("Packager.CreatePackageAsync failed", ex);
-                    Status.Message = $"Packaging failed: {ex.Message}"; // NEW: Update status message on error
-                    MessageBox.Show($"Packaging failed: {ex.Message}",
-                                  "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-                finally
-                {
-                    Status.SetStatusReady(); // NEW: Reset status after completion
-                }
+                Status.SetStatusReady();
+                MessageBox.Show(
+                    $"Package created successfully!\n\nLocation: {outputPath}",
+                    "Success",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+            catch (FileNotFoundException ex) when (ex.Message.Contains("StubInstaller.exe"))
+            {
+                HandleStubMissingError();
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("compare two elements"))
+            {
+                HandleHashingError(ex);
+            }
+            catch (Exception ex)
+            {
+                LogError("Packaging failed", ex);
+                Status.Message = $"Packaging failed: {ex.Message}";
+                MessageBox.Show(
+                    $"Failed to create package:\n{ex.Message}\n\nCheck logs for details.",
+                    "Packaging Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+            finally
+            {
+                Status.SetStatusReady();
             }
         }
 
         private void ExecuteBrowseFilesCommand(object? parameter)
         {
-            var openFileDialog = new OpenFileDialog
+            var dialog = new OpenFileDialog
             {
                 Multiselect = true,
-                Title = "Select Files to Pack"
+                Title = "Select Files to Pack",
+                Filter = "All Files (*.*)|*.*",
+                CheckFileExists = true,
+                CheckPathExists = true
             };
 
-            if (openFileDialog.ShowDialog() == true)
+            if (dialog.ShowDialog() == true)
             {
-                FileList.AddFilesWithValidation(openFileDialog.FileNames);
-                // Trigger scan if setting is enabled
-                if (Settings.IncludeWingetUpdateScript) // Assuming this checkbox triggers scanning initially (rename if needed)
-                    _ = ExecuteScanFilesWithVirusTotal();
+                FileList.AddFilesWithValidation(dialog.FileNames);
+
+                // Auto-scan if enabled in settings
+                if (Settings.ScanWithVirusTotal && !string.IsNullOrWhiteSpace(Settings.VirusTotalApiKey))
+                {
+                    ExecuteScanFilesCommand(null); // Fire-and-forget with internal error handling
+                }
             }
         }
 
-        // Mark this method as Windows-only to address CA1416 platform compatibility diagnostics
-        [SupportedOSPlatform("windows")]
         private async void ExecuteSetOutputLocationCommand(object? parameter)
         {
-            var folderDialog = new CommonOpenFileDialog
+            var dialog = new System.Windows.Forms.FolderBrowserDialog
             {
-                IsFolderPicker = true,
-                Title = "Select Output Folder",
-                InitialDirectory = Settings.OutputLocation,
-                EnsurePathExists = true
+                Description = "Select output folder for packages",
+                SelectedPath = Settings.OutputLocation,
+                ShowNewFolderButton = true
             };
 
-            if (folderDialog.ShowDialog() == CommonFileDialogResult.Ok)
-            {
-                try
-                {
-                    var testFile = Path.Combine(folderDialog.FileName, "permission_test.tmp");
-                    File.WriteAllText(testFile, "test");
-                    File.Delete(testFile);
+            var result = dialog.ShowDialog();
+            if (result != System.Windows.Forms.DialogResult.OK || string.IsNullOrWhiteSpace(dialog.SelectedPath))
+                return;
 
-                    Settings.OutputLocation = folderDialog.FileName;
-                    await Settings.SaveSettingsAsync(); // Save settings after change (awaited)
-                }
-                catch (UnauthorizedAccessException)
-                {
-                    MessageBox.Show("Write access denied to the selected directory.",
-                        "Permission Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-                catch (Exception ex)
-                {
-                    LogError("Output location validation failed", ex);
-                    MessageBox.Show($"Invalid output location: {ex.Message}",
-                        "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
+            try
+            {
+                // Validate write access
+                var testFile = Path.Combine(dialog.SelectedPath, $"packitpro_test_{Guid.NewGuid()}.tmp");
+                await File.WriteAllTextAsync(testFile, "test");
+                File.Delete(testFile);
+
+                Settings.OutputLocation = dialog.SelectedPath;
+                await Settings.SaveSettingsAsync();
+                Status.Message = $"Output location set to: {dialog.SelectedPath}";
+            }
+            catch (UnauthorizedAccessException)
+            {
+                MessageBox.Show(
+                    "Cannot write to selected folder. Please choose a location with write permissions.",
+                    "Permission Denied",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+            catch (Exception ex)
+            {
+                LogError("Output location validation failed", ex);
+                MessageBox.Show(
+                    $"Invalid output location:\n{ex.Message}",
+                    "Validation Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
             }
         }
 
@@ -235,252 +266,207 @@ namespace PackItPro.ViewModels
         {
             var dialog = new InputDialog(
                 "VirusTotal API Key",
-                "Enter your VirusTotal API key (64 characters):",
-                Settings.VirusTotalApiKey
-            );
+                "Enter your 64-character VirusTotal API key:",
+                Settings.VirusTotalApiKey);
 
-            if (dialog.ShowDialog() == true)
+            if (dialog.ShowDialog() != true) return;
+
+            var key = dialog.Answer.Trim();
+            if (string.IsNullOrWhiteSpace(key))
             {
-                var cleanedKey = dialog.Answer.Trim();
-                if (string.IsNullOrEmpty(cleanedKey))
-                {
-                    MessageBox.Show("API key cannot be empty.",
-                        "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return;
-                }
+                MessageBox.Show("API key cannot be empty.", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
 
-                if (cleanedKey.Length != 64)
-                {
-                    MessageBox.Show("VirusTotal API keys must be 64 characters long.",
-                        "Invalid Key", MessageBoxButton.OK, MessageBoxImage.Error);
-                    return;
-                }
+            if (key.Length != 64)
+            {
+                MessageBox.Show(
+                    "VirusTotal API keys must be exactly 64 characters long.\n\nGet your key from: https://www.virustotal.com/gui/user-settings/apikey",
+                    "Invalid Key Length",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+                return;
+            }
 
-                Settings.VirusTotalApiKey = cleanedKey;
-                _virusTotalClient?.SetApiKey(cleanedKey); // Update client's API key
-                Settings.SaveSettingsAsync(); // Save settings after change
-                MessageBox.Show("API key updated successfully!",
-                    "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+            Settings.VirusTotalApiKey = key;
+            _virusTotalClient?.SetApiKey(key);
+            _ = Settings.SaveSettingsAsync(); // Fire-and-forget save (non-critical)
+
+            MessageBox.Show(
+                "API key saved successfully!\n\nNote: Keys are stored locally and never transmitted by PackItPro.",
+                "Success",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+
+        private bool CanExecuteScan(object? parameter) =>
+            FileList.HasFiles && !Status.IsBusy && !string.IsNullOrWhiteSpace(Settings.VirusTotalApiKey);
+
+        private async void ExecuteScanFilesCommand(object? parameter)
+        {
+            if (!CanExecuteScan(parameter)) return;
+
+            try
+            {
+                Status.SetStatusScanning();
+                await ExecuteScanFilesWithVirusTotal();
+            }
+            catch (Exception ex)
+            {
+                LogError("Scan operation failed", ex);
+                Status.Message = $"Scan failed: {ex.Message}";
+                MessageBox.Show(
+                    $"Virus scan failed:\n{ex.Message}",
+                    "Scan Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+            finally
+            {
+                Status.SetStatusReady();
             }
         }
 
-        // NEW: Add other command implementations here (ExportLogs, ViewCache, etc.)
-        // For now, placeholder implementations:
+        private void ExecuteClearAllFilesCommand(object? parameter)
+        {
+            if (FileList.Items.Count == 0) return;
+
+            var result = MessageBox.Show(
+                $"Remove all {FileList.Items.Count} files from the list?",
+                "Confirm Clear",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (result == MessageBoxResult.Yes)
+                FileList.ClearAllFilesCommand.Execute(null);
+        }
+
+        private bool CanExecuteClearAll(object? parameter) => FileList.HasFiles;
+
         private void ExecuteExportLogsCommand(object? parameter)
         {
             var logPath = Path.Combine(_appDataDir, "packitpro.log");
-            if (File.Exists(logPath))
+            if (!File.Exists(logPath))
             {
-                var saveDialog = new SaveFileDialog
-                {
-                    Filter = "Log Files (*.log)|*.log|All Files (*.*)|*.*",
-                    FileName = $"PackItPro_Log_{DateTime.Now:yyyyMMdd_HHmmss}.log",
-                    InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Desktop)
-                };
+                MessageBox.Show("No log file exists yet.", "No Logs", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
 
-                if (saveDialog.ShowDialog() == true)
+            var dialog = new SaveFileDialog
+            {
+                Filter = "Log Files (*.log)|*.log|Text Files (*.txt)|*.txt|All Files (*.*)|*.*",
+                FileName = $"PackItPro_Log_{DateTime.Now:yyyyMMdd_HHmmss}.log",
+                InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Desktop)
+            };
+
+            if (dialog.ShowDialog() == true)
+            {
+                try
                 {
-                    try
-                    {
-                        File.Copy(logPath, saveDialog.FileName, overwrite: true);
-                        MessageBox.Show($"Logs exported to:\n{saveDialog.FileName}", "Export Successful", MessageBoxButton.OK, MessageBoxImage.Information);
-                    }
-                    catch (Exception ex)
-                    {
-                        LogError("Log export failed", ex);
-                        MessageBox.Show($"Failed to export logs: {ex.Message}", "Export Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                    }
+                    File.Copy(logPath, dialog.FileName, overwrite: true);
+                    MessageBox.Show(
+                        $"Logs exported to:\n{dialog.FileName}",
+                        "Export Successful",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                }
+                catch (Exception ex)
+                {
+                    LogError("Log export failed", ex);
+                    MessageBox.Show(
+                        $"Failed to export logs:\n{ex.Message}",
+                        "Export Error",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
                 }
             }
-            else
-            {
-                MessageBox.Show("No log file found to export.", "No Logs", MessageBoxButton.OK, MessageBoxImage.Information);
-            }
-        }
-
-        private void ExecuteViewCacheCommand(object? parameter)
-        {
-            MessageBox.Show($"VirusTotal scan cache is located at:\n{_cacheFilePath}\n\nYou can open this file to view cached scan results.", "View Cache", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         private void ExecuteClearCacheCommand(object? parameter)
         {
             var result = MessageBox.Show(
-                "Are you sure you want to clear the VirusTotal scan cache? This will force rescan of all files.",
+                "Clear VirusTotal scan cache?\n\nThis will force re-scanning of all files on next scan.",
                 "Clear Cache",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Warning);
 
-            if (result == MessageBoxResult.Yes)
+            if (result != MessageBoxResult.Yes) return;
+
+            try
             {
-                _virusTotalClient?.ClearCache(); // Clear the client's in-memory cache
-                try
-                {
-                    if (File.Exists(_cacheFilePath))
-                    {
-                        File.Delete(_cacheFilePath);
-                        LogInfo("VirusTotal scan cache file deleted.");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    LogError("Failed to delete cache file", ex);
-                    MessageBox.Show($"Failed to delete cache file: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-                MessageBox.Show("VirusTotal scan cache cleared.", "Cache Cleared", MessageBoxButton.OK, MessageBoxImage.Information);
+                _virusTotalClient?.ClearCache();
+
+                if (File.Exists(_cacheFilePath))
+                    File.Delete(_cacheFilePath);
+
+                MessageBox.Show(
+                    "Scan cache cleared successfully.",
+                    "Cache Cleared",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
             }
-        }
-
-        private void ExecuteTestPackageCommand(object? parameter)
-        {
-            MessageBox.Show("Package testing functionality is not yet implemented.", "Not Implemented", MessageBoxButton.OK, MessageBoxImage.Information);
-        }
-
-        private void ExecuteExportListCommand(object? parameter)
-        {
-            var sb = new StringBuilder();
-            sb.AppendLine("Files in current package:");
-            foreach (var item in FileList.Items)
+            catch (Exception ex)
             {
-                sb.AppendLine($"- {item.FileName} ({item.Size})");
+                LogError("Cache clear failed", ex);
+                MessageBox.Show(
+                    $"Failed to clear cache:\n{ex.Message}",
+                    "Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
             }
-
-            var saveDialog = new SaveFileDialog
-            {
-                Filter = "Text Files (*.txt)|*.txt|All Files (*.*)|*.*",
-                FileName = $"Package_List_{DateTime.Now:yyyyMMdd_HHmmss}.txt",
-                InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Desktop)
-            };
-
-            if (saveDialog.ShowDialog() == true)
-            {
-                try
-                {
-                    File.WriteAllText(saveDialog.FileName, sb.ToString());
-                    MessageBox.Show($"File list exported to:\n{saveDialog.FileName}", "Export Successful", MessageBoxButton.OK, MessageBoxImage.Information);
-                }
-                catch (Exception ex)
-                {
-                    LogError("File list export failed", ex);
-                    MessageBox.Show($"Failed to export file list: {ex.Message}", "Export Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-            }
-        }
-
-        private void ExecuteDocumentationCommand(object? parameter)
-        {
-            MessageBox.Show("Opening documentation...", "Documentation", MessageBoxButton.OK, MessageBoxImage.Information);
-            // Process.Start(new ProcessStartInfo("https://your-documentation-url.com") { UseShellExecute = true }); // Example
-        }
-
-        private void ExecuteGitHubCommand(object? parameter)
-        {
-            MessageBox.Show("Opening GitHub repository...", "GitHub", MessageBoxButton.OK, MessageBoxImage.Information);
-            // Process.Start(new ProcessStartInfo("https://github.com/your-username/your-repo") { UseShellExecute = true }); // Example
-        }
-
-        private void ExecuteReportIssueCommand(object? parameter)
-        {
-            MessageBox.Show("Opening issue reporting page...", "Report Issue", MessageBoxButton.OK, MessageBoxImage.Information);
-            // Process.Start(new ProcessStartInfo("https://github.com/your-username/your-repo/issues/new") { UseShellExecute = true }); // Example
-        }
-
-        private void ExecuteCheckUpdatesCommand(object? parameter)
-        {
-            MessageBox.Show("Checking for updates...", "Check Updates", MessageBoxButton.OK, MessageBoxImage.Information);
-            // Simulate update check
-            // await Task.Delay(2000); // Simulate network call
-            // MessageBox.Show("You are running the latest version.", "No Updates", MessageBoxButton.OK, MessageBoxImage.Information);
-        }
-
-        private void ExecutePackItProSettingsCommand(object? parameter)
-        {
-            var settingsInfo = new StringBuilder();
-            settingsInfo.AppendLine("Current PackItPro Settings:");
-            settingsInfo.AppendLine($"- Output Location: {Settings.OutputLocation}");
-            settingsInfo.AppendLine($"- VirusTotal API Key Set: {!string.IsNullOrEmpty(Settings.VirusTotalApiKey)}");
-            settingsInfo.AppendLine($"- Only Scan Executables: {Settings.OnlyScanExecutables}");
-            settingsInfo.AppendLine($"- Auto Remove Infected: {Settings.AutoRemoveInfectedFiles}");
-            settingsInfo.AppendLine($"- Include Winget Update Script: {Settings.IncludeWingetUpdateScript}");
-            settingsInfo.AppendLine($"- Use LZMA Compression: {Settings.UseLZMACompression}");
-            settingsInfo.AppendLine($"- Requires Admin: {Settings.RequiresAdmin}");
-            settingsInfo.AppendLine($"- Verify Integrity: {Settings.VerifyIntegrity}");
-
-            MessageBox.Show(settingsInfo.ToString(), "PackItPro Settings", MessageBoxButton.OK, MessageBoxImage.Information);
-        }
-
-        private void ExecuteAboutCommand(object? parameter)
-        {
-            MessageBox.Show("PackItPro v1.0\n\nA secure file packaging tool designed to bundle executable files into a single installer package with malware scanning capability.",
-                "About PackItPro", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         private void ExecuteExitCommand(object? parameter)
         {
+            // Save settings before exit
+            _ = Settings.SaveSettingsAsync();
             Application.Current.Shutdown();
-        }
-
-        private void ExecuteRetryCommand(object? parameter)
-        {
-            // Implement logic to retry a failed operation (e.g., retry scan if a scan failed)
-            // For now, just show a message
-            MessageBox.Show("Retrying last operation...", "Retry", MessageBoxButton.OK, MessageBoxImage.Information);
-        }
-
-        private void ExecuteDismissErrorCommand(object? parameter)
-        {
-            // Implement logic to dismiss an error message or clear the error state
-            // For now, just clear the status message and hide the error panel
-            Status.SetStatusReady(); // NEW: Reset status
-            // Assuming ErrorPanel is handled in the View via binding or direct access
-            // ErrorPanel?.Visibility = Visibility.Collapsed;
         }
         #endregion
 
-        #region VirusTotal Integration (Refactored Call)
+        #region VirusTotal Scanning Logic
         private async Task ExecuteScanFilesWithVirusTotal()
         {
-            if (Status.IsBusy) // Don't scan if already busy (packing or scanning)
+            if (_virusTotalClient == null || string.IsNullOrWhiteSpace(Settings.VirusTotalApiKey))
             {
-                LogInfo("Scan requested while already busy. Ignoring request.");
+                MessageBox.Show(
+                    "VirusTotal API key is required for scanning.\nSet it in Settings > VirusTotal API Key.",
+                    "API Key Required",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
                 return;
             }
 
-            // NEW: Use the VirusTotalClient instance
-            if (_virusTotalClient == null)
+            var totalFiles = FileList.Items.Count(f =>
+                !Settings.OnlyScanExecutables ||
+                _executableExtensions.Contains(Path.GetExtension(f.FilePath)));
+
+            if (totalFiles == 0)
             {
-                LogError("VirusTotalClient not initialized", new InvalidOperationException("VirusTotalClient is null"));
-                MessageBox.Show("VirusTotal client is not initialized.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(
+                    "No scannable files found.\nEnable 'Scan all files' in settings to scan non-executables.",
+                    "No Files to Scan",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
                 return;
             }
 
-            if (string.IsNullOrEmpty(Settings.VirusTotalApiKey))
-            {
-                MessageBox.Show("VirusTotal API key is required for scanning. Please set it in Settings.",
-                    "Configuration Required", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-
-            // NEW: Ensure API key is set in the client (should already be done on load, but re-set if key changed recently)
-            _virusTotalClient.SetApiKey(Settings.VirusTotalApiKey);
-
-            Status.SetStatusScanning(); // NEW: Set status before starting scan loop
-            int totalFiles = FileList.Count;
+            Status.Message = $"Scanning {totalFiles} file(s) with VirusTotal...";
             int processed = 0;
+            var infectedFiles = new List<FileItemViewModel>();
 
-            var filesToRemove = new List<FileItemViewModel>();
             foreach (var item in FileList.Items)
             {
+                // Skip non-executables if setting is enabled
+                if (Settings.OnlyScanExecutables &&
+                    !_executableExtensions.Contains(Path.GetExtension(item.FilePath)))
+                {
+                    item.Status = FileStatusEnum.Skipped;
+                    continue;
+                }
+
                 try
                 {
-                    if (Settings.OnlyScanExecutables &&
-                        !_executableExtensions.Contains(Path.GetExtension(item.FilePath)))
-                    {
-                        item.Status = FileStatusEnum.Skipped;
-                        continue;
-                    }
-
-                    // NEW: Use the client to scan the file
                     var result = await _virusTotalClient.ScanFileAsync(
                         item.FilePath,
                         Settings.VirusTotalApiKey,
@@ -488,14 +474,12 @@ namespace PackItPro.ViewModels
                         Settings.MinimumDetectionsToFlag
                     );
 
-                    // NEW: Apply result to the item (properties like Positives, TotalScans are set too)
                     item.Positives = result.Positives;
                     item.TotalScans = result.TotalScans;
-                    // The IsInfected property is calculated based on Status, which is set here
                     item.Status = result.IsInfected ? FileStatusEnum.Infected : FileStatusEnum.Clean;
 
-                    if (item.IsInfected && Settings.AutoRemoveInfectedFiles)
-                        filesToRemove.Add(item);
+                    if (result.IsInfected)
+                        infectedFiles.Add(item);
                 }
                 catch (Exception ex)
                 {
@@ -505,94 +489,129 @@ namespace PackItPro.ViewModels
                 finally
                 {
                     processed++;
-                    // Update progress percentage (this could be a property on StatusVM too)
                     Status.ProgressPercentage = (double)processed / totalFiles * 100;
-                    // Could update progress text block here if needed via binding
                 }
             }
 
-            if (filesToRemove.Any())
+            // Handle infected files
+            if (infectedFiles.Count > 0)
             {
-                var result = MessageBox.Show(
-                    $"{filesToRemove.Count} infected files found. Remove them from the list?",
-                    "Infected Files Detected",
-                    MessageBoxButton.YesNo,
-                    MessageBoxImage.Warning);
-
-                if (result == MessageBoxResult.Yes)
+                var message = $"{infectedFiles.Count} infected file(s) detected!";
+                if (Settings.SettingsModel.AutoRemoveInfectedFiles)
                 {
-                    foreach (var infectedFile in filesToRemove)
-                        FileList.Items.Remove(infectedFile);
+                    foreach (var file in infectedFiles)
+                        FileList.Items.Remove(file);
+
+                    message += $"\n\nAutomatically removed from package list.";
                 }
+                else
+                {
+                    message += $"\n\nReview files marked as 'Infected' before packaging.";
+                }
+
+                MessageBox.Show(
+                    message,
+                    "Security Alert",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
             }
-
-            Status.SetStatusReady(); // NEW: Set status back to ready after scan completes
-            Status.Message = "Scan completed"; // NEW: Update message
-
-            // NEW: Save the updated cache via the client
-            if (_virusTotalClient != null)
+            else
             {
-                await _virusTotalClient.SaveCacheAsync();
+                MessageBox.Show(
+                    $"All {totalFiles} file(s) scanned clean!",
+                    "Scan Complete",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
             }
+
+            // Save updated cache
+            await _virusTotalClient.SaveCacheAsync();
+            Status.Message = "Scan completed successfully";
         }
         #endregion
 
-        #region Error Handling
+        #region Error Handling Helpers
+        private void HandleStubMissingError()
+        {
+            var message = new StringBuilder();
+            message.AppendLine("StubInstaller.exe not found!");
+            message.AppendLine();
+            message.AppendLine("To fix this:");
+            message.AppendLine("1. Ensure StubInstaller.exe exists in your project directory");
+            message.AppendLine("2. In Visual Studio:");
+            message.AppendLine("   - Right-click StubInstaller.exe in Solution Explorer");
+            message.AppendLine("   - Properties → 'Copy to Output Directory' = 'Copy always'");
+            message.AppendLine("3. Rebuild the solution");
+            message.AppendLine();
+            message.AppendLine("Without this file, packaging cannot proceed.");
+
+            MessageBox.Show(
+                message.ToString(),
+                "Missing Component",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+
+            LogError("StubInstaller.exe missing", new FileNotFoundException("StubInstaller.exe not found in output directory"));
+        }
+
+        private void HandleHashingError(Exception ex)
+        {
+            MessageBox.Show(
+                "Critical error during file hashing.\n\nThis usually happens when:" +
+                "\n• Files are locked by another process" +
+                "\n• Insufficient permissions to read files" +
+                "\n• Corrupted file system\n\n" +
+                "Try closing other applications and retry packaging.",
+                "Hashing Error",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+
+            LogError("File hashing failed", ex);
+        }
+        #endregion
+
+        #region Logging
         private void LogError(string message, Exception ex)
         {
             try
             {
-                var logEntry = $"[{DateTime.Now:o}] {message}\n{ex}\n\n";
-                var logPath = Path.Combine(_appDataDir, "packitpro.log"); // Log to AppData
-                File.AppendAllText(logPath, logEntry);
+                var logEntry = $"[{DateTime.Now:u}] ERROR: {message}\n{ex}\n\n";
+                File.AppendAllText(Path.Combine(_appDataDir, "packitpro.log"), logEntry);
                 Debug.WriteLine(logEntry);
             }
-            catch { /* Ensure logging doesn't crash the app */ }
+            catch { /* Silent fail - don't crash on logging errors */ }
         }
 
-        private void LogInfo(string message) // NEW helper for info logs
+        private void LogInfo(string message)
         {
             try
             {
-                var logEntry = $"[{DateTime.Now:o}] [INFO] {message}\n";
-                var logPath = Path.Combine(_appDataDir, "packitpro.log"); // Log to AppData
-                File.AppendAllText(logPath, logEntry);
+                var logEntry = $"[{DateTime.Now:u}] INFO: {message}\n";
+                File.AppendAllText(Path.Combine(_appDataDir, "packitpro.log"), logEntry);
                 Debug.WriteLine(logEntry);
             }
-            catch { /* Ensure logging doesn't crash the app */ }
+            catch { /* Silent fail */ }
         }
         #endregion
 
-        #region IDisposable Support
-        private bool disposedValue = false; // To detect redundant calls
+        #region IDisposable Implementation
+        private bool _disposed;
 
         protected virtual void Dispose(bool disposing)
         {
-            if (!disposedValue)
+            if (_disposed) return;
+
+            if (disposing)
             {
-                if (disposing)
-                {
-                    // TODO: Dispose managed state (managed objects).
-                    _httpClient?.Dispose();
-                    _scanSemaphore?.Dispose();
-                    // NEW: Dispose the VirusTotalClient and PackagerService
-                    _virusTotalClient?.Dispose();
-                    _packagerService?.Dispose(); // NEW: Dispose PackagerService if it holds resources
-                }
-
-                // TODO: Free unmanaged resources (unmanaged objects) and override a finalizer below.
-                // TODO: Set large fields to null.
-
-                disposedValue = true;
+                _virusTotalClient?.Dispose();
+                _disposed = true;
             }
         }
 
-        // This code added to correctly implement the disposable pattern.
         public void Dispose()
         {
-            // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
             Dispose(true);
-            // GC.SuppressFinalize(this);
+            GC.SuppressFinalize(this);
         }
         #endregion
 

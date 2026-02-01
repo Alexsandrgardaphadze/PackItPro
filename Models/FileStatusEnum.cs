@@ -1,14 +1,18 @@
-﻿public enum FileStatusEnum
+﻿namespace PackItPro.Models
 {
-    Pending,
-    Clean,
-    Infected,
-    ScanFailed,
-    Skipped
-}
-public enum CompressionLevelEnum
-{
-    Fast,
-    Normal,
-    Maximum
+    public enum FileStatusEnum
+    {
+        Pending,
+        Clean,
+        Infected,
+        ScanFailed,
+        Skipped
+    }
+
+    public enum CompressionMethodEnum
+    {
+        Fast,
+        Normal,
+        Maximum
+    }
 }

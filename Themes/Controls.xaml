@@ -123,4 +123,30 @@
 		</Setter>
 	</Style>
 
+    <!-- Global focus visual style -->
+    <Style x:Key="FocusVisual">
+        <Setter Property="Control.Template">
+            <Setter.Value>
+                <ControlTemplate>
+                    <Rectangle Stroke="{StaticResource AppPrimaryColor}" 
+                           StrokeThickness="2" 
+                           Margin="-2"
+                           StrokeDashArray="2 2"
+                           SnapsToDevicePixels="true"/>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Apply to interactive controls -->
+    <Style TargetType="Button" BasedOn="{StaticResource Win11Button}">
+        <Setter Property="FocusVisualStyle" Value="{StaticResource FocusVisual}"/>
+    </Style>
+    <Style TargetType="TextBox">
+        <Setter Property="FocusVisualStyle" Value="{StaticResource FocusVisual}"/>
+    </Style>
+    <Style TargetType="CheckBox">
+        <Setter Property="FocusVisualStyle" Value="{StaticResource FocusVisual}"/>
+    </Style>
+
 </ResourceDictionary>

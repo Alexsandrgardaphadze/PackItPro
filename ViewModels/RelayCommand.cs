@@ -1,4 +1,5 @@
-﻿using System;
+﻿// PackItPro/ViewModels/RelayCommand.cs
+using System;
 using System.Windows.Input;
 
 namespace PackItPro.ViewModels
@@ -21,7 +22,12 @@ namespace PackItPro.ViewModels
         }
 
         public bool CanExecute(object? parameter) => _canExecute?.Invoke(parameter) ?? true;
-
         public void Execute(object? parameter) => _execute(parameter);
+
+        // fixes "RaiseCanExecuteChanged not found" error
+        public void RaiseCanExecuteChanged()
+        {
+            CommandManager.InvalidateRequerySuggested();
+        }
     }
 }

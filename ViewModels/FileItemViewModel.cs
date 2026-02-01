@@ -1,9 +1,9 @@
-﻿// ViewModels/FileItemViewModel.cs
+﻿// PackItPro/ViewModels/FileItemViewModel.cs
 using System;
 using System.ComponentModel;
-using System.IO; // For Path
-using System.Windows.Input; // For ICommand
-using System.Windows.Media; // For SolidColorBrush
+using System.IO;
+using System.Windows.Input;
+using PackItPro.Models;
 
 namespace PackItPro.ViewModels
 {
@@ -13,14 +13,9 @@ namespace PackItPro.ViewModels
         private string _filePath = string.Empty;
         private string _size = "0 KB";
         private FileStatusEnum _status = FileStatusEnum.Pending;
-        // NEW: Remove direct StatusColor property, use converter in XAML
-        // private SolidColorBrush _statusColor = Brushes.Gray;
 
-        // NEW: Properties for scan results (to be updated by MainViewModel after scan)
         public int Positives { get; set; }
         public int TotalScans { get; set; }
-
-        // ICommand for remove button (assigned by MainViewModel)
         public ICommand RemoveCommand { get; set; } = null!;
 
         public string FileName
@@ -32,7 +27,7 @@ namespace PackItPro.ViewModels
         public string FilePath
         {
             get => _filePath;
-            set { _filePath = value; OnPropertyChanged(); OnPropertyChanged(nameof(FileIcon)); } // NEW: Notify FileIcon changed
+            set { _filePath = value; OnPropertyChanged(); OnPropertyChanged(nameof(FileIcon)); }
         }
 
         public string Size
@@ -44,10 +39,9 @@ namespace PackItPro.ViewModels
         public FileStatusEnum Status
         {
             get => _status;
-            set { _status = value; OnPropertyChanged(); OnPropertyChanged(nameof(StatusText)); OnPropertyChanged(nameof(IsInfected)); } // NEW: Notify StatusText and IsInfected changed
+            set { _status = value; OnPropertyChanged(); OnPropertyChanged(nameof(StatusText)); OnPropertyChanged(nameof(IsInfected)); }
         }
 
-        // NEW: StatusText is the display text for the UI, derived from Status enum
         public string StatusText => _status switch
         {
             FileStatusEnum.Pending => "Pending Scan",
@@ -58,21 +52,17 @@ namespace PackItPro.ViewModels
             _ => "Unknown"
         };
 
-        // NEW: IsInfected is now calculated based on Status
         public bool IsInfected => Status == FileStatusEnum.Infected;
 
-        // NEW: Add FileIcon property (calculated based on FilePath)
-        public string FileIcon => Path.GetExtension(FilePath).ToLower() switch
+        public string FileIcon => Path.GetExtension(FilePath).ToLowerInvariant() switch
         {
             ".exe" => "⚙️",
             ".msi" => "📦",
             ".zip" => "🗜️",
-            ".appx" => "📱",
-            ".msix" => "📱",
+            ".appx" or ".msix" => "📱",
             _ => "📄"
         };
 
-        // NEW: Add StatusIcon property (calculated based on StatusText)
         public string StatusIcon => StatusText switch
         {
             var s when s.Contains("Infected") => "⚠️",
@@ -86,15 +76,5 @@ namespace PackItPro.ViewModels
         public event PropertyChangedEventHandler? PropertyChanged;
         protected virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string? propertyName = null) =>
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-    }
-
-    // NEW: Enum for file status (defined here or shared)
-    public enum FileStatusEnum
-    {
-        Pending,
-        Clean,
-        Infected,
-        ScanFailed,
-        Skipped
     }
 }

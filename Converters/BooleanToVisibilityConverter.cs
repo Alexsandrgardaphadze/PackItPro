@@ -5,39 +5,16 @@ using System.Windows.Data;
 
 namespace PackItPro.Converters
 {
-    [ValueConversion(typeof(bool), typeof(Visibility))]
     public class BooleanToVisibilityConverter : IValueConverter
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            try
-            {
-                if (value is bool boolValue)
-                {
-                    return boolValue ? Visibility.Visible : Visibility.Collapsed;
-                }
-                return Visibility.Collapsed;
-            }
-            catch
-            {
-                return Visibility.Collapsed;
-            }
+            return (value is bool b && b) ? Visibility.Visible : Visibility.Collapsed;
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            try
-            {
-                if (value is Visibility visibility)
-                {
-                    return visibility == Visibility.Visible;
-                }
-                return false;
-            }
-            catch
-            {
-                return false;
-            }
+            return value is Visibility v && v == Visibility.Visible;
         }
     }
 }

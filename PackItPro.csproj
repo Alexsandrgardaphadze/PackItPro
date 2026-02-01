@@ -1,15 +1,17 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
     <ApplicationIcon>PackItPro.ico</ApplicationIcon>
-    <Version>0.4.2</Version>
+    <Version>0.5</Version>
     <Authors>PackItPro Team</Authors>
     <Description>Secure file packaging</Description>
     <Nullable>enable</Nullable>
-    <PublishSingleFile>true</PublishSingleFile>
-    <SelfContained>true</SelfContained>
+
+	  <!-- Remove PublishSingleFile/SelfContained for debugging -->
+	  <!-- <PublishSingleFile>true</PublishSingleFile> -->
+	  <!-- <SelfContained>true</SelfContained> -->
     <UseWindowsForms>true</UseWindowsForms>
   </PropertyGroup>
 
@@ -31,7 +33,40 @@
     </Content>
   </ItemGroup>
 
+  <ItemGroup>
+    <Page Update="Views\ErrorPanel.xaml">
+      <Generator></Generator>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Page>
+    <Page Update="Views\FileListPanel.xaml">
+      <Generator></Generator>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Page>
+    <Page Update="Views\PackSettingsPanel.xaml">
+      <Generator></Generator>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Page>
+    <Page Update="Views\StatusPanel.xaml">
+      <Generator></Generator>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Page>
+    <Page Update="Views\SummaryPanel.xaml">
+      <Generator></Generator>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Page>
+  </ItemGroup>
+
+	<ItemGroup>
+		<!-- Add StubInstaller.exe as content -->
+		<None Update="StubInstaller.exe">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
+	
+<!--
   <Target Name="CopyStubInstaller" AfterTargets="Build" Condition="'$(Configuration)' == 'Debug' Or '$(Configuration)' == 'Release'">
     <Copy SourceFiles="..\StubInstaller\bin\$(Configuration)\net8.0-windows\StubInstaller.exe" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" />
   </Target>
+  -->
+	
 </Project>
