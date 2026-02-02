@@ -4,7 +4,7 @@
     <TargetFramework>net8.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
     <ApplicationIcon>PackItPro.ico</ApplicationIcon>
-    <Version>0.6</Version>
+    <Version>0.6.1</Version>
     <Authors>PackItPro Team</Authors>
     <Description>Secure file packaging</Description>
     <Nullable>enable</Nullable>
@@ -28,6 +28,9 @@
     <None Update="PackItPro.ico">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <Content Remove="..\StubInstaller\bin\Debug\net8.0-windows\StubInstaller.exe" />
+    <Content Remove="..\StubInstaller\bin\Debug\net8.0-windows\StubInstaller.exe" />
+    <Content Remove="..\StubInstaller\bin\Debug\net8.0-windows\StubInstaller.exe" />
     <Content Include="..\StubInstaller\bin\$(Configuration)\net8.0-windows\StubInstaller.exe" Link="StubInstaller.exe">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
