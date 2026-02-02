@@ -5,4 +5,6 @@
     <conv:InverseBooleanToVisibilityConverter x:Key="InverseBoolToVisibility" />
     <conv:BooleanToYesNoConverter x:Key="BoolToYesNo" />
     <conv:FileStatusToColorConverter x:Key="FileStatusToColor" />
+    <conv:ByteToSizeConverter x:Key="ByteToSizeConverter" />
+    <conv:StatusToBackgroundConverter x:Key="StatusToBackground" />
 </ResourceDictionary>

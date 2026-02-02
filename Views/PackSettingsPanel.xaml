@@ -1,5 +1,4 @@
-﻿<!-- Views/PackSettingsPanel.xaml - FIXED VERSION -->
-<UserControl x:Class="PackItPro.Views.PackSettingsPanel"
+﻿<UserControl x:Class="PackItPro.Views.PackSettingsPanel"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -14,221 +13,254 @@
             BorderBrush="{StaticResource AppBorderColor}"
             BorderThickness="1">
 
-        <ScrollViewer VerticalScrollBarVisibility="Auto" 
-                      HorizontalScrollBarVisibility="Disabled">
-            <StackPanel>
-                <!-- Header with Icon -->
-                <Grid Margin="0,0,0,15">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0"
-                              Text="⚙️" 
-                              FontSize="18" 
-                              Margin="0,0,8,0"
-                              VerticalAlignment="Center"/>
-                    <TextBlock Grid.Column="1"
-                              Text="Package Settings" 
-                              FontSize="16" 
-                              Foreground="{StaticResource AppTextColor}" 
-                              FontWeight="SemiBold"
-                              FontFamily="Segoe UI"
-                              VerticalAlignment="Center"/>
-                </Grid>
+        <!-- StackPanel holds all content; ScrollViewer removed (handled by parent) -->
+        <StackPanel>
 
-                <!-- Output File Name -->
-                <TextBlock Text="Output File Name" 
-                          Foreground="{StaticResource AppTextSecondaryColor}"
-                          FontSize="12"
-                          FontWeight="Medium"
+            <!-- Header with Icon -->
+            <Grid Margin="0,0,0,15">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0"
+                           Text="⚙️" 
+                           FontSize="18" 
+                           Margin="0,0,8,0"
+                           VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="1"
+                           Text="Package Settings" 
+                           FontSize="16" 
+                           Foreground="{StaticResource AppTextColor}" 
+                           FontWeight="SemiBold"
+                           FontFamily="Segoe UI"
+                           VerticalAlignment="Center"/>
+            </Grid>
+
+            <!-- Output File Name -->
+            <TextBlock Text="Output File Name" 
+                       Foreground="{StaticResource AppTextSecondaryColor}"
+                       FontSize="12"
+                       FontWeight="Medium"
+                       FontFamily="Segoe UI"
+                       Margin="0,0,0,6"/>
+            <TextBox Text="{Binding OutputFileName, Mode=TwoWay}" 
+                     Margin="0,0,0,16"
+                     Height="36"
+                     VerticalContentAlignment="Center"
+                     FontFamily="Segoe UI"
+                     FontSize="13"
+                     Background="{StaticResource AppCardColor}"
+                     Foreground="{StaticResource AppTextColor}"
+                     BorderBrush="{StaticResource AppBorderColor}"
+                     Padding="10,8"/>
+
+            <!-- Divider -->
+            <Border Height="1" 
+                    Background="{StaticResource AppDividerColor}" 
+                    Margin="0,4,0,16"/>
+
+            <!-- Security Section -->
+            <TextBlock Text="Security Options" 
+                       FontSize="13" 
+                       FontWeight="SemiBold"
+                       Foreground="{StaticResource AppTextColor}" 
+                       FontFamily="Segoe UI"
+                       Margin="0,0,0,12"/>
+
+            <!-- VirusTotal Scan -->
+            <Grid Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <CheckBox Grid.Column="0"
+                          Content="Scan with VirusTotal" 
+                          IsChecked="{Binding ScanWithVirusTotal, Mode=TwoWay}"
+                          Style="{StaticResource SettingCheckBoxStyle}"
+                          Foreground="{StaticResource AppTextColor}"
                           FontFamily="Segoe UI"
-                          Margin="0,0,0,6"/>
-                <TextBox Text="{Binding OutputFileName, Mode=TwoWay}" 
-                        Margin="0,0,0,16"
-                        Height="36"
-                        VerticalContentAlignment="Center"
-                        FontFamily="Segoe UI"
-                        FontSize="13"
-                        Background="{StaticResource AppCardColor}"
-                        Foreground="{StaticResource AppTextColor}"
-                        BorderBrush="{StaticResource AppBorderColor}"
-                        Padding="10,8"/>
+                          ToolTip="Checks files against VirusTotal database for malware"/>
+                <Button Grid.Column="1" 
+                        Style="{StaticResource InfoButtonStyle}"
+                        VerticalAlignment="Center">
+                    <Button.ToolTip>
+                        <ToolTip MaxWidth="280">
+                            <TextBlock Text="Files will be checked against VirusTotal's database to ensure safety. If scanning fails, packaging continues with a warning." 
+                                       TextWrapping="Wrap"
+                                       FontFamily="Segoe UI"/>
+                        </ToolTip>
+                    </Button.ToolTip>
+                </Button>
+            </Grid>
 
-                <!-- Divider -->
-                <Border Height="1" 
-                       Background="{StaticResource AppDividerColor}" 
-                       Margin="0,4,0,16"/>
+            <!-- Only Scan Executables -->
+            <Grid Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <CheckBox Grid.Column="0"
+                          Content="Only scan executable files" 
+                          IsChecked="{Binding OnlyScanExecutables, Mode=TwoWay}"
+                          Style="{StaticResource SettingCheckBoxStyle}"
+                          Foreground="{StaticResource AppTextColor}"
+                          FontFamily="Segoe UI"/>
+                <Button Grid.Column="1" 
+                        Style="{StaticResource InfoButtonStyle}"
+                        VerticalAlignment="Center">
+                    <Button.ToolTip>
+                        <ToolTip MaxWidth="280">
+                            <TextBlock Text="Only perform VirusTotal scan on files with extensions like .exe, .msi, .dll, etc. Skips other file types." 
+                                       TextWrapping="Wrap"
+                                       FontFamily="Segoe UI"/>
+                        </ToolTip>
+                    </Button.ToolTip>
+                </Button>
+            </Grid>
 
-                <!-- Security Section -->
-                <TextBlock Text="Security Options" 
-                          FontSize="13" 
-                          FontWeight="SemiBold"
-                          Foreground="{StaticResource AppTextColor}" 
-                          FontFamily="Segoe UI"
-                          Margin="0,0,0,12"/>
+            <!-- Auto Remove Infected Files -->
+            <Grid Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <CheckBox Grid.Column="0"
+                          Content="Auto remove infected files" 
+                          IsChecked="{Binding AutoRemoveInfectedFiles, Mode=TwoWay}"
+                          Style="{StaticResource SettingCheckBoxStyle}"
+                          Foreground="{StaticResource AppTextColor}"
+                          FontFamily="Segoe UI"/>
+                <Button Grid.Column="1" 
+                        Style="{StaticResource InfoButtonStyle}"
+                        VerticalAlignment="Center">
+                    <Button.ToolTip>
+                        <ToolTip MaxWidth="280">
+                            <TextBlock Text="Automatically removes files from the list if they are detected as infected by VirusTotal during scanning." 
+                                       TextWrapping="Wrap"
+                                       FontFamily="Segoe UI"/>
+                        </ToolTip>
+                    </Button.ToolTip>
+                </Button>
+            </Grid>
 
-                <!-- VirusTotal Scan with Toggle -->
-                <Grid Margin="0,0,0,12">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <CheckBox Grid.Column="0"
-                             Content="Scan with VirusTotal" 
-                             IsChecked="{Binding ScanWithVirusTotal, Mode=TwoWay}"
-                             Style="{StaticResource SettingCheckBoxStyle}"
-                             Foreground="{StaticResource AppTextColor}"
-                             FontFamily="Segoe UI"
-                             ToolTip="Checks files against VirusTotal database for malware"/>
-                    <Button Grid.Column="1" 
-                           Style="{StaticResource InfoButtonStyle}"
-                           VerticalAlignment="Center">
-                        <Button.ToolTip>
-                            <ToolTip MaxWidth="280">
-                                <TextBlock Text="Files will be checked against VirusTotal's database to ensure safety. If scanning fails, packaging continues with a warning." 
-                                          TextWrapping="Wrap"
-                                          FontFamily="Segoe UI"/>
-                            </ToolTip>
-                        </Button.ToolTip>
-                    </Button>
-                </Grid>
+            <!-- Divider -->
+            <Border Height="1" 
+                    Background="{StaticResource AppDividerColor}" 
+                    Margin="0,4,0,16"/>
 
-                <!-- Only Scan Executables -->
-                <Grid Margin="0,0,0,12">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <CheckBox Grid.Column="0"
-                             Content="Only scan executable files" 
-                             IsChecked="{Binding OnlyScanExecutables, Mode=TwoWay}"
-                             Style="{StaticResource SettingCheckBoxStyle}"
-                             Foreground="{StaticResource AppTextColor}"
-                             FontFamily="Segoe UI"/>
-                    <Button Grid.Column="1" 
-                           Style="{StaticResource InfoButtonStyle}"
-                           VerticalAlignment="Center">
-                        <Button.ToolTip>
-                            <ToolTip MaxWidth="280">
-                                <TextBlock Text="Only perform VirusTotal scan on files with extensions like .exe, .msi, .dll, etc. Skips other file types." 
-                                          TextWrapping="Wrap"
-                                          FontFamily="Segoe UI"/>
-                            </ToolTip>
-                        </Button.ToolTip>
-                    </Button>
-                </Grid>
+            <!-- Package Options Section -->
+            <TextBlock Text="Package Options" 
+                       FontSize="13" 
+                       FontWeight="SemiBold"
+                       Foreground="{StaticResource AppTextColor}" 
+                       FontFamily="Segoe UI"
+                       Margin="0,0,0,12"/>
 
-                <!-- Auto Remove Infected Files -->
-                <Grid Margin="0,0,0,12">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <CheckBox Grid.Column="0"
-                             Content="Auto remove infected files" 
-                             IsChecked="{Binding AutoRemoveInfectedFiles, Mode=TwoWay}"
-                             Style="{StaticResource SettingCheckBoxStyle}"
-                             Foreground="{StaticResource AppTextColor}"
-                             FontFamily="Segoe UI"/>
-                    <Button Grid.Column="1" 
-                           Style="{StaticResource InfoButtonStyle}"
-                           VerticalAlignment="Center">
-                        <Button.ToolTip>
-                            <ToolTip MaxWidth="280">
-                                <TextBlock Text="Automatically removes files from the list if they are detected as infected by VirusTotal during scanning." 
-                                          TextWrapping="Wrap"
-                                          FontFamily="Segoe UI"/>
-                            </ToolTip>
-                        </Button.ToolTip>
-                    </Button>
-                </Grid>
+            <!-- Winget Updater -->
+            <Grid Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <CheckBox Grid.Column="0"
+                          Content="Include Winget Updater" 
+                          IsChecked="{Binding IncludeWingetUpdateScript, Mode=TwoWay}"
+                          Style="{StaticResource SettingCheckBoxStyle}"
+                          Foreground="{StaticResource AppTextColor}"
+                          FontFamily="Segoe UI"/>
+                <Button Grid.Column="1" 
+                        Style="{StaticResource InfoButtonStyle}"
+                        VerticalAlignment="Center">
+                    <Button.ToolTip>
+                        <ToolTip MaxWidth="280">
+                            <TextBlock Text="Adds update_all.bat script for automatic app updates via Windows Package Manager (Winget) after installation completes." 
+                                       TextWrapping="Wrap"
+                                       FontFamily="Segoe UI"/>
+                        </ToolTip>
+                    </Button.ToolTip>
+                </Button>
+            </Grid>
 
-                <!-- Divider -->
-                <Border Height="1" 
-                       Background="{StaticResource AppDividerColor}" 
-                       Margin="0,4,0,16"/>
+            <!-- Compression Level -->
+            <TextBlock Text="Compression Level" 
+                       Foreground="{StaticResource AppTextSecondaryColor}"
+                       FontSize="12"
+                       FontWeight="Medium"
+                       FontFamily="Segoe UI"
+                       Margin="0,0,0,6"/>
+            <ComboBox SelectedIndex="{Binding CompressionLevel, Mode=TwoWay}" 
+                      Margin="0,0,0,12" 
+                      Height="36"
+                      VerticalContentAlignment="Center"
+                      FontFamily="Segoe UI"
+                      FontSize="13"
+                      Background="{StaticResource AppCardColor}"
+                      Foreground="{StaticResource AppTextColor}"
+                      BorderBrush="{StaticResource AppBorderColor}">
 
-                <!-- Package Options Section -->
-                <TextBlock Text="Package Options" 
-                          FontSize="13" 
-                          FontWeight="SemiBold"
-                          Foreground="{StaticResource AppTextColor}" 
-                          FontFamily="Segoe UI"
-                          Margin="0,0,0,12"/>
+                <!-- ✅ FIX: Override system colors AND ComboBox dropdown style -->
+                <ComboBox.Resources>
+                    <!-- System color overrides for dropdown -->
+                    <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="#1a1a2e" />
+                    <SolidColorBrush x:Key="{x:Static SystemColors.WindowTextBrushKey}" Color="#f1f5f9" />
+                    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#4f46e5" />
+                    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#f1f5f9" />
+                    <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}" Color="#1a1a2e" />
+                    <SolidColorBrush x:Key="{x:Static SystemColors.ControlTextBrushKey}" Color="#f1f5f9" />
+                </ComboBox.Resources>
 
-                <!-- Winget Updater -->
-                <Grid Margin="0,0,0,12">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <CheckBox Grid.Column="0"
-                             Content="Include Winget Updater" 
-                             IsChecked="{Binding IncludeWingetUpdateScript, Mode=TwoWay}"
-                             Style="{StaticResource SettingCheckBoxStyle}"
-                             Foreground="{StaticResource AppTextColor}"
-                             FontFamily="Segoe UI"/>
-                    <Button Grid.Column="1" 
-                           Style="{StaticResource InfoButtonStyle}"
-                           VerticalAlignment="Center">
-                        <Button.ToolTip>
-                            <ToolTip MaxWidth="280">
-                                <TextBlock Text="Adds update_all.bat script for automatic app updates via Windows Package Manager (Winget) after installation completes." 
-                                          TextWrapping="Wrap"
-                                          FontFamily="Segoe UI"/>
-                            </ToolTip>
-                        </Button.ToolTip>
-                    </Button>
-                </Grid>
+                <!-- ✅ Item container style with proper colors -->
+                <ComboBox.ItemContainerStyle>
+                    <Style TargetType="ComboBoxItem">
+                        <Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
+                        <Setter Property="Background" Value="Transparent"/>
+                        <Setter Property="Padding" Value="10,5"/>
+                        <Setter Property="FontFamily" Value="Segoe UI"/>
+                        <Setter Property="FontSize" Value="13"/>
+                        <Style.Triggers>
+                            <!-- Hover state -->
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#1f1f33"/>
+                            </Trigger>
+                            <!-- Selected state -->
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Background" Value="#4f46e5"/>
+                                <Setter Property="Foreground" Value="#f1f5f9"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </ComboBox.ItemContainerStyle>
 
-                <!-- Compression Level - FIXED BINDING -->
-                <TextBlock Text="Compression Level" 
-                          Foreground="{StaticResource AppTextSecondaryColor}"
-                          FontSize="12"
-                          FontWeight="Medium"
-                          FontFamily="Segoe UI"
-                          Margin="0,0,0,6"/>
-                <ComboBox SelectedIndex="{Binding CompressionLevel, Mode=TwoWay}" 
-                         Margin="0,0,0,12" 
-                         Height="36"
-                         VerticalContentAlignment="Center"
-                         FontFamily="Segoe UI"
-                         FontSize="13"
-                         Background="{StaticResource AppCardColor}"
-                         Foreground="{StaticResource AppTextColor}"
-                         BorderBrush="{StaticResource AppBorderColor}">
-                    <ComboBoxItem Content="None (Fastest)"/>
-                    <ComboBoxItem Content="Fast (Recommended)"/>
-                    <ComboBoxItem Content="Maximum (Smallest)"/>
-                </ComboBox>
+                <ComboBoxItem Content="None (Fastest)"/>
+                <ComboBoxItem Content="Fast (Recommended)"/>
+                <ComboBoxItem Content="Maximum (Smallest)"/>
+            </ComboBox>
 
-                <!-- Require Admin -->
-                <Grid Margin="0,0,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <CheckBox Grid.Column="0"
-                             Content="Require administrator rights" 
-                             IsChecked="{Binding RequiresAdmin, Mode=TwoWay}"
-                             Style="{StaticResource SettingCheckBoxStyle}"
-                             Foreground="{StaticResource AppTextColor}"
-                             FontFamily="Segoe UI"/>
-                    <Button Grid.Column="1" 
-                           Style="{StaticResource InfoButtonStyle}"
-                           VerticalAlignment="Center">
-                        <Button.ToolTip>
-                            <ToolTip MaxWidth="280">
-                                <TextBlock Text="Requests administrator privileges for the entire installation process. May be required by some bundled installers." 
-                                          TextWrapping="Wrap"
-                                          FontFamily="Segoe UI"/>
-                            </ToolTip>
-                        </Button.ToolTip>
-                    </Button>
-                </Grid>
+            <!-- Require Admin -->
+            <Grid Margin="0,0,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <CheckBox Grid.Column="0"
+                          Content="Require administrator rights" 
+                          IsChecked="{Binding RequiresAdmin, Mode=TwoWay}"
+                          Style="{StaticResource SettingCheckBoxStyle}"
+                          Foreground="{StaticResource AppTextColor}"
+                          FontFamily="Segoe UI"/>
+                <Button Grid.Column="1" 
+                        Style="{StaticResource InfoButtonStyle}"
+                        VerticalAlignment="Center">
+                    <Button.ToolTip>
+                        <ToolTip MaxWidth="280">
+                            <TextBlock Text="Requests administrator privileges for the entire installation process. May be required by some bundled installers." 
+                                       TextWrapping="Wrap"
+                                       FontFamily="Segoe UI"/>
+                        </ToolTip>
+                    </Button.ToolTip>
+                </Button>
+            </Grid>
 
-            </StackPanel>
-        </ScrollViewer>
+        </StackPanel>
     </Border>
 </UserControl>

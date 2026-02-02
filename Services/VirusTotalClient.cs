@@ -54,7 +54,8 @@ namespace PackItPro.Services
             string filePath,
             string apiKey,
             bool onlyScanExecutables = true,
-            int minDetectionsToFlag = 1)
+            int minDetectionsToFlag = 1,
+            CancellationToken cancellationToken = default)
         {
             if (onlyScanExecutables && !IsExecutableExtension(filePath))
             {
@@ -84,13 +85,13 @@ namespace PackItPro.Services
                 };
             }
 
-            await _scanSemaphore.WaitAsync();
+            await _scanSemaphore.WaitAsync(cancellationToken);
             try
             {
-                await _rateLimitSemaphore.WaitAsync();
+                await _rateLimitSemaphore.WaitAsync(cancellationToken);
                 try
                 {
-                    var result = await QueryVirusTotalAsync(filePath, hash, apiKey);
+                    var result = await QueryVirusTotalAsync(filePath, hash, apiKey, cancellationToken);
                     result.IsInfected = result.Positives >= minDetectionsToFlag;
                     _scanCache[hash] = result;
                     return result;
@@ -106,14 +107,14 @@ namespace PackItPro.Services
             }
         }
 
-        private async Task<VirusScanResult> QueryVirusTotalAsync(string filePath, string hash, string apiKey)
+        private async Task<VirusScanResult> QueryVirusTotalAsync(string filePath, string hash, string apiKey, CancellationToken cancellationToken = default)
         {
             // FIXED: Remove extra spaces in URLs
-            var reportResponse = await _httpClient.GetAsync($"https://www.virustotal.com/api/v3/files/{hash}");
+            var reportResponse = await _httpClient.GetAsync($"https://www.virustotal.com/api/v3/files/{hash}", cancellationToken);
 
             if (reportResponse.IsSuccessStatusCode)
             {
-                var report = await reportResponse.Content.ReadFromJsonAsync<VirusTotalFileReport>()
+                var report = await reportResponse.Content.ReadFromJsonAsync<VirusTotalFileReport>(cancellationToken: cancellationToken)
                     ?? throw new InvalidDataException("Invalid VirusTotal response");
 
                 if (report.Data?.Attributes?.LastAnalysisStats == null)
@@ -133,10 +134,10 @@ namespace PackItPro.Services
             using var formData = new MultipartFormDataContent();
             formData.Add(fileContent, "file", Path.GetFileName(filePath));
 
-            var uploadResponse = await _httpClient.PostAsync("https://www.virustotal.com/api/v3/files", formData);
+            var uploadResponse = await _httpClient.PostAsync("https://www.virustotal.com/api/v3/files", formData, cancellationToken);
             uploadResponse.EnsureSuccessStatusCode();
 
-            var uploadResult = await uploadResponse.Content.ReadFromJsonAsync<VirusTotalUploadResponse>();
+            var uploadResult = await uploadResponse.Content.ReadFromJsonAsync<VirusTotalUploadResponse>(cancellationToken: cancellationToken);
             if (uploadResult?.Data?.Id == null)
                 throw new InvalidDataException("VirusTotal upload response missing analysis ID");
 
@@ -145,12 +146,12 @@ namespace PackItPro.Services
             // Poll for results
             for (int i = 0; i < 10; i++)
             {
-                await Task.Delay(5000);
-                var analysisResponse = await _httpClient.GetAsync($"https://www.virustotal.com/api/v3/analyses/{analysisId}");
+                await Task.Delay(5000, cancellationToken);
+                var analysisResponse = await _httpClient.GetAsync($"https://www.virustotal.com/api/v3/analyses/{analysisId}", cancellationToken);
 
                 if (analysisResponse.IsSuccessStatusCode)
                 {
-                    var analysis = await analysisResponse.Content.ReadFromJsonAsync<VirusTotalFileReport>();
+                    var analysis = await analysisResponse.Content.ReadFromJsonAsync<VirusTotalFileReport>(cancellationToken: cancellationToken);
                     if (analysis?.Data?.Attributes?.LastAnalysisStats != null)
                     {
                         return new VirusScanResult

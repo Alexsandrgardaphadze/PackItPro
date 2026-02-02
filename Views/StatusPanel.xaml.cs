@@ -1,22 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
+﻿using System.Windows.Controls;
 
 namespace PackItPro.Views
 {
     /// <summary>
     /// Interaction logic for StatusPanel.xaml
+    /// Pure MVVM implementation - all actions handled via Command bindings
     /// </summary>
     public partial class StatusPanel : UserControl
     {
@@ -25,19 +13,13 @@ namespace PackItPro.Views
             InitializeComponent();
         }
 
-        private void PackNow_Click(object sender, RoutedEventArgs e)
-        {
-            // Intentionally minimal: actual command is bound in MainViewModel.
-        }
-
-        private void Retry_Click(object sender, RoutedEventArgs e)
-        {
-            // Intentionally minimal: actual logic is handled by ViewModel command.
-        }
-
-        private void DismissError_Click(object sender, RoutedEventArgs e)
-        {
-            // Intentionally minimal: actual logic is handled by ViewModel command.
-        }
+        // ✅ No event handlers needed - StatusPanel uses Command binding
+        // The XAML uses:
+        // - Command="{Binding PackCommand}" for the Pack button
+        // - All status display is data-bound to StatusViewModel properties
+        
+        // Note: The original Retry_Click and DismissError_Click handlers were for ErrorPanel,
+        // not StatusPanel. Those are now properly implemented in ErrorPanel.xaml with
+        // ErrorViewModel commands (RetryCommand and DismissErrorCommand).
     }
 }

@@ -77,7 +77,7 @@
             <Button x:Name="PackButton"
                    Grid.Column="3"
                    Content="Pack Now"
-                   Click="PackNow_Click"
+                   Command="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=DataContext.PackCommand}"
                    Style="{StaticResource Win11Button}"
                    Height="40"
                    FontSize="13"

@@ -10,14 +10,23 @@ using System.Threading.Tasks;
 
 namespace PackItPro.Services
 {
+    /// <summary>
+    /// Delegate for reporting progress during packing operations
+    /// </summary>
+    public delegate void ProgressReportHandler(int percentage, string message);
+
     public static class Packager
     {
+        // ✅ NEW: Progress event for UI updates
+        public static event ProgressReportHandler? ProgressChanged;
+
         public static async Task<string> CreatePackageAsync(
             List<string> filePaths,
             string outputDirectory,
             string packageName,
             bool requiresAdmin,
-            bool useLZMACompression)
+            bool useLZMACompression,
+            IProgress<(int percentage, string message)>? progress = null)
         {
             var tempDir = Path.Combine(Path.GetTempPath(), $"PackItPro_{Guid.NewGuid()}");
             string? payloadZipPath = null;
@@ -26,10 +35,14 @@ namespace PackItPro.Services
             try
             {
                 Directory.CreateDirectory(tempDir);
+                ReportProgress(progress, 5, "Preparing files...");
+                LogInfo("Creating temporary directory for packing");
 
                 // Copy files (use overwrite to avoid "already exists" error)
-                foreach (var file in filePaths)
+                var totalFiles = filePaths.Count;
+                for (int i = 0; i < filePaths.Count; i++)
                 {
+                    var file = filePaths[i];
                     try
                     {
                         // Verify file is accessible before copying
@@ -39,6 +52,9 @@ namespace PackItPro.Services
                         }
                         
                         File.Copy(file, Path.Combine(tempDir, Path.GetFileName(file)), overwrite: true);
+                        var copyProgress = (int)(5 + (i / (double)totalFiles) * 15);
+                        ReportProgress(progress, copyProgress, $"Copying files ({i + 1}/{totalFiles})...");
+                        LogInfo($"Copied: {Path.GetFileName(file)}");
                     }
                     catch (IOException ex) when (ex.Message.Contains("in use"))
                     {
@@ -46,10 +62,13 @@ namespace PackItPro.Services
                     }
                 }
 
+                ReportProgress(progress, 20, "Generating manifest...");
                 var manifestJson = ManifestGenerator.Generate(filePaths, packageName, requiresAdmin, includeWingetUpdateScript: false);
                 var initialManifestPath = Path.Combine(tempDir, "packitmeta.json");
                 await File.WriteAllTextAsync(initialManifestPath, manifestJson);
+                LogInfo("Manifest generated");
 
+                ReportProgress(progress, 25, "Computing checksums...");
                 var initialDirHash = Convert.ToBase64String(FileHasher.ComputeDirectoryHash(tempDir));
                 LogInfo($"Calculated initial directory hash: {initialDirHash}");
 
@@ -59,11 +78,24 @@ namespace PackItPro.Services
                 manifestJson = JsonSerializer.Serialize(manifestObj, new JsonSerializerOptions { WriteIndented = true });
                 await File.WriteAllTextAsync(initialManifestPath, manifestJson);
 
+                ReportProgress(progress, 30, "Creating ZIP archive...");
                 payloadZipPath = Path.Combine(Path.GetTempPath(), $"payload_{Guid.NewGuid()}.zip");
+                var allFilesInTemp = Directory.GetFiles(tempDir, "*", SearchOption.AllDirectories).ToList();
+                long totalBytes = 0;
+                long processedBytes = 0;
+
+                // Calculate total size for progress reporting
+                foreach (var file in allFilesInTemp)
+                {
+                    totalBytes += new FileInfo(file).Length;
+                }
+
                 using (var fs = new FileStream(payloadZipPath, FileMode.Create))
                 using (var zipStream = new ZipOutputStream(fs))
                 {
                     zipStream.SetLevel(useLZMACompression ? 9 : 0);
+                    var compressionLevel = useLZMACompression ? "Maximum (LZMA)" : "None";
+                    LogInfo($"ZIP compression level: {compressionLevel}");
 
                     // Add manifest
                     var manifestFileInfo = new FileInfo(initialManifestPath);
@@ -76,9 +108,12 @@ namespace PackItPro.Services
                     using var manifestStream = File.OpenRead(manifestFileInfo.FullName);
                     await manifestStream.CopyToAsync(zipStream);
                     zipStream.CloseEntry();
+                    processedBytes += manifestFileInfo.Length;
+                    ReportProgress(progress, 35, "Added manifest to archive");
 
                     // Add user files
-                    foreach (var filePath in Directory.GetFiles(tempDir, "*", SearchOption.AllDirectories))
+                    var fileIndex = 0;
+                    foreach (var filePath in allFilesInTemp)
                     {
                         if (Path.GetFileName(filePath) == "packitmeta.json") continue;
 
@@ -92,16 +127,33 @@ namespace PackItPro.Services
                         using var fileStream = File.OpenRead(filePath);
                         await fileStream.CopyToAsync(zipStream);
                         zipStream.CloseEntry();
+                        processedBytes += fileInfo.Length;
+                        fileIndex++;
+
+                        // Progress: 35% (archive start) to 60% (archive complete)
+                        var zipProgress = (int)(35 + (processedBytes / (double)totalBytes) * 25);
+                        ReportProgress(progress, Math.Min(zipProgress, 60), $"Compressing {Path.GetFileName(filePath)} ({fileIndex}/{allFilesInTemp.Count})...");
+                        LogInfo($"Added to ZIP: {Path.GetFileName(filePath)}");
                     }
                 }
+
+                ReportProgress(progress, 65, "Injecting payload into stub...");
+                var zipFileSize = new FileInfo(payloadZipPath).Length;
+                LogInfo($"ZIP file created: {zipFileSize} bytes");
 
                 // FIXED: Find StubInstaller.exe correctly
                 var stubPath = FindStubInstaller();
                 tempFinalPath = Path.GetTempFileName();
                 ResourceInjector.InjectPayload(stubPath, payloadZipPath, tempFinalPath);
+                LogInfo("Payload injected into stub");
 
+                ReportProgress(progress, 80, "Finalizing executable...");
                 var outputPath = Path.Combine(outputDirectory, $"{packageName}.exe");
                 File.Move(tempFinalPath, outputPath, overwrite: true);
+                var finalSize = new FileInfo(outputPath).Length;
+                LogInfo($"Output file created: {outputPath} ({finalSize} bytes)");
+
+                ReportProgress(progress, 100, $"Package created successfully! ({FormatBytes(finalSize)})");
                 return outputPath;
             }
             finally
@@ -129,6 +181,30 @@ namespace PackItPro.Services
             if (File.Exists(appDataPath)) return appDataPath;
 
             throw new FileNotFoundException("StubInstaller.exe not found in application directory or AppData.");
+        }
+
+        // ✅ Helper method to format bytes
+        private static string FormatBytes(long bytes)
+        {
+            string[] sizes = { "B", "KB", "MB", "GB" };
+            double len = bytes;
+            int order = 0;
+
+            while (len >= 1024 && order < sizes.Length - 1)
+            {
+                order++;
+                len /= 1024;
+            }
+
+            return $"{len:0.##} {sizes[order]}";
+        }
+
+        // ✅ Helper to report progress
+        private static void ReportProgress(IProgress<(int, string)>? progress, int percentage, string message)
+        {
+            progress?.Report((percentage, message));
+            ProgressChanged?.Invoke(percentage, message);
+            LogInfo($"Progress: {percentage}% - {message}");
         }
 
         private static void LogInfo(string message) =>

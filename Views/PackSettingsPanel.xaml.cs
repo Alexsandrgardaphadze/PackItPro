@@ -1,22 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
+﻿using System.Windows.Controls;
 
 namespace PackItPro.Views
 {
     /// <summary>
     /// Interaction logic for PackSettingsPanel.xaml
+    /// Pure MVVM implementation - all data binding handled in XAML
     /// </summary>
     public partial class PackSettingsPanel : UserControl
     {
@@ -25,19 +13,15 @@ namespace PackItPro.Views
             InitializeComponent();
         }
 
-        private void RequireAdminCheckBox_Checked(object sender, RoutedEventArgs e)
-        {
-            // Event handler intentionally left minimal. Settings are bound to ViewModel.
-        }
-
-        private void OnlyScanExecutablesCheckBox_Checked(object sender, RoutedEventArgs e)
-        {
-            // Event handler intentionally left minimal. Settings are bound to ViewModel.
-        }
-
-        private void AutoRemoveInfectedFilesCheckBox_Checked(object sender, RoutedEventArgs e)
-        {
-            // Event handler intentionally left minimal. Settings are bound to ViewModel.
-        }
+        // ✅ No event handlers needed - all settings are two-way bound to SettingsViewModel
+        // The XAML uses:
+        // - IsChecked="{Binding PropertyName, Mode=TwoWay}" for checkboxes
+        // - Text="{Binding PropertyName, Mode=TwoWay}" for textboxes
+        // - SelectedIndex="{Binding PropertyName, Mode=TwoWay}" for comboboxes
+        
+        // This approach ensures:
+        // 1. Immediate updates to ViewModel when user changes settings
+        // 2. No manual event handling required
+        // 3. Settings automatically persist via SettingsViewModel.SaveSettingsAsync()
     }
 }

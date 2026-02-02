@@ -3,6 +3,8 @@ using Microsoft.Win32;
 using PackItPro.Services;
 using PackItPro.Models;
 using PackItPro.Views;
+using PackItPro.ViewModels.CommandHandlers;
+using PackItPro.ViewModels.Services;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -32,6 +34,8 @@ namespace PackItPro.ViewModels
         };
 
         private VirusTotalClient? _virusTotalClient;
+        private VirusTotalCommandHandler? _virusTotalHandler;
+        private readonly ILogService _logService;
         private bool _isInitialized;
 
         // ✅ NEW: Added ErrorViewModel
@@ -48,7 +52,8 @@ namespace PackItPro.ViewModels
         public ICommand BrowseFilesCommand { get; }
         public ICommand SetOutputLocationCommand { get; }
         public ICommand SetVirusApiKeyCommand { get; }
-        public ICommand ScanFilesCommand { get; }
+        public ICommand ScanFilesCommand => _virusTotalHandler?.ScanFilesCommand ?? new RelayCommand(_ => { });
+        public ICommand CancelScanCommand => _virusTotalHandler?.CancelScanCommand ?? new RelayCommand(_ => { });
         public ICommand ClearAllFilesCommand { get; }
         public ICommand ExportLogsCommand { get; }
         public ICommand ClearCacheCommand { get; }
@@ -68,19 +73,22 @@ namespace PackItPro.ViewModels
             _cacheFilePath = Path.Combine(_appDataDir, "virusscancache.json");
             EnsureAppDataDirectoryExists();
 
+            // Initialize log service
+            var logPath = Path.Combine(_appDataDir, "packitpro.log");
+            _logService = new FileLogService(logPath);
+
             // Initialize sub-ViewModels
             Settings = new SettingsViewModel(Path.Combine(_appDataDir, "settings.json"));
             FileList = new FileListViewModel(Settings.SettingsModel, _executableExtensions);
-            Summary = new SummaryViewModel(FileList);
+            Summary = new SummaryViewModel(FileList, Settings);  // ✅ Pass Settings to SummaryViewModel
             Status = new StatusViewModel();
-            Error = new ErrorViewModel(); // ✅ NEW: Initialize ErrorViewModel
+            Error = new ErrorViewModel(); // ✅ Initialize ErrorViewModel
 
             // Initialize commands
             PackCommand = new RelayCommand(ExecutePackCommand, CanExecutePack);
             BrowseFilesCommand = new RelayCommand(ExecuteBrowseFilesCommand);
             SetOutputLocationCommand = new RelayCommand(ExecuteSetOutputLocationCommand);
             SetVirusApiKeyCommand = new RelayCommand(ExecuteSetVirusApiKeyCommand);
-            ScanFilesCommand = new RelayCommand(ExecuteScanFilesCommand, CanExecuteScan);
             ClearAllFilesCommand = new RelayCommand(ExecuteClearAllFilesCommand, CanExecuteClearAll);
             ExportLogsCommand = new RelayCommand(ExecuteExportLogsCommand);
             ClearCacheCommand = new RelayCommand(ExecuteClearCacheCommand);
@@ -114,7 +122,6 @@ namespace PackItPro.ViewModels
             if (e.PropertyName == nameof(Status.IsBusy))
             {
                 ((RelayCommand)PackCommand).RaiseCanExecuteChanged();
-                ((RelayCommand)ScanFilesCommand).RaiseCanExecuteChanged();
             }
         }
 
@@ -138,6 +145,17 @@ namespace PackItPro.ViewModels
 
                 await _virusTotalClient.LoadCacheAsync();
                 LogInfo("Scan cache loaded");
+
+                // Initialize VirusTotal handler
+                _virusTotalHandler = new VirusTotalCommandHandler(
+                    FileList,
+                    Settings,
+                    Status,
+                    Error,
+                    _virusTotalClient,
+                    _logService,
+                    _executableExtensions);
+                LogInfo("VirusTotal handler initialized");
 
                 _isInitialized = true;
                 Status.SetStatusReady();
@@ -184,18 +202,32 @@ namespace PackItPro.ViewModels
 
                 if (saveDialog.ShowDialog() != true) return;
 
+                // ✅ NEW: Set initial status and start progress reporting
                 Status.SetStatusPacking();
-                Status.Message = "Creating package...";
+                Status.Message = "Preparing to create package...";
+                Status.ProgressPercentage = 0;
+
+                // ✅ NEW: Create progress reporter to update StatusViewModel
+                var progress = new Progress<(int percentage, string message)>(report =>
+                {
+                    Status.ProgressPercentage = report.percentage;
+                    Status.Message = report.message;
+                    LogInfo($"Pack Progress: {report.percentage}% - {report.message}");
+                });
 
                 var outputPath = await Packager.CreatePackageAsync(
                     FileList.Items.Select(f => f.FilePath).ToList(),
                     Path.GetDirectoryName(saveDialog.FileName) ?? Settings.OutputLocation,
                     Path.GetFileNameWithoutExtension(saveDialog.FileName),
                     Settings.RequiresAdmin,
-                    Settings.UseLZMACompression
+                    Settings.UseLZMACompression,
+                    progress  // ✅ NEW: Pass progress reporter
                 );
 
                 Status.SetStatusReady();
+                Status.Message = "Package created successfully!";
+                Status.ProgressPercentage = 100;
+
                 MessageBox.Show(
                     $"Package created successfully!\n\nLocation: {outputPath}",
                     "Success",
@@ -257,7 +289,7 @@ namespace PackItPro.ViewModels
 
                 if (Settings.ScanWithVirusTotal && !string.IsNullOrWhiteSpace(Settings.VirusTotalApiKey))
                 {
-                    ExecuteScanFilesCommand(null);
+                    ScanFilesCommand.Execute(null);
                 }
             }
         }
@@ -327,33 +359,6 @@ namespace PackItPro.ViewModels
                 "Success",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
-        }
-
-        private bool CanExecuteScan(object? parameter) =>
-            FileList.HasFiles && !Status.IsBusy && !string.IsNullOrWhiteSpace(Settings.VirusTotalApiKey);
-
-        private async void ExecuteScanFilesCommand(object? parameter)
-        {
-            if (!CanExecuteScan(parameter)) return;
-
-            try
-            {
-                Status.SetStatusScanning();
-                await ExecuteScanFilesWithVirusTotal();
-            }
-            catch (Exception ex)
-            {
-                LogError("Scan operation failed", ex);
-                Status.Message = $"Scan failed: {ex.Message}";
-                Error.ShowError(
-                    $"Virus scan failed: {ex.Message}",
-                    retryAction: () => ExecuteScanFilesCommand(parameter)
-                );
-            }
-            finally
-            {
-                Status.SetStatusReady();
-            }
         }
 
         private void ExecuteClearAllFilesCommand(object? parameter)
@@ -597,111 +602,6 @@ namespace PackItPro.ViewModels
         }
         #endregion
 
-        #region VirusTotal Scanning Logic
-        private async Task ExecuteScanFilesWithVirusTotal()
-        {
-            if (_virusTotalClient == null || string.IsNullOrWhiteSpace(Settings.VirusTotalApiKey))
-            {
-                Error.ShowError("VirusTotal API key is required for scanning.\nSet it in Settings > VirusTotal API Key.");
-                return;
-            }
-
-            var totalFiles = FileList.Items.Count(f =>
-                !Settings.OnlyScanExecutables ||
-                _executableExtensions.Contains(Path.GetExtension(f.FilePath)));
-
-            if (totalFiles == 0)
-            {
-                MessageBox.Show(
-                    "No scannable files found.\nEnable 'Scan all files' in settings to scan non-executables.",
-                    "No Files to Scan",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-                return;
-            }
-
-            Status.Message = $"Scanning {totalFiles} file(s) with VirusTotal...";
-            int processed = 0;
-            int failedCount = 0;
-            var infectedFiles = new List<FileItemViewModel>();
-
-            foreach (var item in FileList.Items)
-            {
-                if (Settings.OnlyScanExecutables &&
-                    !_executableExtensions.Contains(Path.GetExtension(item.FilePath)))
-                {
-                    item.Status = FileStatusEnum.Skipped;
-                    continue;
-                }
-
-                try
-                {
-                    var result = await _virusTotalClient.ScanFileAsync(
-                        item.FilePath,
-                        Settings.VirusTotalApiKey,
-                        Settings.OnlyScanExecutables,
-                        Settings.MinimumDetectionsToFlag
-                    );
-
-                    item.Positives = result.Positives;
-                    item.TotalScans = result.TotalScans;
-                    item.Status = result.IsInfected ? FileStatusEnum.Infected : FileStatusEnum.Clean;
-
-                    if (result.IsInfected)
-                        infectedFiles.Add(item);
-                }
-                catch (Exception ex)
-                {
-                    LogError($"Scan failed for {item.FileName}", ex);
-                    item.Status = FileStatusEnum.ScanFailed;
-                    failedCount++;
-                }
-                finally
-                {
-                    processed++;
-                    Status.ProgressPercentage = (double)processed / totalFiles * 100;
-                }
-            }
-
-            if (infectedFiles.Count > 0)
-            {
-                var message = $"{infectedFiles.Count} infected file(s) detected!";
-                if (Settings.SettingsModel.AutoRemoveInfectedFiles)
-                {
-                    foreach (var file in infectedFiles)
-                        FileList.Items.Remove(file);
-
-                    message += $"\n\nAutomatically removed from package list.";
-                }
-                else
-                {
-                    message += $"\n\nReview files marked as 'Infected' before packaging.";
-                }
-
-                MessageBox.Show(message, "Security Alert", MessageBoxButton.OK, MessageBoxImage.Warning);
-            }
-            else if (failedCount > 0)
-            {
-                MessageBox.Show(
-                    $"Scan completed with errors:\n{failedCount} file(s) failed to scan.\n\nCheck logs for details.",
-                    "Scan Completed with Errors",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
-            }
-            else
-            {
-                MessageBox.Show(
-                    $"All {totalFiles} file(s) scanned clean!",
-                    "Scan Complete",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-            }
-
-            await _virusTotalClient.SaveCacheAsync();
-            Status.Message = failedCount > 0 ? "Scan completed with errors" : "Scan completed successfully";
-        }
-        #endregion
-
         #region Error Handling Helpers
         private void HandleStubMissingError()
         {
@@ -721,27 +621,9 @@ namespace PackItPro.ViewModels
         #endregion
 
         #region Logging
-        private void LogError(string message, Exception ex)
-        {
-            try
-            {
-                var logEntry = $"[{DateTime.Now:u}] ERROR: {message}\n{ex}\n\n";
-                File.AppendAllText(Path.Combine(_appDataDir, "packitpro.log"), logEntry);
-                Debug.WriteLine(logEntry);
-            }
-            catch { }
-        }
+        private void LogError(string message, Exception ex) => _logService.Error(message, ex);
 
-        private void LogInfo(string message)
-        {
-            try
-            {
-                var logEntry = $"[{DateTime.Now:u}] INFO: {message}\n";
-                File.AppendAllText(Path.Combine(_appDataDir, "packitpro.log"), logEntry);
-                Debug.WriteLine(logEntry);
-            }
-            catch { }
-        }
+        private void LogInfo(string message) => _logService.Info(message);
         #endregion
 
         #region IDisposable Implementation
@@ -760,7 +642,8 @@ namespace PackItPro.ViewModels
                 if (Status != null)
                     Status.PropertyChanged -= OnStatusPropertyChanged;
 
-                // Dispose other resources
+                // Dispose handlers and other resources
+                _virusTotalHandler?.Dispose();
                 _virusTotalClient?.Dispose();
                 FileList?.Dispose();
 

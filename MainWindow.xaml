@@ -21,12 +21,16 @@
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
+            <!-- Menu Bar -->
             <RowDefinition Height="*"/>
+            <!-- Main Content -->
             <RowDefinition Height="Auto"/>
+            <!-- Status Panel -->
             <RowDefinition Height="Auto"/>
+            <!-- Bottom Progress Bar -->
         </Grid.RowDefinitions>
 
-        <!-- Menu Bar - Bind commands directly to MainViewModel -->
+        <!-- MENU BAR (Preserved) -->
         <Menu Grid.Row="0" Background="{StaticResource AppBackgroundColor}" Padding="0,6" Margin="0,0,0,12">
             <MenuItem Header="File" Foreground="{StaticResource AppTextColor}" Style="{StaticResource MenuItemStyle}">
                 <MenuItem Header="Add Files..." Command="{Binding BrowseFilesCommand}" Style="{StaticResource SubMenuItemStyle}"/>
@@ -59,29 +63,32 @@
             </MenuItem>
         </Menu>
 
-        <!-- Main Content Area -->
+        <!-- MAIN CONTENT AREA (With Scrollable Right Panel) -->
         <Grid Grid.Row="1" Margin="0,10">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="3*"/>
                 <ColumnDefinition Width="2*"/>
             </Grid.ColumnDefinitions>
-            <!-- File List Panel - Bind its DataContext to the FileList sub-ViewModel -->
+
+            <!-- File List Panel (Left) -->
             <views:FileListPanel Grid.Column="0" Margin="0,0,10,0" DataContext="{Binding FileList}" />
-            <!-- Right side with Settings and Summary -->
-            <Grid Grid.Column="1">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                </Grid.RowDefinitions>
-                <views:PackSettingsPanel Grid.Row="0" DataContext="{Binding Settings}" />
-                <views:SummaryPanel Grid.Row="1" DataContext="{Binding Summary}" />
-            </Grid>
+
+            <!-- SCROLLABLE RIGHT PANEL (Settings + Summary) -->
+            <ScrollViewer Grid.Column="1" 
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
+                          Margin="0,0,0,0">
+                <StackPanel>
+                    <views:PackSettingsPanel DataContext="{Binding Settings}" Margin="0,0,0,10"/>
+                    <views:SummaryPanel DataContext="{Binding Summary}" />
+                </StackPanel>
+            </ScrollViewer>
         </Grid>
 
-        <!-- Status Area - Bind to the Status sub-ViewModel -->
+        <!-- STATUS PANEL -->
         <views:StatusPanel Grid.Row="2" Margin="0,0,0,8" DataContext="{Binding Status}" />
 
-        <!-- Bottom Progress Bar -->
+        <!-- BOTTOM PROGRESS BAR -->
         <ProgressBar Grid.Row="3"
                      Value="{Binding Status.ProgressPercentage}"
                      Style="{StaticResource RoundedProgressBarStyle}"/>
