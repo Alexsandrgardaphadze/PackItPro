@@ -30,8 +30,9 @@
             <!-- Bottom Progress Bar -->
         </Grid.RowDefinitions>
 
-        <!-- MENU BAR (Preserved) -->
+        <!-- MENU BAR -->
         <Menu Grid.Row="0" Background="{StaticResource AppBackgroundColor}" Padding="0,6" Margin="0,0,0,12">
+            <!-- File Menu -->
             <MenuItem Header="File" Foreground="{StaticResource AppTextColor}" Style="{StaticResource MenuItemStyle}">
                 <MenuItem Header="Add Files..." Command="{Binding BrowseFilesCommand}" Style="{StaticResource SubMenuItemStyle}"/>
                 <MenuItem Header="Clear All Files" Command="{Binding ClearAllFilesCommand}" Style="{StaticResource SubMenuItemStyle}"/>
@@ -40,11 +41,15 @@
                 <Separator Background="{StaticResource AppBorderColor}"/>
                 <MenuItem Header="Exit" Command="{Binding ExitCommand}" Style="{StaticResource SubMenuItemStyle}"/>
             </MenuItem>
+
+            <!-- Settings Menu -->
             <MenuItem Header="Settings" Foreground="{StaticResource AppTextColor}" Style="{StaticResource MenuItemStyle}">
                 <MenuItem Header="Output Location..." Command="{Binding SetOutputLocationCommand}" Style="{StaticResource SubMenuItemStyle}"/>
                 <MenuItem Header="VirusTotal API Key..." Command="{Binding SetVirusApiKeyCommand}" Style="{StaticResource SubMenuItemStyle}"/>
                 <MenuItem Header="PackItPro Settings..." Command="{Binding PackItProSettingsCommand}" Style="{StaticResource SubMenuItemStyle}"/>
             </MenuItem>
+
+            <!-- Tools Menu -->
             <MenuItem Header="Tools" Foreground="{StaticResource AppTextColor}" Style="{StaticResource MenuItemStyle}">
                 <MenuItem Header="Test Package..." Command="{Binding TestPackageCommand}" Style="{StaticResource SubMenuItemStyle}"/>
                 <MenuItem Header="View Cache..." Command="{Binding ViewCacheCommand}" Style="{StaticResource SubMenuItemStyle}"/>
@@ -52,6 +57,8 @@
                 <Separator Background="{StaticResource AppBorderColor}"/>
                 <MenuItem Header="Export List..." Command="{Binding ExportListCommand}" Style="{StaticResource SubMenuItemStyle}"/>
             </MenuItem>
+
+            <!-- Help Menu -->
             <MenuItem Header="Help" Foreground="{StaticResource AppTextColor}" Style="{StaticResource MenuItemStyle}">
                 <MenuItem Header="Documentation" Command="{Binding DocumentationCommand}" Style="{StaticResource SubMenuItemStyle}"/>
                 <MenuItem Header="GitHub Repository" Command="{Binding GitHubCommand}" Style="{StaticResource SubMenuItemStyle}"/>
@@ -63,21 +70,20 @@
             </MenuItem>
         </Menu>
 
-        <!-- MAIN CONTENT AREA (With Scrollable Right Panel) -->
+        <!-- MAIN CONTENT AREA -->
         <Grid Grid.Row="1" Margin="0,10">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="3*"/>
+                <!-- File List -->
                 <ColumnDefinition Width="2*"/>
+                <!-- Settings + Summary -->
             </Grid.ColumnDefinitions>
 
-            <!-- File List Panel (Left) -->
+            <!-- LEFT PANEL: File List -->
             <views:FileListPanel Grid.Column="0" Margin="0,0,10,0" DataContext="{Binding FileList}" />
 
-            <!-- SCROLLABLE RIGHT PANEL (Settings + Summary) -->
-            <ScrollViewer Grid.Column="1" 
-                          VerticalScrollBarVisibility="Auto"
-                          HorizontalScrollBarVisibility="Disabled"
-                          Margin="0,0,0,0">
+            <!-- RIGHT PANEL: Scrollable -->
+            <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                 <StackPanel>
                     <views:PackSettingsPanel DataContext="{Binding Settings}" Margin="0,0,0,10"/>
                     <views:SummaryPanel DataContext="{Binding Summary}" />
@@ -87,10 +93,5 @@
 
         <!-- STATUS PANEL -->
         <views:StatusPanel Grid.Row="2" Margin="0,0,0,8" DataContext="{Binding Status}" />
-
-        <!-- BOTTOM PROGRESS BAR -->
-        <ProgressBar Grid.Row="3"
-                     Value="{Binding Status.ProgressPercentage}"
-                     Style="{StaticResource RoundedProgressBarStyle}"/>
     </Grid>
 </Window>
