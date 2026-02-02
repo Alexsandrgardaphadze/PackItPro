@@ -1,42 +1,47 @@
-﻿// ViewModels/FileListViewModel.cs
+﻿// ViewModels/FileListViewModel.cs - OPTIMIZED VERSION
 using PackItPro.Models;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Windows;
-using System.Windows.Input; // For RelayCommand
+using System.Windows.Input;
 
 namespace PackItPro.ViewModels
 {
-    public class FileListViewModel : INotifyPropertyChanged
+    public class FileListViewModel : INotifyPropertyChanged, IDisposable
     {
         private readonly ObservableCollection<FileItemViewModel> _items = new();
-        private readonly AppSettings _settings; // NEW: Hold the AppSettings model, not the ViewModel
-        private readonly HashSet<string> _executableExtensions; // NEW: Reference to allowed extensions
+        private readonly AppSettings _settings;
+        private readonly HashSet<string> _executableExtensions;
+
+        // ✅ CACHED PROPERTIES (Performance optimization)
+        private long _totalSize;
+        private bool _disposed;
 
         // Expose the collection for binding
         public ObservableCollection<FileItemViewModel> Items => _items;
 
         // Properties derived from the list
         public int Count => _items.Count;
+
+        // ✅ CACHED - No longer recalculates on every access
         public long TotalSize
         {
-            get
+            get => _totalSize;
+            private set
             {
-                try
+                if (_totalSize != value)
                 {
-                    return _items.Sum(f => File.Exists(f.FilePath) ? new FileInfo(f.FilePath).Length : 0);
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[FileListViewModel] Error calculating TotalSize: {ex.Message}");
-                    return 0; // Fallback if any file access error occurs
+                    _totalSize = value;
+                    OnPropertyChanged();
                 }
             }
-        } // NEW: Handle exceptions in UI code-behind if needed
+        }
+
         public int CleanCount => _items.Count(f => f.Status == FileStatusEnum.Clean);
         public int InfectedCount => _items.Count(f => f.Status == FileStatusEnum.Infected);
         public int FailedCount => _items.Count(f => f.Status == FileStatusEnum.ScanFailed);
@@ -44,7 +49,11 @@ namespace PackItPro.ViewModels
         public bool HasFiles => _items.Any();
         public bool HasInfectedFiles => _items.Any(f => f.Status == FileStatusEnum.Infected);
 
-        // NEW: Accept AppSettings model and executable extensions
+        // Commands
+        public ICommand AddFilesCommand { get; }
+        public ICommand ClearAllFilesCommand { get; }
+        public ICommand RemoveFileCommand { get; }
+
         public FileListViewModel(AppSettings settings, HashSet<string> executableExtensions)
         {
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
@@ -52,17 +61,47 @@ namespace PackItPro.ViewModels
 
             AddFilesCommand = new RelayCommand(ExecuteAddFiles);
             ClearAllFilesCommand = new RelayCommand(ExecuteClearAllFiles);
-            // RemoveFileCommand is more complex, often handled by the individual FileItemViewModel's RemoveCommand
-            // Or, define it here if it takes the FileItemViewModel as a parameter
-            // RemoveFileCommand = new RelayCommand(ExecuteRemoveFile);
+            RemoveFileCommand = new RelayCommand(ExecuteRemoveFile);
+
+            // ✅ FIX: Subscribe to collection changes to update cached properties
+            _items.CollectionChanged += OnItemsCollectionChanged;
         }
 
-        // NEW: Command properties (example)
-        public ICommand AddFilesCommand { get; }
-        public ICommand ClearAllFilesCommand { get; }
-        // public ICommand RemoveFileCommand { get; } // If defined per item, no need here.
+        // ✅ FIX: Proper collection change handling
+        private void OnItemsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        {
+            // Recalculate cached properties when collection changes
+            RecalculateTotalSize();
+            NotifyListChanged();
+        }
 
-        // NEW: Result model for validation
+        // ✅ OPTIMIZATION: Calculate total size once instead of on every access
+        private void RecalculateTotalSize()
+        {
+            try
+            {
+                TotalSize = _items.Sum(f =>
+                {
+                    try
+                    {
+                        return File.Exists(f.FilePath) ? new FileInfo(f.FilePath).Length : 0;
+                    }
+                    catch
+                    {
+                        return 0; // Ignore individual file errors
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[FileListViewModel] Error calculating TotalSize: {ex.Message}");
+                TotalSize = 0;
+            }
+        }
+
+        /// <summary>
+        /// Result model for validation
+        /// </summary>
         public class AddFilesResult
         {
             public int SuccessCount { get; set; }
@@ -70,21 +109,26 @@ namespace PackItPro.ViewModels
             public List<string> SkipReasons { get; } = new();
         }
 
-        // NEW: Method to add files with validation results
+        /// <summary>
+        /// Adds files with validation and returns result
+        /// </summary>
         public void AddFilesWithValidation(string[] paths, out AddFilesResult result)
         {
             result = new AddFilesResult();
-            var skipReasons = new List<string>();
 
+            // ✅ FIX: Early return now adds message to result
             if (_items.Count >= _settings.MaxFilesInList)
             {
                 result.SkippedCount = paths.Length;
-                result.SkipReasons.Add($"File limit reached ({_settings.MaxFilesInList} files maximum)");
+                var message = $"File limit reached ({_settings.MaxFilesInList} files maximum)";
+                result.SkipReasons.Add(message); // ✅ Fixed: Add directly to result
                 return;
             }
 
+            var skipReasons = new List<string>();
+
             var validFiles = paths
-                .Where(p => 
+                .Where(p =>
                 {
                     if (!File.Exists(p))
                     {
@@ -147,11 +191,12 @@ namespace PackItPro.ViewModels
             result.SkippedCount = skipReasons.Count;
             result.SkipReasons.AddRange(skipReasons);
 
-            // Notify properties that depend on the list count/contents
-            NotifyListChanged();
+            // Collection change will trigger NotifyListChanged via event handler
         }
 
-        // Backward compatibility overload
+        /// <summary>
+        /// Backward compatibility overload
+        /// </summary>
         public void AddFilesWithValidation(string[] paths)
         {
             AddFilesWithValidation(paths, out _);
@@ -159,34 +204,35 @@ namespace PackItPro.ViewModels
 
         private void ExecuteAddFiles(object? parameter)
         {
-            // Handle both cases: direct string[] (from drag-drop) and null (from button)
             if (parameter is string[] filePaths)
             {
                 AddFilesWithValidation(filePaths);
             }
-            // If no parameter, the button should trigger a file browser in MainViewModel instead
         }
 
         private void ExecuteClearAllFiles(object? parameter)
         {
             _items.Clear();
-            NotifyListChanged();
+            // Collection change will trigger NotifyListChanged via event handler
         }
 
-        private void ExecuteRemoveFile(FileItemViewModel item)
+        private void ExecuteRemoveFile(object? parameter)
         {
-            _items.Remove(item);
-            NotifyListChanged();
+            if (parameter is FileItemViewModel item)
+            {
+                _items.Remove(item);
+                // Collection change will trigger NotifyListChanged via event handler
+            }
         }
 
         /// <summary>
-        /// Notifies UI of all list-dependent property changes.
-        /// Call after any operation that modifies the file list.
+        /// Notifies UI of all list-dependent property changes
+        /// ✅ OPTIMIZED: Now uses batch notification
         /// </summary>
         private void NotifyListChanged()
         {
+            // Batch notification - tells UI all properties changed
             OnPropertyChanged(nameof(Count));
-            OnPropertyChanged(nameof(TotalSize));
             OnPropertyChanged(nameof(HasFiles));
             OnPropertyChanged(nameof(HasInfectedFiles));
             OnPropertyChanged(nameof(CleanCount));
@@ -210,8 +256,34 @@ namespace PackItPro.ViewModels
             return $"{size:0.##} {suffixes[suffixIndex]}";
         }
 
+        // ✅ FIX: Proper disposal to prevent memory leaks
+        protected virtual void Dispose(bool disposing)
+        {
+            if (_disposed) return;
+
+            if (disposing)
+            {
+                // Unsubscribe from events
+                _items.CollectionChanged -= OnItemsCollectionChanged;
+
+                // Clear items
+                _items.Clear();
+            }
+
+            _disposed = true;
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
         public event PropertyChangedEventHandler? PropertyChanged;
-        protected virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string? propertyName = null) =>
+
+        protected virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string? propertyName = null)
+        {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
     }
 }

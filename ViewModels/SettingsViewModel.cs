@@ -81,6 +81,12 @@ namespace PackItPro.ViewModels
             set { SettingsModel.ScanWithVirusTotal = value; OnPropertyChanged(); }
         }
 
+        public int CompressionLevel
+        {
+            get => SettingsModel.CompressionLevel;
+            set { SettingsModel.CompressionLevel = value; OnPropertyChanged(); }
+        }
+
         public SettingsViewModel(string settingsFilePath)
         {
             SettingsModel = new AppSettings();
@@ -109,6 +115,7 @@ namespace PackItPro.ViewModels
                         SettingsModel.RequiresAdmin = loadedSettings.RequiresAdmin;
                         SettingsModel.VerifyIntegrity = loadedSettings.VerifyIntegrity;
                         SettingsModel.ScanWithVirusTotal = loadedSettings.ScanWithVirusTotal;
+                        SettingsModel.CompressionLevel = loadedSettings.CompressionLevel;
                     }
                 }
             }

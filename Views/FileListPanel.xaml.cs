@@ -1,20 +1,40 @@
-﻿using System.Windows;
+﻿// Views/FileListPanel.xaml.cs - UPDATED VERSION
+using PackItPro.ViewModels;
+using System.Linq;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using System.Linq;
-
+using System.Windows.Media.Animation;
 
 namespace PackItPro.Views
 {
     public partial class FileListPanel : UserControl
     {
+        private Storyboard? _pulseAnimation;
+
         public FileListPanel()
         {
             InitializeComponent();
+
+            // ✅ FIX: Only start animation when empty state is visible
+            EmptyDropState.IsVisibleChanged += EmptyDropState_IsVisibleChanged;
         }
 
-        // The DataContext of this control will be a FileListViewModel.
-        // We can cast it to get access to its commands.
+        // ✅ FIX: Control animation based on visibility
+        private void EmptyDropState_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+        {
+            if (EmptyDropState.Visibility == Visibility.Visible)
+            {
+                // Start animation when empty state becomes visible
+                _pulseAnimation = (Storyboard)Resources["PulseAnimation"];
+                _pulseAnimation?.Begin();
+            }
+            else
+            {
+                // Stop animation when empty state is hidden
+                _pulseAnimation?.Stop();
+            }
+        }
 
         private void UserControl_DragEnter(object sender, DragEventArgs e)
         {
@@ -24,7 +44,6 @@ namespace PackItPro.Views
                 var hoverBrush = TryFindResource("AppDropAreaHoverColor") as SolidColorBrush
                                  ?? new SolidColorBrush(Colors.LightBlue);
                 var color = hoverBrush.Color;
-                // Since DropAreaBorder is the root, we can style it directly.
                 this.BorderBrush = hoverBrush;
                 this.Background = new SolidColorBrush(Color.FromArgb(30, color.R, color.G, color.B));
             }
@@ -49,10 +68,10 @@ namespace PackItPro.Views
         private void UserControl_Drop(object sender, DragEventArgs e)
         {
             UserControl_DragLeave(sender, e);
+
             if (e.Data.GetData(DataFormats.FileDrop) is string[] files)
             {
-                // Now, forward the files to the ViewModel's command.
-                if (this.DataContext is ViewModels.FileListViewModel viewModel)
+                if (this.DataContext is FileListViewModel viewModel)
                 {
                     viewModel.AddFilesWithValidation(files, out var result);
 
@@ -68,8 +87,8 @@ namespace PackItPro.Views
                                 message += $"\n...and {result.SkipReasons.Count - 5} more";
                         }
 
-                        MessageBox.Show(message, "Files Added", System.Windows.MessageBoxButton.OK, 
-                            result.SkippedCount > 0 ? System.Windows.MessageBoxImage.Warning : System.Windows.MessageBoxImage.Information);
+                        MessageBox.Show(message, "Files Added", MessageBoxButton.OK,
+                            result.SkippedCount > 0 ? MessageBoxImage.Warning : MessageBoxImage.Information);
                     }
                     else if (result.SkippedCount > 0)
                     {
@@ -77,8 +96,8 @@ namespace PackItPro.Views
                             $"⚠ All files were skipped:\n\n{string.Join("\n", result.SkipReasons.Take(5))}" +
                             (result.SkipReasons.Count > 5 ? $"\n...and {result.SkipReasons.Count - 5} more" : ""),
                             "No Files Added",
-                            System.Windows.MessageBoxButton.OK,
-                            System.Windows.MessageBoxImage.Warning);
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Warning);
                     }
                 }
             }

@@ -1,4 +1,4 @@
-﻿// PackItPro/ViewModels/MainViewModel.cs
+﻿// ViewModels/MainViewModel.cs - COMPLETE FIXED VERSION
 using Microsoft.Win32;
 using PackItPro.Services;
 using PackItPro.Models;
@@ -34,13 +34,16 @@ namespace PackItPro.ViewModels
         private VirusTotalClient? _virusTotalClient;
         private bool _isInitialized;
 
-        // Sub-ViewModels (hierarchical MVVM structure)
+        // ✅ NEW: Added ErrorViewModel
+        public ErrorViewModel Error { get; }
+
+        // Sub-ViewModels
         public FileListViewModel FileList { get; }
         public SettingsViewModel Settings { get; }
         public SummaryViewModel Summary { get; }
         public StatusViewModel Status { get; }
 
-        // Commands (all properly typed and validated)
+        // Commands
         public ICommand PackCommand { get; }
         public ICommand BrowseFilesCommand { get; }
         public ICommand SetOutputLocationCommand { get; }
@@ -60,11 +63,8 @@ namespace PackItPro.ViewModels
         public ICommand CheckUpdatesCommand { get; }
         public ICommand AboutCommand { get; }
 
-
-
         public MainViewModel()
         {
-            // Initialize paths first
             _cacheFilePath = Path.Combine(_appDataDir, "virusscancache.json");
             EnsureAppDataDirectoryExists();
 
@@ -73,8 +73,9 @@ namespace PackItPro.ViewModels
             FileList = new FileListViewModel(Settings.SettingsModel, _executableExtensions);
             Summary = new SummaryViewModel(FileList);
             Status = new StatusViewModel();
+            Error = new ErrorViewModel(); // ✅ NEW: Initialize ErrorViewModel
 
-            // Initialize commands with proper can-execute logic
+            // Initialize commands
             PackCommand = new RelayCommand(ExecutePackCommand, CanExecutePack);
             BrowseFilesCommand = new RelayCommand(ExecuteBrowseFilesCommand);
             SetOutputLocationCommand = new RelayCommand(ExecuteSetOutputLocationCommand);
@@ -94,24 +95,27 @@ namespace PackItPro.ViewModels
             CheckUpdatesCommand = new RelayCommand(ExecuteCheckUpdatesCommand);
             AboutCommand = new RelayCommand(ExecuteAboutCommand);
 
-            // Subscribe to property changes for UI state updates
-            FileList.PropertyChanged += (s, e) =>
+            // ✅ FIX: Use named methods instead of lambdas to prevent memory leaks
+            FileList.PropertyChanged += OnFileListPropertyChanged;
+            Status.PropertyChanged += OnStatusPropertyChanged;
+        }
+
+        // ✅ FIX: Named event handlers for proper cleanup
+        private void OnFileListPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(FileList.HasFiles))
             {
-                if (e.PropertyName == nameof(FileList.HasFiles))
-                    ((RelayCommand)PackCommand).RaiseCanExecuteChanged();
-            };
+                ((RelayCommand)PackCommand).RaiseCanExecuteChanged();
+            }
+        }
 
-            Status.PropertyChanged += (s, e) =>
-{
-    if (e.PropertyName == nameof(Status.IsBusy))
-    {
-        if (PackCommand is RelayCommand packRelayCommand)
-            packRelayCommand.RaiseCanExecuteChanged();
-
-        if (ScanFilesCommand is RelayCommand scanRelayCommand)
-            scanRelayCommand.RaiseCanExecuteChanged();
-    }
-};
+        private void OnStatusPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(Status.IsBusy))
+            {
+                ((RelayCommand)PackCommand).RaiseCanExecuteChanged();
+                ((RelayCommand)ScanFilesCommand).RaiseCanExecuteChanged();
+            }
         }
 
         private void EnsureAppDataDirectoryExists()
@@ -126,15 +130,12 @@ namespace PackItPro.ViewModels
 
             try
             {
-                // 1. Load settings first
                 await Settings.LoadSettingsAsync();
                 LogInfo("Settings loaded successfully");
 
-                // 2. Initialize VirusTotal client with loaded API key
                 _virusTotalClient = new VirusTotalClient(_cacheFilePath, Settings.VirusTotalApiKey);
                 LogInfo("VirusTotal client initialized");
 
-                // 3. Load scan cache
                 await _virusTotalClient.LoadCacheAsync();
                 LogInfo("Scan cache loaded");
 
@@ -146,16 +147,17 @@ namespace PackItPro.ViewModels
             {
                 LogError("Initialization failed", ex);
                 Status.Message = "Failed to initialize application. Check logs for details.";
-                MessageBox.Show(
-                    "Application failed to initialize properly.\nSee logs for details.",
-                    "Initialization Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+
+                // ✅ NEW: Use ErrorViewModel instead of MessageBox
+                Error.ShowError(
+                    "Application failed to initialize properly. See logs for details.",
+                    retryAction: async () => await InitializeAsync()
+                );
             }
         }
         #endregion
 
-        #region Command Execution (Async-Safe)
+        #region Command Execution - Primary Commands
         private bool CanExecutePack(object? parameter) =>
             FileList.HasFiles && !Status.IsBusy && !string.IsNullOrWhiteSpace(Settings.OutputLocation);
 
@@ -163,34 +165,28 @@ namespace PackItPro.ViewModels
         {
             if (!CanExecutePack(parameter)) return;
 
-            // Validate settings before proceeding
-            if (!Settings.ValidateSettings(out var errorMessage))
-            {
-                MessageBox.Show(
-                    $"Invalid settings:\n{errorMessage}",
-                    "Settings Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
-                return;
-            }
-
-            var saveDialog = new SaveFileDialog
-            {
-                Filter = "PackItPro Executable (*.exe)|*.exe",
-                InitialDirectory = Settings.OutputLocation,
-                FileName = $"{Settings.OutputFileName ?? "Package"}_{DateTime.Now:yyyyMMdd_HHmmss}.exe",
-                DefaultExt = "exe",
-                AddExtension = true
-            };
-
-            if (saveDialog.ShowDialog() != true) return;
-
             try
             {
+                if (!Settings.ValidateSettings(out var errorMessage))
+                {
+                    Error.ShowError($"Invalid settings: {errorMessage}");
+                    return;
+                }
+
+                var saveDialog = new SaveFileDialog
+                {
+                    Filter = "PackItPro Executable (*.exe)|*.exe",
+                    InitialDirectory = Settings.OutputLocation,
+                    FileName = $"{Settings.OutputFileName ?? "Package"}_{DateTime.Now:yyyyMMdd_HHmmss}.exe",
+                    DefaultExt = "exe",
+                    AddExtension = true
+                };
+
+                if (saveDialog.ShowDialog() != true) return;
+
                 Status.SetStatusPacking();
                 Status.Message = "Creating package...";
 
-                // ✅ CRITICAL FIX: Use REAL Packager instead of placeholder PackagerService
                 var outputPath = await Packager.CreatePackageAsync(
                     FileList.Items.Select(f => f.FilePath).ToList(),
                     Path.GetDirectoryName(saveDialog.FileName) ?? Settings.OutputLocation,
@@ -212,28 +208,20 @@ namespace PackItPro.ViewModels
             }
             catch (IOException ex) when (ex.Message.Contains("in use"))
             {
-                MessageBox.Show(
-                    $"Cannot package: A file is locked or in use by another application.\n\n" +
-                    $"Details: {ex.InnerException?.Message}\n\n" +
-                    $"Solution: Close any programs that have these files open and try again.",
-                    "File Locked",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+                Error.ShowError(
+                    $"Cannot package: A file is locked or in use.\n\nSolution: Close programs using these files and try again.",
+                    retryAction: () => ExecutePackCommand(parameter)
+                );
                 LogError("Packaging failed - file locked", ex);
-            }
-            catch (InvalidOperationException ex) when (ex.Message.Contains("compare two elements"))
-            {
-                HandleHashingError(ex);
             }
             catch (Exception ex)
             {
                 LogError("Packaging failed", ex);
                 Status.Message = $"Packaging failed: {ex.Message}";
-                MessageBox.Show(
-                    $"Failed to create package:\n{ex.Message}\n\nCheck logs for details.",
-                    "Packaging Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Error.ShowError(
+                    $"Failed to create package: {ex.Message}\n\nCheck logs for details.",
+                    retryAction: () => ExecutePackCommand(parameter)
+                );
             }
             finally
             {
@@ -256,7 +244,6 @@ namespace PackItPro.ViewModels
             {
                 FileList.AddFilesWithValidation(dialog.FileNames, out var result);
 
-                // Show summary if files were skipped
                 if (result.SkippedCount > 0)
                 {
                     var message = $"Added {result.SuccessCount} file(s).\n\n";
@@ -268,7 +255,6 @@ namespace PackItPro.ViewModels
                     MessageBox.Show(message, "Files Added", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
 
-                // Auto-scan if enabled in settings
                 if (Settings.ScanWithVirusTotal && !string.IsNullOrWhiteSpace(Settings.VirusTotalApiKey))
                 {
                     ExecuteScanFilesCommand(null);
@@ -291,7 +277,6 @@ namespace PackItPro.ViewModels
 
             try
             {
-                // Validate write access
                 var testFile = Path.Combine(dialog.SelectedPath, $"packitpro_test_{Guid.NewGuid()}.tmp");
                 await File.WriteAllTextAsync(testFile, "test");
                 File.Delete(testFile);
@@ -302,20 +287,12 @@ namespace PackItPro.ViewModels
             }
             catch (UnauthorizedAccessException)
             {
-                MessageBox.Show(
-                    "Cannot write to selected folder. Please choose a location with write permissions.",
-                    "Permission Denied",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+                Error.ShowError("Cannot write to selected folder. Please choose a location with write permissions.");
             }
             catch (Exception ex)
             {
                 LogError("Output location validation failed", ex);
-                MessageBox.Show(
-                    $"Invalid output location:\n{ex.Message}",
-                    "Validation Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Error.ShowError($"Invalid output location: {ex.Message}");
             }
         }
 
@@ -331,23 +308,19 @@ namespace PackItPro.ViewModels
             var key = dialog.Answer.Trim();
             if (string.IsNullOrWhiteSpace(key))
             {
-                MessageBox.Show("API key cannot be empty.", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                Error.ShowError("API key cannot be empty.");
                 return;
             }
 
             if (key.Length != 64)
             {
-                MessageBox.Show(
-                    "VirusTotal API keys must be exactly 64 characters long.\n\nGet your key from: https://www.virustotal.com/gui/user-settings/apikey",
-                    "Invalid Key Length",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Error.ShowError("VirusTotal API keys must be exactly 64 characters long.\n\nGet your key from: https://www.virustotal.com/gui/user-settings/apikey");
                 return;
             }
 
             Settings.VirusTotalApiKey = key;
             _virusTotalClient?.SetApiKey(key);
-            _ = Settings.SaveSettingsAsync(); // Fire-and-forget save (non-critical)
+            _ = Settings.SaveSettingsAsync();
 
             MessageBox.Show(
                 "API key saved successfully!\n\nNote: Keys are stored locally and never transmitted by PackItPro.",
@@ -372,11 +345,10 @@ namespace PackItPro.ViewModels
             {
                 LogError("Scan operation failed", ex);
                 Status.Message = $"Scan failed: {ex.Message}";
-                MessageBox.Show(
-                    $"Virus scan failed:\n{ex.Message}",
-                    "Scan Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Error.ShowError(
+                    $"Virus scan failed: {ex.Message}",
+                    retryAction: () => ExecuteScanFilesCommand(parameter)
+                );
             }
             finally
             {
@@ -399,7 +371,9 @@ namespace PackItPro.ViewModels
         }
 
         private bool CanExecuteClearAll(object? parameter) => FileList.HasFiles;
+        #endregion
 
+        #region Command Execution - Additional Commands
         private void ExecuteExportLogsCommand(object? parameter)
         {
             var logPath = Path.Combine(_appDataDir, "packitpro.log");
@@ -430,11 +404,7 @@ namespace PackItPro.ViewModels
                 catch (Exception ex)
                 {
                     LogError("Log export failed", ex);
-                    MessageBox.Show(
-                        $"Failed to export logs:\n{ex.Message}",
-                        "Export Error",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Error);
+                    Error.ShowError($"Failed to export logs: {ex.Message}");
                 }
             }
         }
@@ -465,23 +435,16 @@ namespace PackItPro.ViewModels
             catch (Exception ex)
             {
                 LogError("Cache clear failed", ex);
-                MessageBox.Show(
-                    $"Failed to clear cache:\n{ex.Message}",
-                    "Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                Error.ShowError($"Failed to clear cache: {ex.Message}");
             }
         }
 
         private void ExecuteExitCommand(object? parameter)
         {
-            // Save settings before exit
             _ = Settings.SaveSettingsAsync();
             Application.Current.Shutdown();
         }
-        #endregion
 
-        #region Additional Commands Execution
         private void ExecutePackItProSettingsCommand(object? parameter)
         {
             MessageBox.Show(
@@ -543,11 +506,7 @@ namespace PackItPro.ViewModels
                 catch (Exception ex)
                 {
                     LogError("File list export failed", ex);
-                    MessageBox.Show(
-                        $"Failed to export list:\n{ex.Message}",
-                        "Export Error",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Error);
+                    Error.ShowError($"Failed to export list: {ex.Message}");
                 }
             }
         }
@@ -627,9 +586,10 @@ namespace PackItPro.ViewModels
         private void ExecuteAboutCommand(object? parameter)
         {
             MessageBox.Show(
-                "PackItPro v1.0\n\n" +
+                "PackItPro v0.5.1\n\n" +
                 "A secure package builder for bundling multiple applications.\n\n" +
-                "© 2024 All rights reserved.\n\n" +
+                "Still in development, but already close to finishing.\n\n" +
+                "© 2025 Maybe all rights reserved.\n\n" +
                 "GitHub: https://github.com/Alexsandrgardaphadze/PackItPro",
                 "About PackItPro",
                 MessageBoxButton.OK,
@@ -642,11 +602,7 @@ namespace PackItPro.ViewModels
         {
             if (_virusTotalClient == null || string.IsNullOrWhiteSpace(Settings.VirusTotalApiKey))
             {
-                MessageBox.Show(
-                    "VirusTotal API key is required for scanning.\nSet it in Settings > VirusTotal API Key.",
-                    "API Key Required",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
+                Error.ShowError("VirusTotal API key is required for scanning.\nSet it in Settings > VirusTotal API Key.");
                 return;
             }
 
@@ -671,7 +627,6 @@ namespace PackItPro.ViewModels
 
             foreach (var item in FileList.Items)
             {
-                // Skip non-executables if setting is enabled
                 if (Settings.OnlyScanExecutables &&
                     !_executableExtensions.Contains(Path.GetExtension(item.FilePath)))
                 {
@@ -708,7 +663,6 @@ namespace PackItPro.ViewModels
                 }
             }
 
-            // Handle infected files
             if (infectedFiles.Count > 0)
             {
                 var message = $"{infectedFiles.Count} infected file(s) detected!";
@@ -724,17 +678,12 @@ namespace PackItPro.ViewModels
                     message += $"\n\nReview files marked as 'Infected' before packaging.";
                 }
 
-                MessageBox.Show(
-                    message,
-                    "Security Alert",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+                MessageBox.Show(message, "Security Alert", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
             else if (failedCount > 0)
             {
                 MessageBox.Show(
-                    $"Scan completed with errors:\n{failedCount} file(s) failed to scan.\n\n" +
-                    $"Check logs for details.",
+                    $"Scan completed with errors:\n{failedCount} file(s) failed to scan.\n\nCheck logs for details.",
                     "Scan Completed with Errors",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
@@ -748,7 +697,6 @@ namespace PackItPro.ViewModels
                     MessageBoxImage.Information);
             }
 
-            // Save updated cache
             await _virusTotalClient.SaveCacheAsync();
             Status.Message = failedCount > 0 ? "Scan completed with errors" : "Scan completed successfully";
         }
@@ -766,31 +714,9 @@ namespace PackItPro.ViewModels
             message.AppendLine("   - Right-click StubInstaller.exe in Solution Explorer");
             message.AppendLine("   - Properties → 'Copy to Output Directory' = 'Copy always'");
             message.AppendLine("3. Rebuild the solution");
-            message.AppendLine();
-            message.AppendLine("Without this file, packaging cannot proceed.");
 
-            MessageBox.Show(
-                message.ToString(),
-                "Missing Component",
-                MessageBoxButton.OK,
-                MessageBoxImage.Error);
-
-            LogError("StubInstaller.exe missing", new FileNotFoundException("StubInstaller.exe not found in output directory"));
-        }
-
-        private void HandleHashingError(Exception ex)
-        {
-            MessageBox.Show(
-                "Critical error during file hashing.\n\nThis usually happens when:" +
-                "\n• Files are locked by another process" +
-                "\n• Insufficient permissions to read files" +
-                "\n• Corrupted file system\n\n" +
-                "Try closing other applications and retry packaging.",
-                "Hashing Error",
-                MessageBoxButton.OK,
-                MessageBoxImage.Error);
-
-            LogError("File hashing failed", ex);
+            Error.ShowError(message.ToString());
+            LogError("StubInstaller.exe missing", new FileNotFoundException("StubInstaller.exe not found"));
         }
         #endregion
 
@@ -803,7 +729,7 @@ namespace PackItPro.ViewModels
                 File.AppendAllText(Path.Combine(_appDataDir, "packitpro.log"), logEntry);
                 Debug.WriteLine(logEntry);
             }
-            catch { /* Silent fail - don't crash on logging errors */ }
+            catch { }
         }
 
         private void LogInfo(string message)
@@ -814,7 +740,7 @@ namespace PackItPro.ViewModels
                 File.AppendAllText(Path.Combine(_appDataDir, "packitpro.log"), logEntry);
                 Debug.WriteLine(logEntry);
             }
-            catch { /* Silent fail */ }
+            catch { }
         }
         #endregion
 
@@ -827,7 +753,17 @@ namespace PackItPro.ViewModels
 
             if (disposing)
             {
+                // ✅ Unsubscribe from events to prevent memory leaks
+                if (FileList != null)
+                    FileList.PropertyChanged -= OnFileListPropertyChanged;
+
+                if (Status != null)
+                    Status.PropertyChanged -= OnStatusPropertyChanged;
+
+                // Dispose other resources
                 _virusTotalClient?.Dispose();
+                FileList?.Dispose();
+
                 _disposed = true;
             }
         }

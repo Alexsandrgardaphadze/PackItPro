@@ -1,40 +1,51 @@
-﻿using System;
+﻿// Converters/StatusToBackgroundConverter.cs
+using System;
 using System.Globalization;
 using System.Windows.Data;
 using System.Windows.Media;
-using PackItPro.Models; // Only if you use enums; otherwise remove
+using PackItPro.Models;
 
 namespace PackItPro.Converters
 {
     /// <summary>
-    /// Converts a file status string or enum to a background Brush for the ListView badge.
+    /// Converts a status color (SolidColorBrush or FileStatusEnum) to a semi-transparent background brush
+    /// Used for status badges in the file list
     /// </summary>
     public class StatusToBackgroundConverter : IValueConverter
     {
-        // Convert Status string to a background Brush
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            if (value == null)
-                return Brushes.LightGray;
-
-            // If you have an enum FileStatusEnum:
-            if (value is string statusString)
+            // Handle SolidColorBrush input (direct color)
+            if (value is SolidColorBrush brush)
             {
-                switch (statusString.ToLower())
-                {
-                    case "pending": return new SolidColorBrush(Color.FromRgb(59, 130, 246)); // blue
-                    case "completed": return new SolidColorBrush(Color.FromRgb(198, 239, 206)); // green
-                    case "error": return new SolidColorBrush(Color.FromRgb(239, 68, 68));   // red
-                    default: return Brushes.LightGray;
-                }
+                var color = brush.Color;
+                // Create semi-transparent version (15% opacity = 38/255)
+                return new SolidColorBrush(Color.FromArgb(38, color.R, color.G, color.B));
             }
 
-            return Brushes.LightGray;
+            // Handle FileStatusEnum input
+            if (value is FileStatusEnum status)
+            {
+                // Convert enum to color, then to semi-transparent background
+                var color = status switch
+                {
+                    FileStatusEnum.Clean => Color.FromRgb(0x10, 0xB9, 0x81),      // Green
+                    FileStatusEnum.Infected => Color.FromRgb(0xEF, 0x44, 0x44),   // Red
+                    FileStatusEnum.ScanFailed => Color.FromRgb(0xF5, 0x9E, 0x0B), // Yellow/Orange
+                    FileStatusEnum.Skipped => Color.FromRgb(0x3B, 0x82, 0xF6),    // Blue
+                    FileStatusEnum.Pending => Color.FromRgb(0x3B, 0x82, 0xF6),    // Blue
+                    _ => Color.FromRgb(0x94, 0xA3, 0xB8)                          // Gray
+                };
+                return new SolidColorBrush(Color.FromArgb(38, color.R, color.G, color.B));
+            }
+
+            // Fallback: transparent
+            return new SolidColorBrush(Colors.Transparent);
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            throw new NotImplementedException();
+            throw new NotImplementedException("StatusToBackgroundConverter is one-way only");
         }
     }
 }

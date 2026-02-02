@@ -1,17 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿// Views/ErrorPanel.xaml.cs - UPDATED VERSION
+using System;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
+using System.Windows.Media.Animation;
+using PackItPro.ViewModels;
 
 namespace PackItPro.Views
 {
@@ -23,6 +15,32 @@ namespace PackItPro.Views
         public ErrorPanel()
         {
             InitializeComponent();
+
+            // ✅ FIX: Subscribe to DataContext changes to wire up animation
+            DataContextChanged += OnDataContextChanged;
+        }
+
+        private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
+        {
+            // Unsubscribe from old ViewModel
+            if (e.OldValue is ErrorViewModel oldVm)
+            {
+                oldVm.ErrorShown -= OnErrorShown;
+            }
+
+            // Subscribe to new ViewModel
+            if (e.NewValue is ErrorViewModel newVm)
+            {
+                newVm.ErrorShown += OnErrorShown;
+            }
+        }
+
+        // ✅ FIX: Trigger animation when error is shown
+        private void OnErrorShown(object? sender, EventArgs e)
+        {
+            // Play the slide-in animation
+            var storyboard = (Storyboard)Resources["SlideInAnimation"];
+            storyboard?.Begin();
         }
     }
 }
