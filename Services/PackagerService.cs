@@ -1,61 +1,80 @@
-// Services/PackagerService.cs
-/*
-using System;
-using System.Collections.Generic;
+﻿using System;
 using System.IO;
-using System.Threading.Tasks;
+using System.Text;
 
-namespace PackItPro.Services
+public class PackagerService
 {
-    /// <summary>
-    /// Minimal PackagerService implementation to satisfy MainViewModel usage.
-    /// Extend this class to integrate the real packaging implementation.
-    /// </summary>
-    public class PackagerService : IDisposable
+    private const string PayloadMarker = "###PACKITPRO_PAYLOAD###";
+
+    public void InjectPayloadIntoStub(
+        string stubExePath,
+        byte[] zipPayload,
+        string outputExePath,
+        Action<string> log)
     {
-        private bool _disposed;
+        log("========== PAYLOAD INJECTION START ==========");
 
-        public PackagerService()
-        {
-            // Initialize resources if needed
-        }
+        if (!File.Exists(stubExePath))
+            throw new FileNotFoundException("Stub executable not found", stubExePath);
 
-        /// <summary>
-        /// Create a package and return the output path. Currently returns a placeholder file path.
-        /// </summary>
-        public async Task<string> CreatePackageAsync(
-            List<string> filePaths,
-            string outputLocation,
-            string packageName,
-            bool requiresAdmin,
-            bool includeWingetUpdateScript,
-            bool verifyIntegrity,
-            bool useLzmaCompression)
-        {
-            // Very small placeholder implementation so the project builds.
-            await Task.Yield();
+        if (zipPayload == null || zipPayload.Length == 0)
+            throw new InvalidOperationException("ZIP payload is EMPTY");
 
-            var safeName = string.IsNullOrWhiteSpace(packageName) ? "package" : packageName;
-            var fileName = $"{safeName}_{DateTime.Now:yyyyMMdd_HHmmss}.exe";
-            var outPath = Path.Combine(outputLocation ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop), fileName);
+        log($"ZIP payload size: {zipPayload.Length:N0} bytes");
 
-            // Ensure directory exists
-            var dir = Path.GetDirectoryName(outPath);
-            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
-                Directory.CreateDirectory(dir);
+        // DEBUG: dump payload to disk
+        string debugZipPath = Path.Combine(
+            Path.GetDirectoryName(outputExePath)!,
+            "DEBUG_payload.zip"
+        );
 
-            // Create an empty placeholder file to indicate success
-            File.WriteAllText(outPath, $"PackItPro placeholder package created at {DateTime.Now:o}");
+        File.WriteAllBytes(debugZipPath, zipPayload);
+        log($"DEBUG ZIP written: {debugZipPath}");
 
-            return outPath;
-        }
+        long stubSize = new FileInfo(stubExePath).Length;
+        log($"Stub EXE size: {stubSize:N0} bytes");
 
-        public void Dispose()
-        {
-            if (_disposed) return;
-            // Dispose managed resources here (if any)
-            _disposed = true;
-        }
+        using FileStream stubStream = new FileStream(
+            stubExePath,
+            FileMode.Open,
+            FileAccess.Read
+        );
+
+        using FileStream outputStream = new FileStream(
+            outputExePath,
+            FileMode.Create,
+            FileAccess.Write
+        );
+
+        // 1️⃣ Copy stub EXE
+        stubStream.CopyTo(outputStream);
+        log("Stub copied to output");
+
+        // 2️⃣ Write payload marker
+        byte[] markerBytes = Encoding.UTF8.GetBytes(PayloadMarker);
+        outputStream.Write(markerBytes, 0, markerBytes.Length);
+        log($"Marker written ({markerBytes.Length} bytes)");
+
+        // 3️⃣ Write payload size (Int64)
+        byte[] sizeBytes = BitConverter.GetBytes((long)zipPayload.Length);
+        outputStream.Write(sizeBytes, 0, sizeBytes.Length);
+        log("Payload size written (Int64)");
+
+        // 4️⃣ Write payload itself
+        outputStream.Write(zipPayload, 0, zipPayload.Length);
+        log("ZIP payload appended");
+
+        outputStream.Flush();
+        outputStream.Close();
+
+        long finalSize = new FileInfo(outputExePath).Length;
+        log($"Final EXE size: {finalSize:N0} bytes");
+
+        if (finalSize <= stubSize + 1024)
+            throw new InvalidOperationException(
+                "FINAL EXE SIZE INVALID — PAYLOAD WAS NOT APPENDED"
+            );
+
+        log("========== PAYLOAD INJECTION SUCCESS ==========");
     }
 }
-*/
