@@ -1,4 +1,4 @@
-﻿// PackItPro/Services/ResourceInjector.cs - FIXED VERSION
+﻿// PackItPro/Services/ResourceInjector.cs - FINAL COMPLETE VERSION
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -34,13 +34,23 @@ namespace PackItPro.Services
             if (!File.Exists(payloadZipPath))
                 throw new FileNotFoundException("Payload ZIP not found", payloadZipPath);
 
+            // Validate stub is self-contained
+            var stubInfo = new FileInfo(stubPath);
+            if (stubInfo.Length < 10 * 1024 * 1024) // < 10 MB
+            {
+                throw new InvalidOperationException(
+                    $"Stub is too small ({FormatBytes(stubInfo.Length)}).\n" +
+                    $"This indicates a framework-dependent build.\n" +
+                    $"Expected: 25-100 MB (self-contained)");
+            }
+
             // Read payload
             byte[] payloadBytes = File.ReadAllBytes(payloadZipPath);
 
             if (payloadBytes.Length == 0)
                 throw new InvalidOperationException("Payload ZIP is empty!");
 
-            long stubSize = new FileInfo(stubPath).Length;
+            long stubSize = stubInfo.Length;
             long payloadSize = payloadBytes.Length;
 
             LogInfo($"Stub size: {FormatBytes(stubSize)}");
@@ -64,6 +74,7 @@ namespace PackItPro.Services
                 byte[] sizeBytes = BitConverter.GetBytes((long)payloadSize);
                 outputStream.Write(sizeBytes, 0, SIZE_LENGTH);
                 LogInfo($"✅ Size footer written (8 bytes)");
+                LogInfo($"   Size bytes: {BitConverter.ToString(sizeBytes)}");
 
                 // 4️⃣ Write marker ("PACKIT_END" in ASCII)
                 byte[] markerBytes = Encoding.ASCII.GetBytes(PAYLOAD_MARKER);

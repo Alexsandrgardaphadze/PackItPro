@@ -49,7 +49,14 @@
 		</Page>
 	</ItemGroup>
 
-	<!-- Custom target to copy StubInstaller after it's built -->
+	<ItemGroup>
+		<Content Include="Resources\StubInstaller.exe">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</Content>
+	</ItemGroup>
+
+
+	<!-- Custom target to copy StubInstaller after it's built 
 	<Target Name="CopyStubInstaller" AfterTargets="Build">
 		<PropertyGroup>
 			<StubSourcePath>..\StubInstaller\bin\$(Configuration)\net8.0-windows\StubInstaller.exe</StubSourcePath>
@@ -58,7 +65,7 @@
 
 		<Message Text="Looking for StubInstaller at: $(StubSourcePath)" Importance="high" />
 
-		<!-- Check if the file exists before trying to copy -->
+
 		<Copy
 		  SourceFiles="$(StubSourcePath)"
 		  DestinationFiles="$(StubDestPath)"
@@ -67,9 +74,10 @@
 			<Output TaskParameter="DestinationFiles" ItemName="FileWrites"/>
 		</Copy>
 
-		<!-- Warn if file doesn't exist -->
+
 		<Warning
 		  Text="StubInstaller.exe not found at $(StubSourcePath). Please build StubInstaller project first."
 		  Condition="!Exists('$(StubSourcePath)')" />
-	</Target>
+	</Target>  -->
+
 </Project>

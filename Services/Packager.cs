@@ -1,4 +1,4 @@
-﻿// PackItPro/Services/Packager.cs - COMPLETE PRODUCTION VERSION
+﻿// PackItPro/Services/Packager.cs - COMPLETE FIXED VERSION
 using ICSharpCode.SharpZipLib.Zip;
 using System;
 using System.Collections.Generic;
@@ -201,12 +201,13 @@ namespace PackItPro.Services
                 ReportProgress(progress, 65, "Injecting payload into stub...");
                 LogInfo("Injecting payload into stub installer...");
 
-                var stubPath = FindStubInstaller();
+                // CRITICAL FIX: Use StubLocator instead of FindStubInstaller()
+                string stubPath = StubLocator.FindStubInstaller();
                 LogInfo($"  Using stub: {stubPath}");
 
                 tempFinalPath = Path.GetTempFileName();
 
-                // Use the FIXED ResourceInjector
+                // CRITICAL FIX: Use correct method signature - InjectPayload(stubPath, payloadZipPath, outputPath)
                 ResourceInjector.InjectPayload(stubPath, payloadZipPath, tempFinalPath);
 
                 // Verify the injection worked
@@ -298,48 +299,6 @@ namespace PackItPro.Services
                     LogWarning($"Failed to delete temp final file: {ex.Message}");
                 }
             }
-        }
-
-        /// <summary>
-        /// Finds the StubInstaller.exe in known locations
-        /// </summary>
-        private static string FindStubInstaller()
-        {
-            // Check local directory (development)
-            var local = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "StubInstaller.exe");
-            if (File.Exists(local))
-            {
-                LogInfo($"Found stub in local directory: {local}");
-                return local;
-            }
-
-            // Check AppData (installed)
-            var appData = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "PackItPro",
-                "StubInstaller.exe");
-
-            if (File.Exists(appData))
-            {
-                LogInfo($"Found stub in AppData: {appData}");
-                return appData;
-            }
-
-            // Check one level up (bin/Debug vs project root)
-            var parentDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "StubInstaller.exe");
-            if (File.Exists(parentDir))
-            {
-                LogInfo($"Found stub in parent directory: {parentDir}");
-                return Path.GetFullPath(parentDir);
-            }
-
-            throw new FileNotFoundException(
-                "StubInstaller.exe not found!\n\n" +
-                "Searched in:\n" +
-                $"  1. {local}\n" +
-                $"  2. {appData}\n" +
-                $"  3. {parentDir}\n\n" +
-                "Please ensure StubInstaller.exe is in your project output directory and set to 'Copy always'.");
         }
 
         /// <summary>

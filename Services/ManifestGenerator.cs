@@ -17,7 +17,8 @@ namespace PackItPro.Services
                 InstallType = GetInstallTypeFromExtension(Path.GetExtension(path)),
                 SilentArgs = GetDefaultSilentArgs(Path.GetExtension(path)), // Use string[] now
                 RequiresAdmin = false, // Could be configurable per file later
-                InstallOrder = index
+                InstallOrder = index,
+                TimeoutMinutes = 10
                 // TODO: Add WingetId mapping here if available
             }).ToList();
 
@@ -89,6 +90,7 @@ namespace PackItPro.Services
         public string[]? SilentArgs { get; set; } // Changed to string[]
         public bool RequiresAdmin { get; set; } = false;
         public int InstallOrder { get; set; } = 0;
+        public int TimeoutMinutes { get; set; } = 10;
         // TODO: Add WingetId field for mapping during packaging/update
         // public string? WingetId { get; set; }
     }
