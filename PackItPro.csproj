@@ -4,7 +4,7 @@
 		<TargetFramework>net8.0-windows</TargetFramework>
 		<UseWPF>true</UseWPF>
 		<ApplicationIcon>PackItPro.ico</ApplicationIcon>
-		<Version>0.6.2</Version>
+		<Version>1.0.0</Version>
 		<Authors>PackItPro Team</Authors>
 		<Description>Secure file packaging</Description>
 		<Nullable>enable</Nullable>
