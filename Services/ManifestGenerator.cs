@@ -1,97 +1,165 @@
-﻿// ManifestGenerator.cs
+﻿// PackItPro/Services/ManifestGenerator.cs - v2.2
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace PackItPro.Services
 {
     public static class ManifestGenerator
     {
-        public static string Generate(List<string> filePaths, string packageName, bool requiresAdmin, bool includeWingetUpdateScript = false)
+        private static readonly JsonSerializerOptions WriteOptions = new()
         {
-            var files = filePaths.Select((path, index) => new ManifestFile
-            {
-                Name = Path.GetFileName(path),
-                InstallType = GetInstallTypeFromExtension(Path.GetExtension(path)),
-                SilentArgs = GetDefaultSilentArgs(Path.GetExtension(path)), // Use string[] now
-                RequiresAdmin = false, // Could be configurable per file later
-                InstallOrder = index,
-                TimeoutMinutes = 10
-                // TODO: Add WingetId mapping here if available
-            }).ToList();
+            WriteIndented = true,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        };
+
+        public static string Generate(
+            List<string> filePaths,
+            string packageName,
+            bool requiresAdmin,
+            bool includeWingetUpdateScript = false)
+        {
+            var files = filePaths
+                .OrderBy(p => p)
+                .Select((path, index) =>
+                {
+                    // FIX: Detect once, use everywhere — no double detection cost.
+                    var type = DetectInstallType(path);
+                    return new ManifestFile
+                    {
+                        Name = Path.GetFileName(path),
+                        InstallType = type,
+                        SilentArgs = GetDefaultSilentArgs(type),
+                        RequiresAdmin = false,
+                        InstallOrder = index,
+                        TimeoutMinutes = GetDefaultTimeout(path),
+                    };
+                })
+                .ToList();
 
             var manifest = new PackageManifest
             {
                 PackageName = packageName,
                 Files = files,
                 RequiresAdmin = requiresAdmin,
-                Cleanup = true // Default to true
+                Cleanup = true,
+                AutoUpdateScript = includeWingetUpdateScript ? "update_all.bat" : null,
             };
 
-            if (includeWingetUpdateScript)
-            {
-                manifest.AutoUpdateScript = "update_all.bat";
-            }
-
-            return JsonSerializer.Serialize(manifest, new JsonSerializerOptions { WriteIndented = true });
+            return JsonSerializer.Serialize(manifest, WriteOptions);
         }
 
-        private static string GetInstallTypeFromExtension(string ext)
+        // ──────────────────────────────────────────────────────────────
+        // Detection
+        // ──────────────────────────────────────────────────────────────
+
+        public static string DetectInstallType(string filePath)
         {
-            switch (ext.ToLower())
+            return Path.GetExtension(filePath).ToLowerInvariant() switch
             {
-                case ".msi":
-                    return "msi";
-                case ".exe":
-                    // Could attempt deeper inspection here (e.g., check file headers for Inno, NSIS)
-                    return "exe";
-                case ".appx":
-                case ".appxbundle":
-                    return "appx";
-                default:
-                    return "file"; // Generic file type
-            }
+                ".msi" => "msi",
+                ".msp" => "msp",
+                ".appx" => "appx",
+                ".appxbundle" => "appx",
+                ".msix" => "msix",
+                ".exe" => DetectExeType(filePath),
+                _ => "file",
+            };
         }
 
-        // NEW: Return string[] for silent args
-        private static string[]? GetDefaultSilentArgs(string ext)
+        private static string DetectExeType(string filePath)
         {
-            switch (ext.ToLower())
+            try
             {
-                case ".msi":
-                    return new[] { "/quiet", "/norestart" };
-                case ".exe":
-                    // Return an array of common silent flags. The stub installer can try them sequentially.
-                    return new[] { "/S", "/silent", "/quiet", "/SILENT", "/VERYSILENT" };
-                default:
-                    return null;
+                Span<byte> header = stackalloc byte[512];
+                using var fs = File.OpenRead(filePath);
+                int read = fs.Read(header);
+
+                // FIX: Guard against tiny EXEs (< 8 bytes) that can't contain
+                // any valid signature — return "exe" immediately.
+                if (read < 8) return "exe";
+
+                header = header[..read];
+
+                // FIX: Use Span<byte>.IndexOf with UTF-8 literal instead of
+                // Encoding.ASCII.GetString — binary→string conversion can produce
+                // false positives when arbitrary bytes coincidentally match ASCII
+                // sequences. Raw byte comparison is exact.
+
+                // InnoSetup: "Inno Setup" appears in the early header bytes
+                if (header.IndexOf("Inno Setup"u8) >= 0)
+                    return "inno";
+
+                // NSIS: magic bytes 0xEFBEADDE at offset 4 (after MZ header)
+                if (header[4] == 0xEF &&
+                    header[5] == 0xBE &&
+                    header[6] == 0xAD &&
+                    header[7] == 0xDE)
+                    return "nsis";
             }
+            catch
+            {
+                // Unreadable header — fall through to generic "exe"
+            }
+
+            return "exe";
+        }
+
+        // ──────────────────────────────────────────────────────────────
+        // Silent args — keyed on type string, not path
+        // ──────────────────────────────────────────────────────────────
+
+        private static string[]? GetDefaultSilentArgs(string installType)
+        {
+            return installType switch
+            {
+                "msi" => new[] { "/quiet", "/norestart" },
+                "msp" => new[] { "/quiet", "/norestart" },
+                "inno" => new[] { "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" },
+                "nsis" => new[] { "/S" },
+                "exe" => new[] { "/S", "/silent", "/quiet", "/SILENT", "/VERYSILENT" },
+                _ => null,
+            };
+        }
+
+        private static int GetDefaultTimeout(string filePath)
+        {
+            try
+            {
+                double mb = new FileInfo(filePath).Length / (1024.0 * 1024.0);
+                if (mb > 500) return 60;
+                if (mb > 100) return 30;
+            }
+            catch { }
+            return 10;
         }
     }
 
-    // Manifest model (defined here or shared)
+    // ──────────────────────────────────────────────────────────────────
+    // Manifest models
+    // ──────────────────────────────────────────────────────────────────
+
     public class PackageManifest
     {
-        public string Version { get; set; } = "1.0";
         public string PackageName { get; set; } = "MySoftwareBundle";
-        public List<ManifestFile> Files { get; set; } = new List<ManifestFile>();
+        public string Version { get; set; } = "1.0";
+        public List<ManifestFile> Files { get; set; } = new();
         public bool Cleanup { get; set; } = true;
-        public string? AutoUpdateScript { get; set; } // Optional script name
-        public string? SHA256Checksum { get; set; } // NEW: Add SHA256Checksum for integrity verification
-        public bool RequiresAdmin { get; set; } = false; // NEW: Add overall package admin requirement
+        public string? AutoUpdateScript { get; set; }
+        public string? SHA256Checksum { get; set; }
+        public bool RequiresAdmin { get; set; } = false;
     }
 
     public class ManifestFile
     {
         public string Name { get; set; } = "";
-        public string InstallType { get; set; } = "exe"; // e.g., exe, msi, appx
-        public string[]? SilentArgs { get; set; } // Changed to string[]
+        public string InstallType { get; set; } = "exe";
+        public string[]? SilentArgs { get; set; }
         public bool RequiresAdmin { get; set; } = false;
         public int InstallOrder { get; set; } = 0;
         public int TimeoutMinutes { get; set; } = 10;
-        // TODO: Add WingetId field for mapping during packaging/update
-        // public string? WingetId { get; set; }
     }
 }

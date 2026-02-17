@@ -1,7 +1,7 @@
 ﻿// ViewModels/CommandHandlers/VirusTotalCommandHandler.cs
 using PackItPro.Models;
 using PackItPro.Services;
-using PackItPro.ViewModels.Services;
+// using PackItPro.ViewModels.Services;
 using System;
 using System.Collections.Generic;
 using System.IO;

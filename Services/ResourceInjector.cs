@@ -1,194 +1,146 @@
-﻿// PackItPro/Services/ResourceInjector.cs - FINAL COMPLETE VERSION
+﻿// PackItPro/Services/ResourceInjector.cs - v2.2
 using System;
-using System.Diagnostics;
 using System.IO;
 using System.Text;
+using System.Threading;
 
 namespace PackItPro.Services
 {
     /// <summary>
-    /// Injects a ZIP payload into the stub installer executable
-    /// Format: [STUB][PAYLOAD][SIZE:8bytes][MARKER:"PACKIT_END"]
+    /// Injects a ZIP payload into the stub installer executable.
+    ///
+    /// Final binary layout:
+    ///   [ STUB EXE ][ ZIP payload ][ payload size: Int64 LE ][ "PACKIT_END": 10 ASCII bytes ]
+    ///                                                         |__________ FOOTER: 18 bytes __|
     /// </summary>
     public static class ResourceInjector
     {
-        private const string PAYLOAD_MARKER = "PACKIT_END";
+        public const string PAYLOAD_MARKER = "PACKIT_END";
         private const int MARKER_LENGTH = 10;
         private const int SIZE_LENGTH = sizeof(long);
-        private const int FOOTER_LENGTH = SIZE_LENGTH + MARKER_LENGTH; // 18 bytes total
+        public const int FOOTER_LENGTH = SIZE_LENGTH + MARKER_LENGTH; // 18 bytes
+
+        private const int STREAM_BUFFER = 1024 * 1024; // 1 MB copy buffer
+        private const long MIN_STUB_SIZE = 10L * 1024 * 1024; // 10 MB
 
         /// <summary>
-        /// Injects the payload ZIP into the stub installer
+        /// Injects the payload ZIP into the stub and writes the final EXE to outputPath.
+        /// Streams all data — safe for 1 GB+ payloads.
+        /// Supports cancellation for large files.
         /// </summary>
-        /// <param name="stubPath">Path to StubInstaller.exe</param>
-        /// <param name="payloadZipPath">Path to the ZIP file containing all installers</param>
-        /// <param name="outputPath">Path where the final EXE will be created</param>
-        public static void InjectPayload(string stubPath, string payloadZipPath, string outputPath)
+        public static void InjectPayload(
+            string stubPath,
+            string payloadZipPath,
+            string outputPath,
+            CancellationToken ct = default)
         {
-            LogInfo("========== PAYLOAD INJECTION START ==========");
-
-            // Validation
             if (!File.Exists(stubPath))
-                throw new FileNotFoundException("Stub executable not found", stubPath);
+                throw new FileNotFoundException("Stub executable not found.", stubPath);
 
             if (!File.Exists(payloadZipPath))
-                throw new FileNotFoundException("Payload ZIP not found", payloadZipPath);
+                throw new FileNotFoundException("Payload ZIP not found.", payloadZipPath);
 
-            // Validate stub is self-contained
             var stubInfo = new FileInfo(stubPath);
-            if (stubInfo.Length < 10 * 1024 * 1024) // < 10 MB
-            {
+            var payloadInfo = new FileInfo(payloadZipPath);
+
+            if (stubInfo.Length < MIN_STUB_SIZE)
                 throw new InvalidOperationException(
-                    $"Stub is too small ({FormatBytes(stubInfo.Length)}).\n" +
-                    $"This indicates a framework-dependent build.\n" +
-                    $"Expected: 25-100 MB (self-contained)");
-            }
+                    $"Stub is too small ({FormatBytes(stubInfo.Length)}) — this is a framework-dependent build.\n" +
+                    "Publish StubInstaller as self-contained (dotnet publish --self-contained) and copy it to PackItPro/Resources.");
 
-            // Read payload
-            byte[] payloadBytes = File.ReadAllBytes(payloadZipPath);
-
-            if (payloadBytes.Length == 0)
-                throw new InvalidOperationException("Payload ZIP is empty!");
+            if (payloadInfo.Length == 0)
+                throw new InvalidOperationException("Payload ZIP is empty.");
 
             long stubSize = stubInfo.Length;
-            long payloadSize = payloadBytes.Length;
-
-            LogInfo($"Stub size: {FormatBytes(stubSize)}");
-            LogInfo($"Payload size: {FormatBytes(payloadSize)}");
-
-            // Create output file
-            using (FileStream outputStream = new FileStream(outputPath, FileMode.Create, FileAccess.Write))
-            {
-                // 1️⃣ Copy stub executable
-                using (FileStream stubStream = File.OpenRead(stubPath))
-                {
-                    stubStream.CopyTo(outputStream);
-                }
-                LogInfo($"✅ Stub copied ({FormatBytes(stubSize)})");
-
-                // 2️⃣ Write payload ZIP
-                outputStream.Write(payloadBytes, 0, payloadBytes.Length);
-                LogInfo($"✅ Payload written ({FormatBytes(payloadSize)})");
-
-                // 3️⃣ Write payload size (8 bytes, little-endian Int64)
-                byte[] sizeBytes = BitConverter.GetBytes((long)payloadSize);
-                outputStream.Write(sizeBytes, 0, SIZE_LENGTH);
-                LogInfo($"✅ Size footer written (8 bytes)");
-                LogInfo($"   Size bytes: {BitConverter.ToString(sizeBytes)}");
-
-                // 4️⃣ Write marker ("PACKIT_END" in ASCII)
-                byte[] markerBytes = Encoding.ASCII.GetBytes(PAYLOAD_MARKER);
-                if (markerBytes.Length != MARKER_LENGTH)
-                    throw new InvalidOperationException($"Marker must be exactly {MARKER_LENGTH} bytes!");
-
-                outputStream.Write(markerBytes, 0, MARKER_LENGTH);
-                LogInfo($"✅ Marker written ('{PAYLOAD_MARKER}' 10 bytes)");
-
-                outputStream.Flush();
-            }
-
-            // Verification
-            long finalSize = new FileInfo(outputPath).Length;
+            long payloadSize = payloadInfo.Length;
             long expectedSize = stubSize + payloadSize + FOOTER_LENGTH;
 
-            LogInfo($"Final EXE size: {FormatBytes(finalSize)}");
-            LogInfo($"Expected size: {FormatBytes(expectedSize)}");
-
-            if (finalSize != expectedSize)
+            using (var output = new FileStream(outputPath, FileMode.Create, FileAccess.Write, FileShare.None, STREAM_BUFFER))
             {
-                throw new InvalidOperationException(
-                    $"SIZE MISMATCH! Final size is {FormatBytes(finalSize)}, " +
-                    $"but expected {FormatBytes(expectedSize)}. " +
-                    $"Payload may not have been written correctly!");
+                // 1. Stream stub
+                ct.ThrowIfCancellationRequested();
+                using (var stub = File.OpenRead(stubPath))
+                    CopyWithCancellation(stub, output, ct);
+
+                // 2. Stream payload ZIP
+                ct.ThrowIfCancellationRequested();
+                using (var payload = File.OpenRead(payloadZipPath))
+                    CopyWithCancellation(payload, output, ct);
+
+                // 3. Write payload size (8 bytes, little-endian Int64)
+                output.Write(BitConverter.GetBytes(payloadSize), 0, SIZE_LENGTH);
+
+                // 4. Write marker ("PACKIT_END", exactly 10 ASCII bytes)
+                var markerBytes = Encoding.ASCII.GetBytes(PAYLOAD_MARKER);
+                if (markerBytes.Length != MARKER_LENGTH)
+                    throw new InvalidOperationException(
+                        $"Marker is {markerBytes.Length} bytes — expected {MARKER_LENGTH}. " +
+                        "Do not modify PAYLOAD_MARKER without updating MARKER_LENGTH.");
+
+                output.Write(markerBytes, 0, MARKER_LENGTH);
+
+                // FIX: Flush(true) — forces OS write-through to disk before we
+                // read the file back for verification. Without this, the file system
+                // cache may serve stale data and verification will fail spuriously.
+                output.Flush(flushToDisk: true);
             }
 
-            if (finalSize <= stubSize + 1024) // Sanity check
-            {
+            long actualSize = new FileInfo(outputPath).Length;
+            if (actualSize != expectedSize)
                 throw new InvalidOperationException(
-                    $"CRITICAL ERROR: Final EXE size ({FormatBytes(finalSize)}) is too small! " +
-                    $"Payload was NOT appended correctly!");
-            }
-
-            LogInfo("========== PAYLOAD INJECTION SUCCESS ==========");
+                    $"Output size mismatch — expected {FormatBytes(expectedSize)}, got {FormatBytes(actualSize)}.");
         }
 
         /// <summary>
-        /// Verifies that a packaged EXE has the correct structure
+        /// Reads the last 18 bytes of a packaged EXE and confirms the footer is valid.
+        /// Does NOT extract or verify payload contents.
         /// </summary>
         public static bool VerifyPackagedExe(string packagedExePath)
         {
             try
             {
-                if (!File.Exists(packagedExePath))
-                    return false;
+                if (!File.Exists(packagedExePath)) return false;
 
                 using var fs = File.OpenRead(packagedExePath);
+                if (fs.Length < FOOTER_LENGTH) return false;
 
-                if (fs.Length < FOOTER_LENGTH)
-                    return false;
-
-                // Read footer
                 fs.Seek(-FOOTER_LENGTH, SeekOrigin.End);
-                byte[] footer = new byte[FOOTER_LENGTH];
-                fs.Read(footer, 0, FOOTER_LENGTH);
+                var footer = new byte[FOOTER_LENGTH];
+                if (fs.Read(footer, 0, FOOTER_LENGTH) != FOOTER_LENGTH) return false;
 
-                // Extract marker
-                byte[] markerBytes = new byte[MARKER_LENGTH];
-                Array.Copy(footer, SIZE_LENGTH, markerBytes, 0, MARKER_LENGTH);
-                string marker = Encoding.ASCII.GetString(markerBytes);
+                long payloadSize = BitConverter.ToInt64(footer, 0);
+                if (payloadSize <= 0 || payloadSize > fs.Length - FOOTER_LENGTH) return false;
 
-                if (marker != PAYLOAD_MARKER)
-                {
-                    LogError($"Invalid marker: '{marker}' (expected '{PAYLOAD_MARKER}')");
-                    return false;
-                }
-
-                // Extract size
-                byte[] sizeBytes = new byte[SIZE_LENGTH];
-                Array.Copy(footer, 0, sizeBytes, 0, SIZE_LENGTH);
-                long payloadSize = BitConverter.ToInt64(sizeBytes, 0);
-
-                if (payloadSize <= 0 || payloadSize > fs.Length - FOOTER_LENGTH)
-                {
-                    LogError($"Invalid payload size: {payloadSize}");
-                    return false;
-                }
-
-                LogInfo($"✅ Package verified: Payload size = {FormatBytes(payloadSize)}");
-                return true;
+                string marker = Encoding.ASCII.GetString(footer, SIZE_LENGTH, MARKER_LENGTH);
+                return marker == PAYLOAD_MARKER;
             }
-            catch (Exception ex)
+            catch
             {
-                LogError($"Verification failed: {ex.Message}");
                 return false;
+            }
+        }
+
+        // ──────────────────────────────────────────────────────────────
+        // Helpers
+        // ──────────────────────────────────────────────────────────────
+
+        private static void CopyWithCancellation(Stream source, Stream dest, CancellationToken ct)
+        {
+            var buffer = new byte[STREAM_BUFFER];
+            int read;
+            while ((read = source.Read(buffer, 0, buffer.Length)) > 0)
+            {
+                ct.ThrowIfCancellationRequested();
+                dest.Write(buffer, 0, read);
             }
         }
 
         private static string FormatBytes(long bytes)
         {
-            string[] sizes = { "B", "KB", "MB", "GB", "TB" };
-            double len = bytes;
-            int order = 0;
-            while (len >= 1024 && order < sizes.Length - 1)
-            {
-                order++;
-                len /= 1024;
-            }
-            return $"{len:0.##} {sizes[order]}";
-        }
-
-        private static void LogInfo(string message)
-        {
-            var msg = $"[ResourceInjector] {message}";
-            Debug.WriteLine(msg);
-            Console.WriteLine(msg);
-        }
-
-        private static void LogError(string message)
-        {
-            var msg = $"[ResourceInjector] ERROR: {message}";
-            Debug.WriteLine(msg);
-            Console.WriteLine(msg);
+            string[] s = { "B", "KB", "MB", "GB", "TB" };
+            double v = bytes; int o = 0;
+            while (v >= 1024 && o < s.Length - 1) { o++; v /= 1024; }
+            return $"{v:0.##} {s[o]}";
         }
     }
 }

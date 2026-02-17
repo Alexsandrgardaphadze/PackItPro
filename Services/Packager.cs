@@ -1,352 +1,287 @@
-﻿// PackItPro/Services/Packager.cs - COMPLETE FIXED VERSION
+﻿// PackItPro/Services/Packager.cs - v2.2
 using ICSharpCode.SharpZipLib.Zip;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace PackItPro.Services
 {
-    public delegate void ProgressReportHandler(int percentage, string message);
+    // FIX: Static event removed entirely — it accumulates handlers across packaging
+    // operations, leaking memory. Callers use IProgress<> instead.
+    // public static event ProgressReportHandler? ProgressChanged;  ← DELETED
 
     public static class Packager
     {
-        public static event ProgressReportHandler? ProgressChanged;
+        // Deterministic ZIP timestamp — same content always produces same bytes.
+        // Professional packagers (NuGet, npm, Debian) do this.
+        private static readonly DateTime ZipEpoch = new(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
-        /// <summary>
-        /// Creates a packaged installer containing multiple files
-        /// </summary>
         public static async Task<string> CreatePackageAsync(
             List<string> filePaths,
             string outputDirectory,
             string packageName,
             bool requiresAdmin,
             bool useLZMACompression,
-            IProgress<(int percentage, string message)>? progress = null)
+            IProgress<(int percentage, string message)>? progress = null,
+            ILogService? log = null,
+            CancellationToken ct = default)
         {
+            log ??= NullLogService.Instance;
+
             var tempDir = Path.Combine(Path.GetTempPath(), $"PackItPro_{Guid.NewGuid()}");
-            string? payloadZipPath = null;
-            string? tempFinalPath = null;
+            string? zipPath = null;
+            string? finalTemp = null;
 
             try
             {
                 Directory.CreateDirectory(tempDir);
-                ReportProgress(progress, 5, "Preparing files...");
-                LogInfo("========== PACKAGE CREATION START ==========");
-                LogInfo($"Creating temporary directory: {tempDir}");
+                Report(progress, 5, "Preparing files...");
+                log.Info("========== PACKAGE CREATION START ==========");
+                log.Info($"Package: '{packageName}' | Files: {filePaths.Count} | Admin: {requiresAdmin}");
 
                 // ============================================================
-                // STEP 1: COPY FILES TO TEMP DIRECTORY
+                // STEP 1: COPY FILES TO TEMP
                 // ============================================================
-                int totalFiles = filePaths.Count;
-                LogInfo($"Copying {totalFiles} file(s) to temp directory...");
+                Report(progress, 8, "Copying files...");
+                log.Info($"STEP 1: Copying {filePaths.Count} file(s)...");
 
-                for (int i = 0; i < totalFiles; i++)
+                for (int i = 0; i < filePaths.Count; i++)
                 {
-                    string file = filePaths[i];
+                    ct.ThrowIfCancellationRequested();
+
+                    string src = filePaths[i];
+                    string dest = Path.Combine(tempDir, Path.GetFileName(src));
+
                     try
                     {
-                        // Verify file is accessible
-                        using (var fs = File.Open(file, FileMode.Open, FileAccess.Read, FileShare.Read)) { }
-
-                        string destPath = Path.Combine(tempDir, Path.GetFileName(file));
-                        File.Copy(file, destPath, overwrite: true);
-
-                        var copyProgress = (int)(5 + (i / (double)totalFiles) * 15);
-                        ReportProgress(progress, copyProgress, $"Copying files ({i + 1}/{totalFiles})...");
-                        LogInfo($"  ✓ Copied: {Path.GetFileName(file)} ({FormatBytes(new FileInfo(file).Length)})");
-                    }
-                    catch (IOException ex) when (ex.Message.Contains("in use") || ex.Message.Contains("being used"))
-                    {
-                        throw new IOException($"File is locked or in use: {Path.GetFileName(file)}\n\nPlease close any programs using this file and try again.", ex);
+                        // Verify accessible before committing to copy
+                        using (File.Open(src, FileMode.Open, FileAccess.Read, FileShare.Read)) { }
+                        File.Copy(src, dest, overwrite: true);
+                        log.Info($"  [{i + 1}/{filePaths.Count}] {Path.GetFileName(src)} ({FormatBytes(new FileInfo(src).Length)})");
+                        Report(progress, 8 + (int)((i + 1.0) / filePaths.Count * 12),
+                            $"Copying files ({i + 1}/{filePaths.Count})...");
                     }
                     catch (UnauthorizedAccessException ex)
                     {
-                        throw new UnauthorizedAccessException($"Cannot access file: {Path.GetFileName(file)}\n\nCheck file permissions.", ex);
+                        throw new UnauthorizedAccessException(
+                            $"Access denied to '{Path.GetFileName(src)}'. " +
+                            "Check file permissions or run PackItPro as Administrator.", ex);
+                    }
+                    catch (IOException ex)
+                    {
+                        // FIX: Catch all IOExceptions (not just sharing violations) and
+                        // give an actionable message for whichever error occurred.
+                        throw new IOException(
+                            $"Cannot read '{Path.GetFileName(src)}': {ex.Message}\n" +
+                            "Ensure the file is not locked by another program.", ex);
                     }
                 }
 
                 // ============================================================
-                // STEP 2: GENERATE MANIFEST
+                // STEP 2: GENERATE MANIFEST (no checksum yet)
                 // ============================================================
-                ReportProgress(progress, 20, "Generating manifest...");
-                LogInfo("Generating package manifest...");
+                Report(progress, 20, "Generating manifest...");
+                log.Info("STEP 2: Generating manifest...");
 
-                var manifestJson = ManifestGenerator.Generate(filePaths, packageName, requiresAdmin, false);
+                var manifestJson = ManifestGenerator.Generate(filePaths, packageName, requiresAdmin);
                 var manifestPath = Path.Combine(tempDir, "packitmeta.json");
-                await File.WriteAllTextAsync(manifestPath, manifestJson);
-                LogInfo("  ✓ Manifest generated");
+                await File.WriteAllTextAsync(manifestPath, manifestJson, ct);
+                log.Info("  Manifest written (checksum pending).");
 
                 // ============================================================
-                // STEP 3: COMPUTE DIRECTORY HASH
+                // STEP 3: HASH INSTALLER FILES ONLY
+                // FileHasher.DefaultExclusions permanently skips packitmeta.json
+                // and install.log — no extra args needed.
+                // SHA256 over hundreds of MB is CPU-bound, run on thread pool.
                 // ============================================================
-                ReportProgress(progress, 25, "Computing checksums...");
-                LogInfo("Computing directory hash for integrity verification...");
+                Report(progress, 25, "Computing integrity hash...");
+                log.Info("STEP 3: Hashing installer files...");
 
-                string dirHash = Convert.ToBase64String(FileHasher.ComputeDirectoryHash(tempDir));
-                LogInfo($"  ✓ Directory hash: {dirHash.Substring(0, 16)}...");
+                string dirHash = await Task.Run(
+                    () => Convert.ToBase64String(FileHasher.ComputeDirectoryHash(tempDir)), ct);
+                log.Info($"  Hash: {dirHash[..16]}...");
 
-                // Update manifest with hash
-                var manifestObj = JsonSerializer.Deserialize<PackageManifest>(manifestJson) ??
-                    throw new InvalidDataException("Failed to deserialize manifest");
+                var manifestObj = JsonSerializer.Deserialize<PackageManifest>(manifestJson)
+                    ?? throw new InvalidDataException("Failed to deserialize manifest for checksum update.");
                 manifestObj.SHA256Checksum = dirHash;
                 manifestJson = JsonSerializer.Serialize(manifestObj, new JsonSerializerOptions { WriteIndented = true });
-                await File.WriteAllTextAsync(manifestPath, manifestJson);
-                LogInfo("  ✓ Manifest updated with checksum");
+                await File.WriteAllTextAsync(manifestPath, manifestJson, ct);
+                log.Info("  Manifest updated with checksum.");
 
                 // ============================================================
                 // STEP 4: CREATE ZIP ARCHIVE
+                // SharpZipLib is synchronous — mixing async reads with sync ZIP
+                // writes creates fake async that blocks the thread pool.
+                // We push the ENTIRE compression work onto a background thread.
                 // ============================================================
-                ReportProgress(progress, 30, "Creating ZIP archive...");
-                LogInfo("Creating ZIP payload...");
+                Report(progress, 30, "Creating ZIP archive...");
+                log.Info("STEP 4: Compressing payload...");
 
-                payloadZipPath = Path.Combine(Path.GetTempPath(), $"payload_{Guid.NewGuid()}.zip");
-                var allFilesInTemp = Directory.GetFiles(tempDir, "*", SearchOption.AllDirectories).ToList();
-                long totalBytes = allFilesInTemp.Sum(f => new FileInfo(f).Length);
+                zipPath = Path.Combine(Path.GetTempPath(), $"payload_{Guid.NewGuid()}.zip");
+
+                var allFiles = Directory.GetFiles(tempDir, "*", SearchOption.AllDirectories).ToList();
+                long totalBytes = allFiles.Sum(f => new FileInfo(f).Length);
+                int level = useLZMACompression ? 9 : 6;
+
+                log.Info($"  {allFiles.Count} file(s) | {FormatBytes(totalBytes)} | level {level}");
+
                 long processedBytes = 0;
 
-                LogInfo($"  Compressing {allFilesInTemp.Count} file(s) ({FormatBytes(totalBytes)})...");
-
-                using (var fs = new FileStream(payloadZipPath, FileMode.Create, FileAccess.Write, FileShare.None))
-                using (var zipStream = new ZipOutputStream(fs))
+                await Task.Run(() =>
                 {
-                    // Set compression level (0=none, 9=max)
-                    zipStream.SetLevel(useLZMACompression ? 9 : 6);
-                    LogInfo($"  Compression level: {(useLZMACompression ? "Maximum (9)" : "Standard (6)")}");
+                    using var fs = new FileStream(zipPath, FileMode.Create, FileAccess.Write, FileShare.None, 1 << 20);
+                    using var zip = new ZipOutputStream(fs);
+                    zip.SetLevel(level);
 
-                    // Add manifest first
-                    var manifestFileInfo = new FileInfo(manifestPath);
-                    var manifestEntry = new ZipEntry("packitmeta.json")
+                    // Manifest first — stub needs it before anything else
+                    AddFileToZipSync(zip, manifestPath, "packitmeta.json", ZipEpoch);
+
+                    var installers = allFiles
+                        .Where(f => !Path.GetFileName(f).Equals("packitmeta.json", StringComparison.OrdinalIgnoreCase))
+                        .ToList();
+
+                    for (int i = 0; i < installers.Count; i++)
                     {
-                        DateTime = DateTime.Now,
-                        Size = manifestFileInfo.Length
-                    };
+                        ct.ThrowIfCancellationRequested();
 
-                    zipStream.PutNextEntry(manifestEntry);
-                    using (var manifestStream = File.OpenRead(manifestPath))
-                    {
-                        await manifestStream.CopyToAsync(zipStream);
-                    }
-                    zipStream.CloseEntry();
-                    processedBytes += manifestFileInfo.Length;
-                    ReportProgress(progress, 35, "Added manifest to archive");
+                        var filePath = installers[i];
+                        var entryName = Path.GetRelativePath(tempDir, filePath);
+                        var fileSize = new FileInfo(filePath).Length;
 
-                    // Add all user files
-                    int fileIndex = 0;
-                    foreach (var filePath in allFilesInTemp)
-                    {
-                        if (Path.GetFileName(filePath) == "packitmeta.json")
-                            continue; // Already added
+                        AddFileToZipSync(zip, filePath, entryName, ZipEpoch);
 
-                        var fileInfo = new FileInfo(filePath);
-                        var relativePath = Path.GetRelativePath(tempDir, filePath);
-
-                        var entry = new ZipEntry(relativePath)
-                        {
-                            DateTime = DateTime.Now,
-                            Size = fileInfo.Length
-                        };
-
-                        zipStream.PutNextEntry(entry);
-
-                        using (var fileStream = File.OpenRead(filePath))
-                        {
-                            byte[] buffer = new byte[81920]; // 80 KB buffer
-                            int bytesRead;
-                            long fileBytesWritten = 0;
-
-                            while ((bytesRead = await fileStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
-                            {
-                                zipStream.Write(buffer, 0, bytesRead);
-                                fileBytesWritten += bytesRead;
-                            }
-
-                            if (fileBytesWritten != fileInfo.Length)
-                            {
-                                LogWarning($"Size mismatch for {Path.GetFileName(filePath)}: wrote {fileBytesWritten}, expected {fileInfo.Length}");
-                            }
-                        }
-
-                        zipStream.CloseEntry();
-                        processedBytes += fileInfo.Length;
-                        fileIndex++;
-
-                        var zipProgress = (int)(35 + (processedBytes / (double)totalBytes) * 25);
-                        ReportProgress(progress, Math.Min(zipProgress, 60),
-                            $"Compressing {Path.GetFileName(filePath)} ({fileIndex}/{allFilesInTemp.Count})...");
-
-                        LogInfo($"    [{fileIndex}/{allFilesInTemp.Count}] {Path.GetFileName(filePath)} ({FormatBytes(fileInfo.Length)})");
+                        processedBytes += fileSize;
+                        int pct = 30 + (int)(processedBytes / (double)totalBytes * 35);
+                        Report(progress, Math.Min(pct, 65),
+                            $"Compressing {Path.GetFileName(filePath)} ({i + 1}/{installers.Count})...");
                     }
 
-                    zipStream.Finish();
-                    zipStream.Flush();
-                }
+                    zip.Finish();
+                }, ct);
 
-                // Verify ZIP was created correctly
-                var zipFileInfo = new FileInfo(payloadZipPath);
-                if (!zipFileInfo.Exists || zipFileInfo.Length == 0)
-                {
-                    throw new InvalidOperationException("ZIP payload creation failed - file is empty or missing!");
-                }
+                var zipInfo = new FileInfo(zipPath);
+                if (!zipInfo.Exists || zipInfo.Length == 0)
+                    throw new InvalidOperationException("ZIP creation failed — output file is empty.");
 
-                LogInfo($"  ✓ ZIP created: {FormatBytes(zipFileInfo.Length)}");
-                LogInfo($"  Compression ratio: {(totalBytes > 0 ? (zipFileInfo.Length * 100.0 / totalBytes) : 0):F1}%");
+                log.Info($"  ZIP: {FormatBytes(zipInfo.Length)} ({zipInfo.Length * 100.0 / Math.Max(totalBytes, 1):F1}% of original)");
 
                 // ============================================================
                 // STEP 5: INJECT PAYLOAD INTO STUB
                 // ============================================================
-                ReportProgress(progress, 65, "Injecting payload into stub...");
-                LogInfo("Injecting payload into stub installer...");
+                Report(progress, 68, "Injecting payload into stub...");
+                log.Info("STEP 5: Injecting payload...");
 
-                // CRITICAL FIX: Use StubLocator instead of FindStubInstaller()
-                string stubPath = StubLocator.FindStubInstaller();
-                LogInfo($"  Using stub: {stubPath}");
+                string stubPath = StubLocator.FindStubInstaller(log);
+                log.Info($"  Stub: {stubPath} ({FormatBytes(new FileInfo(stubPath).Length)})");
 
-                tempFinalPath = Path.GetTempFileName();
+                finalTemp = Path.GetTempFileName();
 
-                // CRITICAL FIX: Use correct method signature - InjectPayload(stubPath, payloadZipPath, outputPath)
-                ResourceInjector.InjectPayload(stubPath, payloadZipPath, tempFinalPath);
+                await Task.Run(() => ResourceInjector.InjectPayload(stubPath, zipPath, finalTemp, ct), ct);
 
-                // Verify the injection worked
-                if (!ResourceInjector.VerifyPackagedExe(tempFinalPath))
-                {
-                    throw new InvalidOperationException("Package verification failed! The payload may not have been injected correctly.");
-                }
+                if (!ResourceInjector.VerifyPackagedExe(finalTemp))
+                    throw new InvalidOperationException("Package verification failed after injection.");
 
-                LogInfo("  ✓ Payload injection verified");
+                log.Info("  Injection verified ✓");
 
                 // ============================================================
                 // STEP 6: MOVE TO FINAL LOCATION
                 // ============================================================
-                ReportProgress(progress, 80, "Finalizing executable...");
-                LogInfo("Moving to final location...");
+                Report(progress, 92, "Finalizing...");
+                log.Info("STEP 6: Writing output...");
 
                 string outputPath = Path.Combine(outputDirectory, $"{packageName}.exe");
 
-                // Delete existing file if it exists
                 if (File.Exists(outputPath))
                 {
-                    try
-                    {
-                        File.Delete(outputPath);
-                        LogInfo($"  Deleted existing file: {outputPath}");
-                    }
+                    try { File.Delete(outputPath); }
                     catch (IOException ex)
                     {
-                        throw new IOException($"Cannot overwrite existing file (it may be in use): {outputPath}\n\nClose any programs using this file.", ex);
+                        throw new IOException(
+                            $"Cannot overwrite '{outputPath}' — it may be open in another program.", ex);
                     }
                 }
 
-                File.Move(tempFinalPath, outputPath, overwrite: true);
+                File.Move(finalTemp, outputPath, overwrite: true);
+                finalTemp = null; // consumed — don't delete in finally
 
-                var finalFileInfo = new FileInfo(outputPath);
-                LogInfo($"  ✓ Package created: {outputPath}");
-                LogInfo($"  Final size: {FormatBytes(finalFileInfo.Length)}");
-
-                ReportProgress(progress, 100, "Package created successfully!");
-                LogInfo("========== PACKAGE CREATION SUCCESS ==========");
+                log.Info($"  Output: {outputPath} ({FormatBytes(new FileInfo(outputPath).Length)})");
+                Report(progress, 100, "Package created successfully!");
+                log.Info("========== PACKAGE CREATION SUCCESS ==========");
 
                 return outputPath;
             }
+            catch (OperationCanceledException)
+            {
+                log.Warning("Package creation cancelled by user.");
+                throw;
+            }
             catch (Exception ex)
             {
-                LogError($"Package creation failed: {ex.Message}");
-                LogError($"Stack trace: {ex.StackTrace}");
-                throw; // Re-throw to let caller handle
+                log.Error("Package creation failed", ex);
+                throw;
             }
             finally
             {
-                // Cleanup temporary files
-                try
-                {
-                    if (Directory.Exists(tempDir))
-                    {
-                        Directory.Delete(tempDir, true);
-                        LogInfo($"Cleaned up temp directory: {tempDir}");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    LogWarning($"Failed to delete temp directory: {ex.Message}");
-                }
-
-                try
-                {
-                    if (File.Exists(payloadZipPath))
-                    {
-                        File.Delete(payloadZipPath);
-                        LogInfo($"Cleaned up payload ZIP: {payloadZipPath}");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    LogWarning($"Failed to delete payload ZIP: {ex.Message}");
-                }
-
-                try
-                {
-                    if (File.Exists(tempFinalPath))
-                    {
-                        File.Delete(tempFinalPath);
-                        LogInfo($"Cleaned up temp final file: {tempFinalPath}");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    LogWarning($"Failed to delete temp final file: {ex.Message}");
-                }
+                TryDelete(tempDir, isDir: true, log);
+                TryDelete(zipPath, isDir: false, log);
+                TryDelete(finalTemp, isDir: false, log);
             }
         }
 
-        /// <summary>
-        /// Formats bytes into human-readable format
-        /// </summary>
-        private static string FormatBytes(long bytes)
+        // ──────────────────────────────────────────────────────────────
+        // Sync ZIP helper — must be called from inside Task.Run
+        // ──────────────────────────────────────────────────────────────
+
+        private static void AddFileToZipSync(
+            ZipOutputStream zip, string filePath, string entryName, DateTime timestamp)
         {
-            if (bytes == 0) return "0 B";
-
-            string[] sizes = { "B", "KB", "MB", "GB", "TB" };
-            double len = bytes;
-            int order = 0;
-
-            while (len >= 1024 && order < sizes.Length - 1)
+            var entry = new ZipEntry(entryName)
             {
-                order++;
-                len /= 1024;
+                DateTime = timestamp,
+                Size = new FileInfo(filePath).Length,
+            };
+            zip.PutNextEntry(entry);
+
+            using var src = File.OpenRead(filePath);
+            var buffer = new byte[81920];
+            int read;
+            while ((read = src.Read(buffer, 0, buffer.Length)) > 0)
+                zip.Write(buffer, 0, read);
+
+            zip.CloseEntry();
+        }
+
+        // ──────────────────────────────────────────────────────────────
+        // Helpers
+        // ──────────────────────────────────────────────────────────────
+
+        private static void TryDelete(string? path, bool isDir, ILogService log)
+        {
+            if (string.IsNullOrEmpty(path)) return;
+            try
+            {
+                if (isDir && Directory.Exists(path)) Directory.Delete(path, recursive: true);
+                if (!isDir && File.Exists(path)) File.Delete(path);
             }
-
-            return $"{len:0.##} {sizes[order]}";
+            catch (Exception ex) { log.Warning($"Cleanup failed for '{path}': {ex.Message}"); }
         }
 
-        /// <summary>
-        /// Reports progress to both IProgress and event subscribers
-        /// </summary>
-        private static void ReportProgress(IProgress<(int, string)>? progress, int percentage, string message)
+        private static void Report(IProgress<(int, string)>? p, int pct, string msg)
         {
-            progress?.Report((percentage, message));
-            ProgressChanged?.Invoke(percentage, message);
-            LogInfo($"[{percentage}%] {message}");
+            p?.Report((pct, msg));
         }
 
-        private static void LogInfo(string message)
+        private static string FormatBytes(long b)
         {
-            Debug.WriteLine($"[Packager] {message}");
-            Console.WriteLine($"[Packager] {message}");
-        }
-
-        private static void LogWarning(string message)
-        {
-            Debug.WriteLine($"[Packager] WARNING: {message}");
-            Console.WriteLine($"[Packager] WARNING: {message}");
-        }
-
-        private static void LogError(string message)
-        {
-            Debug.WriteLine($"[Packager] ERROR: {message}");
-            Console.WriteLine($"[Packager] ERROR: {message}");
+            if (b == 0) return "0 B";
+            string[] s = { "B", "KB", "MB", "GB", "TB" };
+            double v = b; int o = 0;
+            while (v >= 1024 && o < s.Length - 1) { o++; v /= 1024; }
+            return $"{v:0.##} {s[o]}";
         }
     }
 }

@@ -4,7 +4,7 @@ using PackItPro.Services;
 using PackItPro.Models;
 using PackItPro.Views;
 using PackItPro.ViewModels.CommandHandlers;
-using PackItPro.ViewModels.Services;
+// using PackItPro.ViewModels.Services;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;

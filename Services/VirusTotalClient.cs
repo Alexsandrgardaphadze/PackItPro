@@ -1,9 +1,8 @@
-﻿// PackItPro/Services/VirusTotalClient.cs
+﻿// PackItPro/Services/VirusTotalClient.cs - v2.2
 #nullable enable
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -16,247 +15,303 @@ namespace PackItPro.Services
 {
     public class VirusTotalClient : IDisposable
     {
-        private readonly HttpClient _httpClient;
-        private readonly SemaphoreSlim _rateLimitSemaphore = new(4, 4);
-        private readonly SemaphoreSlim _scanSemaphore = new(4);
-        private readonly ConcurrentDictionary<string, VirusScanResult> _scanCache = new();
+        // VT free tier: 4 requests/minute = 1 per 15s.
+        // We use a single gate (_gate) that serialises all VT HTTP calls and
+        // enforces a post-request delay. This is simpler and more correct than
+        // the previous two-semaphore approach that caused throughput loss.
+        private static readonly TimeSpan RequestDelay = TimeSpan.FromSeconds(16); // 15s + buffer
+        private static readonly TimeSpan PollDelay = TimeSpan.FromSeconds(5);  // polling is cheaper
+        private static readonly TimeSpan CacheExpiry = TimeSpan.FromHours(24);
+        private const int MaxPollAttempts = 10;
+
+        private readonly HttpClient _http;
+        private readonly SemaphoreSlim _gate = new(1, 1); // one VT request at a time
+        private readonly ConcurrentDictionary<string, CachedScanResult> _cache = new();
         private readonly string _cacheFilePath;
-        private readonly HashSet<string> _executableExtensions = new(StringComparer.OrdinalIgnoreCase)
+
+        private readonly HashSet<string> _exeExtensions = new(StringComparer.OrdinalIgnoreCase)
         {
             ".exe", ".dll", ".bat", ".cmd", ".ps1", ".vbs", ".js", ".jar", ".msi", ".com",
             ".scr", ".pif", ".gadget", ".application", ".msc", ".cpl", ".hta", ".reg",
-            ".vb", ".vbe", ".jse", ".ws", ".wsf", ".wsc", ".wsh", ".lnk", ".inf", ".scf"
+            ".vb", ".vbe", ".jse", ".ws", ".wsf", ".wsc", ".wsh", ".lnk", ".inf", ".scf",
         };
 
         public VirusTotalClient(string cacheFilePath, string apiKey = "")
         {
             _cacheFilePath = cacheFilePath;
-            _httpClient = new HttpClient();
-            if (!string.IsNullOrEmpty(apiKey))
-            {
-                _httpClient.DefaultRequestHeaders.Add("x-apikey", apiKey);
-            }
+            _http = new HttpClient();
+            ApplyKey(apiKey);
         }
 
-        public void SetApiKey(string apiKey)
+        public void SetApiKey(string key)
         {
-            _httpClient.DefaultRequestHeaders.Clear();
-            if (!string.IsNullOrEmpty(apiKey))
-            {
-                _httpClient.DefaultRequestHeaders.Add("x-apikey", apiKey);
-            }
+            _http.DefaultRequestHeaders.Remove("x-apikey");
+            ApplyKey(key);
         }
 
-        public bool IsExecutableExtension(string filePath) =>
-            _executableExtensions.Contains(Path.GetExtension(filePath));
+        private void ApplyKey(string key)
+        {
+            if (!string.IsNullOrWhiteSpace(key))
+                _http.DefaultRequestHeaders.Add("x-apikey", key);
+        }
+
+        public bool IsExecutable(string filePath) =>
+            _exeExtensions.Contains(Path.GetExtension(filePath));
+
+        // ──────────────────────────────────────────────────────────────
+        // Public API
+        // ──────────────────────────────────────────────────────────────
 
         public async Task<VirusScanResult> ScanFileAsync(
             string filePath,
             string apiKey,
             bool onlyScanExecutables = true,
             int minDetectionsToFlag = 1,
-            CancellationToken cancellationToken = default)
+            CancellationToken ct = default)
         {
-            if (onlyScanExecutables && !IsExecutableExtension(filePath))
+            if (onlyScanExecutables && !IsExecutable(filePath))
+                return Skipped(filePath, "Skipped — not an executable");
+
+            SetApiKey(apiKey);
+            string hash = FileHasher.ComputeFileHashString(filePath);
+
+            if (_cache.TryGetValue(hash, out var cached) &&
+                DateTime.UtcNow - cached.CachedAt < CacheExpiry)
             {
-                var fileHashString = ComputeFileHashString(filePath);
-                return new VirusScanResult
-                {
-                    FileHash = fileHashString,
-                    Positives = 0,
-                    TotalScans = 0,
-                    ScanDate = DateTime.UtcNow,
-                    Error = "Skipped (Not Executable)",
-                    IsInfected = false
-                };
+                return WithThreshold(cached.Result, minDetectionsToFlag);
             }
 
-            string hash = ComputeFileHashString(filePath);
-            if (_scanCache.TryGetValue(hash, out var cachedResult) && cachedResult != null)
-            {
-                return new VirusScanResult
-                {
-                    FileHash = hash,
-                    Positives = cachedResult.Positives,
-                    TotalScans = cachedResult.TotalScans,
-                    ScanDate = cachedResult.ScanDate,
-                    Error = cachedResult.Error,
-                    IsInfected = cachedResult.Positives >= minDetectionsToFlag
-                };
-            }
+            var result = await ScanInternalAsync(filePath, hash, ct);
+            _cache[hash] = new CachedScanResult { Result = result, CachedAt = DateTime.UtcNow };
+            return WithThreshold(result, minDetectionsToFlag);
+        }
 
-            await _scanSemaphore.WaitAsync(cancellationToken);
-            try
+        // ──────────────────────────────────────────────────────────────
+        // Internal — all VT requests serialised through _gate
+        // ──────────────────────────────────────────────────────────────
+
+        private async Task<VirusScanResult> ScanInternalAsync(
+            string filePath, string hash, CancellationToken ct)
+        {
+            // 1. Try hash lookup (no upload needed)
+            var hashResult = await GatedRequestAsync(async () =>
             {
-                await _rateLimitSemaphore.WaitAsync(cancellationToken);
+                var r = await _http.GetAsync(
+                    $"https://www.virustotal.com/api/v3/files/{hash}", ct);
+
+                if (!r.IsSuccessStatusCode) return null;
+
+                // FIX: Wrap JSON parsing in try/catch — invalid VT response must
+                // not crash the app with an unhandled JsonException.
                 try
                 {
-                    var result = await QueryVirusTotalAsync(filePath, hash, apiKey, cancellationToken);
-                    result.IsInfected = result.Positives >= minDetectionsToFlag;
-                    _scanCache[hash] = result;
-                    return result;
+                    var report = await r.Content
+                        .ReadFromJsonAsync<VtFileReport>(cancellationToken: ct);
+                    return report?.Data?.Attributes?.LastAnalysisStats is { } s
+                        ? MakeResult(hash, s) : null;
                 }
-                finally
+                catch (JsonException ex)
                 {
-                    _rateLimitSemaphore.Release();
+                    throw new InvalidOperationException(
+                        "VirusTotal returned an unexpected JSON format for hash lookup.", ex);
                 }
+            }, ct);
+
+            if (hashResult != null) return hashResult;
+
+            // 2. Upload the file — streamed, safe for 1 GB+
+            string analysisId = await GatedRequestAsync(async () =>
+            {
+                await using var stream = File.OpenRead(filePath);
+                using var content = new StreamContent(stream);
+                using var form = new MultipartFormDataContent();
+                form.Add(content, "file", Path.GetFileName(filePath));
+
+                var resp = await _http.PostAsync(
+                    "https://www.virustotal.com/api/v3/files", form, ct);
+                resp.EnsureSuccessStatusCode();
+
+                // FIX: JSON parse guard on upload response too
+                try
+                {
+                    var upload = await resp.Content
+                        .ReadFromJsonAsync<VtUploadResponse>(cancellationToken: ct);
+                    return upload?.Data?.Id
+                        ?? throw new InvalidDataException("VT upload response missing analysis ID.");
+                }
+                catch (JsonException ex)
+                {
+                    throw new InvalidOperationException(
+                        "VirusTotal returned an unexpected JSON format for file upload.", ex);
+                }
+            }, ct);
+
+            // 3. Poll for results — _gate NOT held between polls so other work can proceed
+            for (int i = 0; i < MaxPollAttempts; i++)
+            {
+                await Task.Delay(PollDelay, ct);
+
+                var pollResult = await GatedRequestAsync(async () =>
+                {
+                    var r = await _http.GetAsync(
+                        $"https://www.virustotal.com/api/v3/analyses/{analysisId}", ct);
+
+                    if (!r.IsSuccessStatusCode) return null;
+
+                    try
+                    {
+                        var analysis = await r.Content
+                            .ReadFromJsonAsync<VtFileReport>(cancellationToken: ct);
+                        return analysis?.Data?.Attributes?.LastAnalysisStats is { } s
+                            ? MakeResult(hash, s) : null;
+                    }
+                    catch (JsonException ex)
+                    {
+                        throw new InvalidOperationException(
+                            "VirusTotal returned an unexpected JSON format during polling.", ex);
+                    }
+                }, ct);
+
+                if (pollResult != null) return pollResult;
+            }
+
+            throw new TimeoutException(
+                $"VT analysis for '{Path.GetFileName(filePath)}' timed out after {MaxPollAttempts} polls.");
+        }
+
+        /// <summary>
+        /// Serialises all VT requests through _gate and enforces the post-request
+        /// rate-limit delay inside the finally block — the gate stays locked for the
+        /// full cooling period so no other call can slip in during it.
+        /// </summary>
+        private async Task<T> GatedRequestAsync<T>(Func<Task<T>> request, CancellationToken ct)
+        {
+            await _gate.WaitAsync(ct);
+            try
+            {
+                return await request();
             }
             finally
             {
-                _scanSemaphore.Release();
+                await Task.Delay(RequestDelay, ct);
+                _gate.Release();
             }
         }
 
-        private async Task<VirusScanResult> QueryVirusTotalAsync(string filePath, string hash, string apiKey, CancellationToken cancellationToken = default)
+        // ──────────────────────────────────────────────────────────────
+        // Cache persistence — FIX: accept ILogService instead of Debug.WriteLine
+        // ──────────────────────────────────────────────────────────────
+
+        public async Task LoadCacheAsync(ILogService? log = null)
         {
-            // FIXED: Remove extra spaces in URLs
-            var reportResponse = await _httpClient.GetAsync($"https://www.virustotal.com/api/v3/files/{hash}", cancellationToken);
-
-            if (reportResponse.IsSuccessStatusCode)
+            log ??= NullLogService.Instance;
+            if (!File.Exists(_cacheFilePath)) return;
+            try
             {
-                var report = await reportResponse.Content.ReadFromJsonAsync<VirusTotalFileReport>(cancellationToken: cancellationToken)
-                    ?? throw new InvalidDataException("Invalid VirusTotal response");
+                var json = await File.ReadAllTextAsync(_cacheFilePath);
+                var items = JsonSerializer.Deserialize<List<CachedScanResult>>(json);
+                if (items == null) return;
 
-                if (report.Data?.Attributes?.LastAnalysisStats == null)
-                    throw new InvalidDataException("Missing analysis data in VirusTotal response");
-
-                return new VirusScanResult
+                var cutoff = DateTime.UtcNow - CacheExpiry;
+                int loaded = 0;
+                foreach (var item in items.Where(i => i.CachedAt > cutoff))
                 {
-                    FileHash = hash,
-                    Positives = report.Data.Attributes.LastAnalysisStats.Malicious,
-                    TotalScans = report.Data.Attributes.LastAnalysisStats.Total,
-                    ScanDate = DateTime.UtcNow
-                };
-            }
-
-            // Upload file
-            using var fileContent = new ByteArrayContent(File.ReadAllBytes(filePath));
-            using var formData = new MultipartFormDataContent();
-            formData.Add(fileContent, "file", Path.GetFileName(filePath));
-
-            var uploadResponse = await _httpClient.PostAsync("https://www.virustotal.com/api/v3/files", formData, cancellationToken);
-            uploadResponse.EnsureSuccessStatusCode();
-
-            var uploadResult = await uploadResponse.Content.ReadFromJsonAsync<VirusTotalUploadResponse>(cancellationToken: cancellationToken);
-            if (uploadResult?.Data?.Id == null)
-                throw new InvalidDataException("VirusTotal upload response missing analysis ID");
-
-            var analysisId = uploadResult.Data.Id;
-
-            // Poll for results
-            for (int i = 0; i < 10; i++)
-            {
-                await Task.Delay(5000, cancellationToken);
-                var analysisResponse = await _httpClient.GetAsync($"https://www.virustotal.com/api/v3/analyses/{analysisId}", cancellationToken);
-
-                if (analysisResponse.IsSuccessStatusCode)
-                {
-                    var analysis = await analysisResponse.Content.ReadFromJsonAsync<VirusTotalFileReport>(cancellationToken: cancellationToken);
-                    if (analysis?.Data?.Attributes?.LastAnalysisStats != null)
-                    {
-                        return new VirusScanResult
-                        {
-                            FileHash = hash,
-                            Positives = analysis.Data.Attributes.LastAnalysisStats.Malicious,
-                            TotalScans = analysis.Data.Attributes.LastAnalysisStats.Total,
-                            ScanDate = DateTime.UtcNow
-                        };
-                    }
+                    _cache[item.Result.FileHash] = item;
+                    loaded++;
                 }
+                log.Info($"[VT] Loaded {loaded} cache entries (expired entries discarded).");
             }
-
-            throw new TimeoutException("VirusTotal analysis timed out");
-        }
-
-        private string ComputeFileHashString(string filePath)
-        {
-            var hashBytes = FileHasher.ComputeFileHash(filePath);
-            return BitConverter.ToString(hashBytes).Replace("-", "").ToLowerInvariant();
-        }
-
-        public async Task LoadCacheAsync()
-        {
-            if (File.Exists(_cacheFilePath))
+            catch (Exception ex)
             {
-                var cacheJson = await File.ReadAllTextAsync(_cacheFilePath);
-                var cache = JsonSerializer.Deserialize<List<VirusScanResult>>(cacheJson);
-                if (cache != null)
-                {
-                    foreach (var item in cache)
-                    {
-                        _scanCache[item.FileHash] = item;
-                    }
-                }
+                log.Warning($"[VT] Cache load failed: {ex.Message}");
             }
         }
 
-        public async Task SaveCacheAsync()
+        public async Task SaveCacheAsync(ILogService? log = null)
         {
-            var dirPath = Path.GetDirectoryName(_cacheFilePath);
-            if (!string.IsNullOrEmpty(dirPath) && !Directory.Exists(dirPath))
+            log ??= NullLogService.Instance;
+            try
             {
-                Directory.CreateDirectory(dirPath);
+                var dir = Path.GetDirectoryName(_cacheFilePath);
+                if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                    Directory.CreateDirectory(dir);
+
+                var json = JsonSerializer.Serialize(
+                    _cache.Values.ToList(),
+                    new JsonSerializerOptions { WriteIndented = true });
+
+                await File.WriteAllTextAsync(_cacheFilePath, json);
+                log.Info($"[VT] Cache saved ({_cache.Count} entries).");
             }
-            var cacheList = _scanCache.Values.ToList();
-            var cacheJson = JsonSerializer.Serialize(cacheList, new JsonSerializerOptions { WriteIndented = true });
-            await File.WriteAllTextAsync(_cacheFilePath, cacheJson);
+            catch (Exception ex)
+            {
+                log.Warning($"[VT] Cache save failed: {ex.Message}");
+            }
         }
 
-        public void ClearCache() => _scanCache.Clear();
+        public void ClearCache() => _cache.Clear();
 
-        private void LogError(string message, Exception ex)
+        // ──────────────────────────────────────────────────────────────
+        // Helpers
+        // ──────────────────────────────────────────────────────────────
+
+        private static VirusScanResult MakeResult(string hash, VtAnalysisStats s) => new()
         {
-            Debug.WriteLine($"[VirusTotalClient] ERROR: {message}\n{ex}");
-        }
+            FileHash = hash,
+            Positives = s.Malicious,
+            TotalScans = s.Total,
+            ScanDate = DateTime.UtcNow,
+        };
+
+        private static VirusScanResult WithThreshold(VirusScanResult r, int threshold) => new()
+        {
+            FileHash = r.FileHash,
+            Positives = r.Positives,
+            TotalScans = r.TotalScans,
+            ScanDate = r.ScanDate,
+            Error = r.Error,
+            IsInfected = r.Positives >= threshold,
+        };
+
+        private static VirusScanResult Skipped(string filePath, string reason) => new()
+        {
+            FileHash = Path.GetFileName(filePath),
+            ScanDate = DateTime.UtcNow,
+            Error = reason,
+            IsInfected = false,
+        };
 
         public void Dispose()
         {
-            _httpClient?.Dispose();
-            _rateLimitSemaphore?.Dispose();
-            _scanSemaphore?.Dispose();
+            _http.Dispose();
+            _gate.Dispose();
         }
     }
 
-    // Models (unchanged - keep as-is)
+    // ──────────────────────────────────────────────────────────────────
+    // Models
+    // ──────────────────────────────────────────────────────────────────
+
     public class VirusScanResult
     {
-        public string FileHash { get; set; } = string.Empty;
+        public string FileHash { get; set; } = "";
         public int Positives { get; set; }
         public int TotalScans { get; set; }
         public DateTime ScanDate { get; set; } = DateTime.UtcNow;
         public string? Error { get; set; }
-        public bool IsInfected { get; set; } = false;
+        public bool IsInfected { get; set; }
     }
 
-    public class VirusTotalFileReport
+    public class CachedScanResult
     {
-        public VirusTotalFileData? Data { get; set; }
+        public VirusScanResult Result { get; set; } = new();
+        public DateTime CachedAt { get; set; } = DateTime.UtcNow;
     }
 
-    public class VirusTotalFileData
-    {
-        public string? Id { get; set; }
-        public VirusTotalFileAttributes? Attributes { get; set; }
-    }
-
-    public class VirusTotalFileAttributes
-    {
-        public VirusTotalAnalysisStats? LastAnalysisStats { get; set; }
-    }
-
-    public class VirusTotalAnalysisStats
-    {
-        public int Malicious { get; set; }
-        public int Total { get; set; }
-    }
-
-    public class VirusTotalUploadResponse
-    {
-        public VirusTotalUploadData? Data { get; set; }
-    }
-
-    public class VirusTotalUploadData
-    {
-        public string? Id { get; set; }
-    }
+    internal class VtFileReport { public VtFileData? Data { get; set; } }
+    internal class VtFileData { public string? Id { get; set; } public VtFileAttributes? Attributes { get; set; } }
+    internal class VtFileAttributes { public VtAnalysisStats? LastAnalysisStats { get; set; } }
+    internal class VtAnalysisStats { public int Malicious { get; set; } public int Total { get; set; } }
+    internal class VtUploadResponse { public VtUploadData? Data { get; set; } }
+    internal class VtUploadData { public string? Id { get; set; } }
 }
