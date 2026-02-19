@@ -1,27 +1,29 @@
-﻿// PackItPro/ViewModels/SettingsViewModel.cs
+﻿// PackItPro/ViewModels/SettingsViewModel.cs - v2.2
 using PackItPro.Models;
 using System;
 using System.ComponentModel;
 using System.IO;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace PackItPro.ViewModels
 {
-    public class SettingsViewModel : INotifyPropertyChanged
+    public class SettingsViewModel : INotifyPropertyChanged, IDisposable
     {
         public AppSettings SettingsModel { get; }
 
         private readonly string _settingsFilePath;
+        private CancellationTokenSource? _saveCts;
+        private bool _disposed;
 
-        // ✅ EXPOSE ALL REQUIRED PROPERTIES (delegating to SettingsModel)
         public string OutputLocation
         {
             get => SettingsModel.OutputLocation;
             set { SettingsModel.OutputLocation = value; OnPropertyChanged(); }
         }
 
-        public string OutputFileName  // ✅ NEW
+        public string OutputFileName
         {
             get => SettingsModel.OutputFileName;
             set { SettingsModel.OutputFileName = value; OnPropertyChanged(); }
@@ -75,7 +77,7 @@ namespace PackItPro.ViewModels
             set { SettingsModel.VerifyIntegrity = value; OnPropertyChanged(); }
         }
 
-        public bool ScanWithVirusTotal  // ✅ NEW
+        public bool ScanWithVirusTotal
         {
             get => SettingsModel.ScanWithVirusTotal;
             set { SettingsModel.ScanWithVirusTotal = value; OnPropertyChanged(); }
@@ -93,17 +95,17 @@ namespace PackItPro.ViewModels
             _settingsFilePath = settingsFilePath ?? throw new ArgumentNullException(nameof(settingsFilePath));
         }
 
-        public async Task LoadSettingsAsync()
+        // FIX: Add CancellationToken support for async operations
+        public async Task LoadSettingsAsync(CancellationToken cancellationToken = default)
         {
             try
             {
                 if (!string.IsNullOrEmpty(_settingsFilePath) && File.Exists(_settingsFilePath))
                 {
-                    var json = await File.ReadAllTextAsync(_settingsFilePath);
+                    var json = await File.ReadAllTextAsync(_settingsFilePath, cancellationToken);
                     var loadedSettings = JsonSerializer.Deserialize<AppSettings>(json);
                     if (loadedSettings != null)
                     {
-                        // ✅ Copy ALL properties (including new ones)
                         SettingsModel.OutputLocation = loadedSettings.OutputLocation;
                         SettingsModel.OutputFileName = loadedSettings.OutputFileName;
                         SettingsModel.VirusTotalApiKey = loadedSettings.VirusTotalApiKey;
@@ -119,14 +121,24 @@ namespace PackItPro.ViewModels
                     }
                 }
             }
+            catch (OperationCanceledException)
+            {
+                // Silent cancellation — caller handles it
+                throw;
+            }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[SettingsViewModel] Load failed: {ex.Message}");
             }
         }
 
-        public async Task SaveSettingsAsync()
+        // FIX: Add CancellationToken support and cancel previous save if in progress
+        public async Task SaveSettingsAsync(CancellationToken cancellationToken = default)
         {
+            // Cancel any previous save operation
+            _saveCts?.Cancel();
+            _saveCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+
             try
             {
                 if (string.IsNullOrEmpty(_settingsFilePath)) return;
@@ -136,11 +148,20 @@ namespace PackItPro.ViewModels
                     Directory.CreateDirectory(dirPath);
 
                 var json = JsonSerializer.Serialize(SettingsModel, new JsonSerializerOptions { WriteIndented = true });
-                await File.WriteAllTextAsync(_settingsFilePath, json);
+                await File.WriteAllTextAsync(_settingsFilePath, json, _saveCts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                // Silent — save was cancelled (normal during rapid property changes)
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[SettingsViewModel] Save failed: {ex.Message}");
+            }
+            finally
+            {
+                _saveCts?.Dispose();
+                _saveCts = null;
             }
         }
 
@@ -148,7 +169,6 @@ namespace PackItPro.ViewModels
         {
             errorMessage = "";
 
-            // Check output location
             if (string.IsNullOrWhiteSpace(OutputLocation))
             {
                 errorMessage = "Output location not set.";
@@ -161,7 +181,6 @@ namespace PackItPro.ViewModels
                 return false;
             }
 
-            // Try creating a temp file to verify write access
             try
             {
                 var testFile = Path.Combine(OutputLocation, $".test_{Guid.NewGuid()}");
@@ -177,7 +196,28 @@ namespace PackItPro.ViewModels
             return true;
         }
 
+        // FIX: Proper disposal
+        protected virtual void Dispose(bool disposing)
+        {
+            if (_disposed) return;
+
+            if (disposing)
+            {
+                _saveCts?.Cancel();
+                _saveCts?.Dispose();
+            }
+
+            _disposed = true;
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
         public event PropertyChangedEventHandler? PropertyChanged;
+
         protected virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string? propertyName = null) =>
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }

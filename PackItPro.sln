@@ -7,8 +7,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PackItPro", "PackItPro.cspr
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StubInstaller", "..\StubInstaller\StubInstaller.csproj", "{5C6A7541-164A-415B-9EDE-E5BF7D08F577}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PackItPro.PayloadInspector", "..\PackItPro.PayloadInspector\PackItPro.PayloadInspector.csproj", "{440EC2FE-D0EA-49ED-B776-9919099B6E74}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -23,10 +21,6 @@ Global
 		{5C6A7541-164A-415B-9EDE-E5BF7D08F577}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5C6A7541-164A-415B-9EDE-E5BF7D08F577}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5C6A7541-164A-415B-9EDE-E5BF7D08F577}.Release|Any CPU.Build.0 = Release|Any CPU
-		{440EC2FE-D0EA-49ED-B776-9919099B6E74}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{440EC2FE-D0EA-49ED-B776-9919099B6E74}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{440EC2FE-D0EA-49ED-B776-9919099B6E74}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{440EC2FE-D0EA-49ED-B776-9919099B6E74}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
