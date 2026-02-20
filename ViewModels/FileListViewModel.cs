@@ -1,4 +1,4 @@
-﻿// ViewModels/FileListViewModel.cs - v2.4 PRODUCTION (TotalSize Optimized)
+﻿// ViewModels/FileListViewModel.cs - v2.5 UPDATED (Added ClearAll method)
 using PackItPro.Models;
 using System;
 using System.Collections.Generic;
@@ -16,16 +16,12 @@ namespace PackItPro.ViewModels
         private readonly ObservableCollection<FileItemViewModel> _items = new();
         private readonly AppSettings _settings;
         private readonly HashSet<string> _executableExtensions;
-
-        // FIX: Cached TotalSize instead of recalculating on every access
         private long _cachedTotalSize = -1;
         private bool _disposed;
 
         public ObservableCollection<FileItemViewModel> Items => _items;
-
         public int Count => _items.Count;
 
-        // FIX: Cached property — invalidated on collection changes
         public long TotalSize
         {
             get
@@ -40,10 +36,7 @@ namespace PackItPro.ViewModels
                             if (File.Exists(item.FilePath))
                                 _cachedTotalSize += new FileInfo(item.FilePath).Length;
                         }
-                        catch
-                        {
-                            // File deleted or inaccessible — skip silently
-                        }
+                        catch { /* File deleted — skip */ }
                     }
                 }
                 return _cachedTotalSize;
@@ -67,7 +60,7 @@ namespace PackItPro.ViewModels
             _executableExtensions = executableExtensions ?? throw new ArgumentNullException(nameof(executableExtensions));
 
             AddFilesCommand = new RelayCommand(ExecuteAddFiles);
-            ClearAllFilesCommand = new RelayCommand(ExecuteClearAllFiles);
+            ClearAllFilesCommand = new RelayCommand(_ => ClearAll());
             RemoveFileCommand = new RelayCommand(ExecuteRemoveFile);
 
             _items.CollectionChanged += OnItemsCollectionChanged;
@@ -75,9 +68,14 @@ namespace PackItPro.ViewModels
 
         private void OnItemsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
-            // FIX: Invalidate cache when collection changes
             _cachedTotalSize = -1;
             NotifyListChanged();
+        }
+
+        // FIX: Public method for direct call from handlers (cleaner than command chaining)
+        public void ClearAll()
+        {
+            _items.Clear();
         }
 
         public class AddFilesResult
@@ -170,11 +168,6 @@ namespace PackItPro.ViewModels
         {
             if (parameter is string[] filePaths)
                 AddFilesWithValidation(filePaths);
-        }
-
-        private void ExecuteClearAllFiles(object? parameter)
-        {
-            _items.Clear();
         }
 
         private void ExecuteRemoveFile(object? parameter)

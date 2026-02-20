@@ -1,4 +1,4 @@
-﻿// ViewModels/MainViewModel.cs - v2.4 PRODUCTION (Memory Leak Fixed)
+﻿// ViewModels/MainViewModel.cs - v2.7 ULTIMATE FIX
 using PackItPro.Services;
 using PackItPro.ViewModels.CommandHandlers;
 using System;
@@ -11,16 +11,14 @@ using System.Windows.Input;
 namespace PackItPro.ViewModels
 {
     /// <summary>
-    /// Main ViewModel — clean orchestrator that delegates to CommandHandlers.
-    /// FIX: Proper event subscription cleanup prevents memory leaks.
+    /// Main ViewModel — orchestrates CommandHandlers with proper command initialization.
+    /// FIX v2.7: Notifies UI when commands become available after InitializeAsync().
     /// </summary>
     public class MainViewModel : INotifyPropertyChanged, IDisposable
     {
-        #region Fields and Paths
+        #region Fields
         private readonly string _appDataDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "PackItPro");
-
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PackItPro");
         private readonly string _cacheFilePath;
         private readonly HashSet<string> _executableExtensions = new(StringComparer.OrdinalIgnoreCase)
         {
@@ -28,7 +26,6 @@ namespace PackItPro.ViewModels
             ".scr", ".pif", ".gadget", ".application", ".msc", ".cpl", ".hta", ".reg",
             ".vb", ".vbe", ".jse", ".ws", ".wsf", ".wsc", ".wsh", ".lnk", ".inf", ".scf"
         };
-
         private VirusTotalClient? _virusTotalClient;
         private readonly ILogService _logService;
         private bool _isInitialized;
@@ -52,42 +49,30 @@ namespace PackItPro.ViewModels
         private ApplicationHandler? _applicationHandler;
         #endregion
 
-        #region Commands (delegated to handlers)
-        // Packaging
+        #region Commands
         public ICommand PackCommand => _packagingHandler?.PackCommand ?? NullCommand;
         public ICommand TestPackageCommand => _packagingHandler?.TestPackageCommand ?? NullCommand;
-
-        // File Operations
         public ICommand BrowseFilesCommand => _fileOperationsHandler?.BrowseFilesCommand ?? NullCommand;
         public ICommand ClearAllFilesCommand => _fileOperationsHandler?.ClearAllFilesCommand ?? NullCommand;
         public ICommand ExportListCommand => _fileOperationsHandler?.ExportListCommand ?? NullCommand;
-
-        // Settings
         public ICommand SetOutputLocationCommand => _settingsHandler?.SetOutputLocationCommand ?? NullCommand;
         public ICommand SetVirusApiKeyCommand => _settingsHandler?.SetVirusApiKeyCommand ?? NullCommand;
         public ICommand ClearCacheCommand => _settingsHandler?.ClearCacheCommand ?? NullCommand;
         public ICommand ExportLogsCommand => _settingsHandler?.ExportLogsCommand ?? NullCommand;
         public ICommand PackItProSettingsCommand => _settingsHandler?.PackItProSettingsCommand ?? NullCommand;
         public ICommand ViewCacheCommand => _settingsHandler?.ViewCacheCommand ?? NullCommand;
-
-        // VirusTotal
         public ICommand ScanFilesCommand => _virusTotalHandler?.ScanFilesCommand ?? NullCommand;
         public ICommand CancelScanCommand => _virusTotalHandler?.CancelScanCommand ?? NullCommand;
-
-        // Help
         public ICommand DocumentationCommand => _helpHandler?.DocumentationCommand ?? NullCommand;
         public ICommand GitHubCommand => _helpHandler?.GitHubCommand ?? NullCommand;
         public ICommand ReportIssueCommand => _helpHandler?.ReportIssueCommand ?? NullCommand;
         public ICommand CheckUpdatesCommand => _helpHandler?.CheckUpdatesCommand ?? NullCommand;
         public ICommand AboutCommand => _helpHandler?.AboutCommand ?? NullCommand;
-
-        // Application
         public ICommand ExitCommand => _applicationHandler?.ExitCommand ?? NullCommand;
 
         private static readonly ICommand NullCommand = new RelayCommand(_ => { });
         #endregion
 
-        #region Initialization
         public MainViewModel()
         {
             _cacheFilePath = Path.Combine(_appDataDir, "virusscancache.json");
@@ -102,7 +87,7 @@ namespace PackItPro.ViewModels
             Status = new StatusViewModel();
             Error = new ErrorViewModel();
 
-            _logService.Info("MainViewModel constructor completed");
+            _logService.Info("MainViewModel constructed");
         }
 
         private void EnsureAppDataDirectoryExists()
@@ -117,85 +102,86 @@ namespace PackItPro.ViewModels
 
             try
             {
-                _logService.Info("========== APPLICATION INITIALIZATION START ==========");
+                _logService.Info("========== INITIALIZATION START ==========");
 
                 await Settings.LoadSettingsAsync();
-                _logService.Info("Settings loaded successfully");
+                _logService.Info("Settings loaded");
 
                 _virusTotalClient = new VirusTotalClient(_cacheFilePath, Settings.VirusTotalApiKey);
                 await _virusTotalClient.LoadCacheAsync(_logService);
-                _logService.Info("VirusTotal client initialized and cache loaded");
+                _logService.Info("VirusTotal initialized");
 
                 InitializeHandlers();
 
+                // ✅ CRITICAL FIX: Notify ALL command properties
+                NotifyAllCommandsAvailable();
+
                 _isInitialized = true;
                 Status.SetStatusReady();
-                _logService.Info("========== APPLICATION INITIALIZATION SUCCESS ==========");
+                _logService.Info("========== INITIALIZATION SUCCESS ==========");
             }
             catch (Exception ex)
             {
-                _logService.Error("Application initialization failed", ex);
-                Status.Message = "Failed to initialize application. Check logs for details.";
-
-                Error.ShowErrorAsync(
-                    "Application failed to initialize properly. See logs for details.",
-                    retryActionAsync: InitializeAsync
-                );
+                _logService.Error("Initialization failed", ex);
+                Status.Message = "Failed to initialize";
+                Error.ShowErrorAsync("App failed to initialize. See logs.", retryActionAsync: InitializeAsync);
             }
         }
 
         private void InitializeHandlers()
         {
-            _packagingHandler = new PackagingCommandHandler(
-                FileList, Settings, Status, Error, _logService);
-
-            _virusTotalHandler = new VirusTotalCommandHandler(
-                FileList, Settings, Status, Error,
-                _virusTotalClient!, _logService, _executableExtensions);
-
-            _fileOperationsHandler = new FileOperationsHandler(
-                FileList, Settings, ScanFilesCommand);
-
-            _settingsHandler = new SettingsHandler(
-                Settings, Status, Error, _virusTotalClient,
-                _cacheFilePath, _appDataDir, _logService);
-
+            _packagingHandler = new PackagingCommandHandler(FileList, Settings, Status, Error, _logService);
+            _virusTotalHandler = new VirusTotalCommandHandler(FileList, Settings, Status, Error, _virusTotalClient!, _logService, _executableExtensions);
+            _fileOperationsHandler = new FileOperationsHandler(FileList, Settings, ScanFilesCommand);
+            _settingsHandler = new SettingsHandler(Settings, Status, Error, _virusTotalClient, _cacheFilePath, _appDataDir, _logService);
             _helpHandler = new HelpHandler();
-
             _applicationHandler = new ApplicationHandler(Settings);
-
-            _logService.Info("All command handlers initialized");
+            _logService.Info("Handlers initialized");
         }
-        #endregion
 
-        #region IDisposable Implementation
+        // ✅ FIX: Tell WPF that commands are now available
+        private void NotifyAllCommandsAvailable()
+        {
+            OnPropertyChanged(nameof(PackCommand));
+            OnPropertyChanged(nameof(TestPackageCommand));
+            OnPropertyChanged(nameof(BrowseFilesCommand));
+            OnPropertyChanged(nameof(ClearAllFilesCommand));
+            OnPropertyChanged(nameof(ExportListCommand));
+            OnPropertyChanged(nameof(SetOutputLocationCommand));
+            OnPropertyChanged(nameof(SetVirusApiKeyCommand));
+            OnPropertyChanged(nameof(ClearCacheCommand));
+            OnPropertyChanged(nameof(ExportLogsCommand));
+            OnPropertyChanged(nameof(PackItProSettingsCommand));
+            OnPropertyChanged(nameof(ViewCacheCommand));
+            OnPropertyChanged(nameof(ScanFilesCommand));
+            OnPropertyChanged(nameof(CancelScanCommand));
+            OnPropertyChanged(nameof(DocumentationCommand));
+            OnPropertyChanged(nameof(GitHubCommand));
+            OnPropertyChanged(nameof(ReportIssueCommand));
+            OnPropertyChanged(nameof(CheckUpdatesCommand));
+            OnPropertyChanged(nameof(AboutCommand));
+            OnPropertyChanged(nameof(ExitCommand));
+            _logService.Info("All command bindings refreshed");
+        }
+
         protected virtual void Dispose(bool disposing)
         {
             if (_disposed) return;
-
             if (disposing)
             {
-                _logService.Info("MainViewModel disposing...");
-
-                // Dispose all handlers (they clean up their own subscriptions)
+                _logService.Info("Disposing...");
                 _packagingHandler?.Dispose();
                 _virusTotalHandler?.Dispose();
                 _fileOperationsHandler?.Dispose();
                 _settingsHandler?.Dispose();
                 _helpHandler?.Dispose();
                 _applicationHandler?.Dispose();
-
-                // Dispose sub-ViewModels (they clean up their own subscriptions)
                 FileList?.Dispose();
                 Summary?.Dispose();
                 Settings?.Dispose();
-
-                // Dispose services
                 _virusTotalClient?.Dispose();
-
-                _logService.Info("MainViewModel disposed successfully");
+                _logService.Info("Disposed");
             }
-
             _disposed = true;
         }
 
@@ -204,12 +190,9 @@ namespace PackItPro.ViewModels
             Dispose(true);
             GC.SuppressFinalize(this);
         }
-        #endregion
 
-        #region INotifyPropertyChanged
         public event PropertyChangedEventHandler? PropertyChanged;
         protected virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string? propertyName = null) =>
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        #endregion
     }
 }

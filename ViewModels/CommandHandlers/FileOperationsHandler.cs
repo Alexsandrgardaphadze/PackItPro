@@ -1,4 +1,4 @@
-﻿// ViewModels/CommandHandlers/FileOperationsHandler.cs
+﻿// ViewModels/CommandHandlers/FileOperationsHandler.cs - v2.7 ULTIMATE
 using Microsoft.Win32;
 using System;
 using System.IO;
@@ -8,18 +8,20 @@ using System.Windows.Input;
 
 namespace PackItPro.ViewModels.CommandHandlers
 {
-    /// <summary>
-    /// Handles all file list operations (Browse, Clear, Export List)
-    /// </summary>
     public class FileOperationsHandler : CommandHandlerBase
     {
         private readonly FileListViewModel _fileList;
         private readonly SettingsViewModel _settings;
         private readonly ICommand _scanFilesCommand;
 
-        public ICommand BrowseFilesCommand { get; }
-        public ICommand ClearAllFilesCommand { get; }
-        public ICommand ExportListCommand { get; }
+        // ✅ Store ALL commands as fields for proper CanExecute refresh
+        private readonly RelayCommand _browseFilesCommand;
+        private readonly RelayCommand _clearAllFilesCommand;
+        private readonly RelayCommand _exportListCommand;
+
+        public ICommand BrowseFilesCommand => _browseFilesCommand;
+        public ICommand ClearAllFilesCommand => _clearAllFilesCommand;
+        public ICommand ExportListCommand => _exportListCommand;
 
         public FileOperationsHandler(
             FileListViewModel fileList,
@@ -30,14 +32,18 @@ namespace PackItPro.ViewModels.CommandHandlers
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
             _scanFilesCommand = scanFilesCommand ?? throw new ArgumentNullException(nameof(scanFilesCommand));
 
-            BrowseFilesCommand = new RelayCommand(ExecuteBrowseFiles);
-            ClearAllFilesCommand = new RelayCommand(ExecuteClearAllFiles, CanExecuteClearAll);
-            ExportListCommand = new RelayCommand(ExecuteExportList);
+            _browseFilesCommand = new RelayCommand(ExecuteBrowseFiles);
+            _clearAllFilesCommand = new RelayCommand(ExecuteClearAllFiles, CanExecuteClearAll);
+            _exportListCommand = new RelayCommand(ExecuteExportList, CanExecuteExportList);
 
+            // ✅ Subscribe to FileList changes and refresh COMMAND state
             _fileList.PropertyChanged += (s, e) =>
             {
                 if (e.PropertyName == nameof(_fileList.HasFiles))
-                    RaiseCanExecuteChanged();
+                {
+                    _clearAllFilesCommand.RaiseCanExecuteChanged();
+                    _exportListCommand.RaiseCanExecuteChanged();
+                }
             };
         }
 
@@ -58,54 +64,47 @@ namespace PackItPro.ViewModels.CommandHandlers
 
             if (result.SkippedCount > 0)
             {
-                var message = $"Added {result.SuccessCount} file(s).\n\n" +
-                             $"Skipped {result.SkippedCount}:\n" +
+                var message = $"Added {result.SuccessCount} file(s).\n\nSkipped {result.SkippedCount}:\n" +
                              string.Join("\n", result.SkipReasons.Take(3));
-
                 if (result.SkipReasons.Count > 3)
                     message += $"\n...and {result.SkipReasons.Count - 3} more";
-
                 MessageBox.Show(message, "Files Added", MessageBoxButton.OK, MessageBoxImage.Information);
             }
 
-            // Auto-scan if enabled
             if (_settings.ScanWithVirusTotal && !string.IsNullOrWhiteSpace(_settings.VirusTotalApiKey))
-            {
                 _scanFilesCommand.Execute(null);
-            }
         }
+
+        private bool CanExecuteClearAll(object? parameter) => _fileList.HasFiles;
 
         private void ExecuteClearAllFiles(object? parameter)
         {
-            if (_fileList.Items.Count == 0) return;
+            if (!_fileList.HasFiles) return;
 
             var result = MessageBox.Show(
-                $"Remove all {_fileList.Items.Count} files from the list?",
+                $"Remove all {_fileList.Count} files?",
                 "Confirm Clear",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question);
 
             if (result == MessageBoxResult.Yes)
-                _fileList.ClearAllFilesCommand.Execute(null);
+                _fileList.ClearAll();
         }
 
-        private bool CanExecuteClearAll(object? parameter) => _fileList.HasFiles;
+        private bool CanExecuteExportList(object? parameter) => _fileList.HasFiles;
 
         private void ExecuteExportList(object? parameter)
         {
-            if (_fileList.Items.Count == 0)
+            if (!_fileList.HasFiles)
             {
-                MessageBox.Show(
-                    "No files to export.",
-                    "Export List",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
+                MessageBox.Show("No files to export.", "Export List",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
             var dialog = new SaveFileDialog
             {
-                Filter = "Text Files (*.txt)|*.txt|CSV Files (*.csv)|*.csv|All Files (*.*)|*.*",
+                Filter = "Text Files (*.txt)|*.txt|CSV Files (*.csv)|*.csv",
                 FileName = $"PackItPro_FileList_{DateTime.Now:yyyyMMdd_HHmmss}.txt",
                 InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Desktop)
             };
@@ -116,20 +115,13 @@ namespace PackItPro.ViewModels.CommandHandlers
             {
                 var content = string.Join("\n", _fileList.Items.Select(f => $"{f.FileName} - {f.Size}"));
                 File.WriteAllText(dialog.FileName, content);
-
-                MessageBox.Show(
-                    $"File list exported to:\n{dialog.FileName}",
-                    "Export Successful",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
+                MessageBox.Show($"List exported to:\n{dialog.FileName}", "Success",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    $"Failed to export list: {ex.Message}",
-                    "Export Failed",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                MessageBox.Show($"Export failed: {ex.Message}", "Error",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
     }

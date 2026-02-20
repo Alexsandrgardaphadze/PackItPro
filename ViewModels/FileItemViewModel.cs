@@ -1,96 +1,141 @@
-﻿// PackItPro/ViewModels/FileItemViewModel.cs
-using System;
+﻿// ViewModels/FileItemViewModel.cs - v3.0 POLISHED (Add these properties)
 using System.ComponentModel;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Windows.Input;
+using System.Windows.Media;
 using PackItPro.Models;
 
 namespace PackItPro.ViewModels
 {
     public class FileItemViewModel : INotifyPropertyChanged
     {
-        private string _fileName = string.Empty;
-        private string _filePath = string.Empty;
-        private string _size = "0 KB";
+        private string _fileName = "";
+        private string _filePath = "";
+        private string _size = "";
         private FileStatusEnum _status = FileStatusEnum.Pending;
-
-        public int Positives { get; set; }
-        public int TotalScans { get; set; }
-        public ICommand RemoveCommand { get; set; } = null!;
+        private int _positives;
+        private int _totalScans;
 
         public string FileName
         {
             get => _fileName;
-            set { _fileName = value; OnPropertyChanged(); }
+            set
+            {
+                _fileName = value;
+                OnPropertyChanged();
+            }
         }
 
         public string FilePath
         {
             get => _filePath;
-            set { _filePath = value; OnPropertyChanged(); OnPropertyChanged(nameof(FileIcon)); }
+            set
+            {
+                _filePath = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(FileTypeIcon));
+                OnPropertyChanged(nameof(FileTypeBadgeColor));
+            }
         }
 
         public string Size
         {
             get => _size;
-            set { _size = value; OnPropertyChanged(); }
+            set
+            {
+                _size = value;
+                OnPropertyChanged();
+            }
         }
 
         public FileStatusEnum Status
         {
             get => _status;
-            set { _status = value; OnPropertyChanged(); OnPropertyChanged(nameof(StatusText)); OnPropertyChanged(nameof(IsInfected)); }
+            set
+            {
+                _status = value;
+                OnPropertyChanged();
+            }
         }
 
-        public string StatusText => _status switch
+        public int Positives
         {
-            FileStatusEnum.Pending => "Pending Scan",
-            FileStatusEnum.Clean => "Clean",
-            FileStatusEnum.Infected => $"Infected ({Positives}/{TotalScans})",
-            FileStatusEnum.ScanFailed => "Scan Failed",
-            FileStatusEnum.Skipped => "Skipped Scan",
-            _ => "Unknown"
-        };
+            get => _positives;
+            set
+            {
+                _positives = value;
+                OnPropertyChanged();
+            }
+        }
 
-        public bool IsInfected => Status == FileStatusEnum.Infected;
-
-        public string FileIcon => Path.GetExtension(FilePath).ToLowerInvariant() switch
+        public int TotalScans
         {
-            ".exe" => "⚙️",
-            ".msi" => "📦",
-            ".zip" => "🗜️",
-            ".appx" or ".msix" => "📱",
-            _ => "📄"
-        };
+            get => _totalScans;
+            set
+            {
+                _totalScans = value;
+                OnPropertyChanged();
+            }
+        }
 
-        public string StatusIcon => StatusText switch
-        {
-            var s when s.Contains("Infected") => "⚠️",
-            "Clean" => "✅",
-            "Pending Scan" => "⏳",
-            "Scan Failed" => "❌",
-            "Skipped Scan" => "⊝",
-            _ => "❓"
-        };
+        public ICommand? RemoveCommand { get; set; }
 
-        public System.Windows.Media.SolidColorBrush StatusColor
+        // ✨ NEW: File type icon based on extension
+        public string FileTypeIcon
         {
             get
             {
-                return Status switch
+                if (string.IsNullOrEmpty(FilePath))
+                    return "📄";
+
+                return Path.GetExtension(FilePath).ToLower() switch
                 {
-                    FileStatusEnum.Clean => new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x10, 0xB9, 0x81)),
-                    FileStatusEnum.Infected => new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xEF, 0x44, 0x44)),
-                    FileStatusEnum.ScanFailed => new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xF5, 0x9E, 0x0B)),
-                    FileStatusEnum.Skipped => new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x3B, 0x82, 0xF6)),
-                    FileStatusEnum.Pending => new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x3B, 0x82, 0xF6)),
-                    _ => new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x94, 0xA3, 0xB8))
+                    ".exe" => "⚙️",
+                    ".msi" => "📦",
+                    ".dll" => "🔧",
+                    ".bat" => "📜",
+                    ".cmd" => "📜",
+                    ".ps1" => "💻",
+                    ".vbs" => "📝",
+                    ".jar" => "☕",
+                    ".zip" => "🗜️",
+                    ".7z" => "🗜️",
+                    ".rar" => "🗜️",
+                    _ => "📄"
+                };
+            }
+        }
+
+        // ✨ NEW: Badge color based on file type
+        public Brush FileTypeBadgeColor
+        {
+            get
+            {
+                if (string.IsNullOrEmpty(FilePath))
+                    return new SolidColorBrush(Color.FromRgb(100, 116, 139)); // Gray
+
+                var ext = Path.GetExtension(FilePath).ToLower();
+                return ext switch
+                {
+                    ".exe" => new SolidColorBrush(Color.FromRgb(99, 102, 241)),   // Blue #6366f1
+                    ".msi" => new SolidColorBrush(Color.FromRgb(16, 185, 129)),   // Green #10b981
+                    ".dll" => new SolidColorBrush(Color.FromRgb(245, 158, 11)),   // Orange #f59e0b
+                    ".bat" => new SolidColorBrush(Color.FromRgb(139, 92, 246)),   // Purple #8b5cf6
+                    ".cmd" => new SolidColorBrush(Color.FromRgb(139, 92, 246)),   // Purple #8b5cf6
+                    ".ps1" => new SolidColorBrush(Color.FromRgb(59, 130, 246)),   // Light Blue #3b82f6
+                    ".jar" => new SolidColorBrush(Color.FromRgb(251, 146, 60)),   // Coffee #fb923c
+                    ".zip" or ".7z" or ".rar" => new SolidColorBrush(Color.FromRgb(236, 72, 153)), // Pink #ec4899
+                    _ => new SolidColorBrush(Color.FromRgb(100, 116, 139))        // Gray #64748b
                 };
             }
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
-        protected virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string? propertyName = null) =>
+
+        protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+        {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
     }
 }
