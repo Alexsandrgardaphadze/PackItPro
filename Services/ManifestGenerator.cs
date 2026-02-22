@@ -1,14 +1,12 @@
-﻿// PackItPro/Services/ManifestGenerator.cs - v2.4 DETECTION FIX
-// Changes vs v2.3:
-//   - InnoSetup detection: increased header scan from 512 → 4096 bytes.
-//     Notepad++ 8.x and other InnoSetup 6.x apps embed the "Inno Setup" string
-//     after the DOS stub and PE headers, which can exceed 512 bytes. Scanning
-//     4KB catches all known InnoSetup versions while remaining fast (one read).
-//   - Added Squirrel/Electron detection: magic bytes 0x1F 0x8B at start of
-//     overlay, OR "Squirrel" string in header. These installers use "--silent"
-//     not "/S". UniGetUI, GitHub Desktop, Slack, Discord all use this format.
-//   - Added "squirrel" as a new install type, with correct "--silent" arg.
-//   - InstallerDetector.cs (stub) must also be updated to handle "squirrel".
+﻿// PackItPro/Services/ManifestGenerator.cs - v2.5
+// Changes vs v2.4:
+//   [1] DetectionSource field added to ManifestFile and populated at Generate() time.
+//       "extension" = type inferred from file extension only (lower confidence)
+//       "header"    = type confirmed by PE binary signature scan (reliable)
+//       Stub reads this field and logs it with a ✅/⚠️ indicator.
+//   [2] DetectInstallTypeWithSource() returns (Type, Source) tuple for the above.
+//       DetectInstallType() delegates to it — fully backward compatible.
+//   [3] DetectExeTypeWithSource() replaces DetectExeType() — same detection logic.
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -36,11 +34,12 @@ namespace PackItPro.Services
                 .OrderBy(p => p)
                 .Select((path, index) =>
                 {
-                    var type = DetectInstallType(path);
+                    var (type, source) = DetectInstallTypeWithSource(path);
                     return new ManifestFile
                     {
                         Name = Path.GetFileName(path),
                         InstallType = type,
+                        DetectionSource = source,
                         SilentArgs = GetDefaultSilentArgs(type),
                         RequiresAdmin = false,
                         InstallOrder = index,
@@ -62,73 +61,62 @@ namespace PackItPro.Services
         }
 
         // ──────────────────────────────────────────────────────────────
-        // Type detection
+        // Type detection — public for unit tests and PackItPro UI preview
         // ──────────────────────────────────────────────────────────────
 
-        public static string DetectInstallType(string filePath)
+        public static string DetectInstallType(string filePath) =>
+            DetectInstallTypeWithSource(filePath).Type;
+
+        /// <summary>
+        /// Returns (InstallType, DetectionSource) so the manifest can record
+        /// how confident the detection was. The stub logs this at install time.
+        /// </summary>
+        public static (string Type, string Source) DetectInstallTypeWithSource(string filePath)
         {
-            return Path.GetExtension(filePath).ToLowerInvariant() switch
+            string ext = Path.GetExtension(filePath).ToLowerInvariant();
+            return ext switch
             {
-                ".msi" => "msi",
-                ".msp" => "msp",
-                ".appx" => "appx",
-                ".appxbundle" => "appx",
-                ".msix" => "msix",
-                ".exe" => DetectExeType(filePath),
-                _ => "file",
+                ".msi" => ("msi", "extension"),
+                ".msp" => ("msp", "extension"),
+                ".appx" => ("appx", "extension"),
+                ".appxbundle" => ("appx", "extension"),
+                ".msix" => ("msix", "extension"),
+                ".exe" => DetectExeTypeWithSource(filePath),
+                _ => ("file", "extension"),
             };
         }
 
-        private static string DetectExeType(string filePath)
+        private static (string Type, string Source) DetectExeTypeWithSource(string filePath)
         {
             try
             {
-                // FIX: scan 4096 bytes instead of 512.
-                // InnoSetup 6.x "Inno Setup" string can appear after offset 512
-                // due to the DOS stub and PE header size variation.
-                // 4KB is still a single disk read and covers all known formats.
                 const int ScanBytes = 4096;
-
                 byte[] header = new byte[ScanBytes];
                 int read;
                 using (var fs = File.OpenRead(filePath))
                     read = fs.Read(header, 0, ScanBytes);
 
-                if (read < 8) return "exe";
+                if (read < 8) return ("exe", "extension");
 
                 var span = header.AsSpan(0, read);
 
-                // ── InnoSetup ────────────────────────────────────────
-                // Embeds "Inno Setup" in the bootstrap stub section.
-                // Both "Inno Setup Setup Data" (5.x) and "Inno Setup" (6.x) match.
                 if (ContainsAscii(span, "Inno Setup"))
-                    return "inno";
+                    return ("inno", "header");
 
-                // ── NSIS ─────────────────────────────────────────────
-                // Magic 4-byte signature at offset 4: EF BE AD DE
                 if (read >= 8 &&
                     span[4] == 0xEF && span[5] == 0xBE &&
                     span[6] == 0xAD && span[7] == 0xDE)
-                    return "nsis";
+                    return ("nsis", "header");
 
-                // ── Squirrel / Electron ───────────────────────────────
-                // Squirrel installers embed the string "Squirrel" or have
-                // a self-extracting 7-zip stub with gzip magic at the overlay.
-                // UniGetUI, GitHub Desktop, Slack, Discord, Teams all use this.
                 if (ContainsAscii(span, "Squirrel"))
-                    return "squirrel";
+                    return ("squirrel", "header");
 
-                // Burn (WiX bootstrapper) — common Microsoft installers
-                // Embed ".wixburn" section name in the PE header area
                 if (ContainsAscii(span, ".wixburn") || ContainsAscii(span, "WiX Burn"))
-                    return "burn";
+                    return ("burn", "header");
             }
-            catch
-            {
-                // Unreadable — fall through to generic exe
-            }
+            catch { }
 
-            return "exe";
+            return ("exe", "extension");
         }
 
         /// <summary>
@@ -158,9 +146,9 @@ namespace PackItPro.Services
             {
                 "msi" => new[] { "/quiet", "/norestart" },
                 "msp" => new[] { "/quiet", "/norestart" },
-                "inno" => new[] { "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" },
+                "inno" => new[] { "/SP-", "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" },
                 "nsis" => new[] { "/S" },
-                "squirrel" => new[] { "--silent", "--update=0" },
+                "squirrel" => new[] { "--silent" },
                 "burn" => new[] { "/quiet", "/norestart" },
 
                 // Generic exe: null = stub will try /S at runtime via InstallerDetector
@@ -210,5 +198,14 @@ namespace PackItPro.Services
         public bool RequiresAdmin { get; set; } = false;
         public int InstallOrder { get; set; } = 0;
         public int TimeoutMinutes { get; set; } = 10;
+
+        /// <summary>
+        /// How the InstallType was determined. Values:
+        ///   "extension"  — inferred from file extension only (lowest confidence)
+        ///   "header"     — confirmed by PE header / binary signature scan (high confidence)
+        ///   "manifest"   — explicitly set by the user in the UI (authoritative)
+        /// Stored in the manifest so the stub can log it for diagnostics.
+        /// </summary>
+        public string DetectionSource { get; set; } = "extension";
     }
 }
