@@ -1,4 +1,12 @@
-﻿// ViewModels/FileListViewModel.cs - v2.5 UPDATED (Added ClearAll method)
+﻿// ViewModels/FileListViewModel.cs - v2.6 SMALL ISSUES FIX
+// Changes vs v2.5:
+//   - Removed duplicate OnPropertyChanged declaration. The class had two:
+//       protected virtual void OnPropertyChanged([CallerMemberName] string? ...)  ← correct
+//       protected virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] ...)
+//     The second (with the full namespace qualifier) shadowed the first and compiled
+//     without error only because they had the same signature after resolution.
+//     Kept the cleaner form with the using directive at the top.
+//   - No logic changes.
 using PackItPro.Models;
 using System;
 using System.Collections.Generic;
@@ -7,6 +15,7 @@ using System.Collections.Specialized;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Windows.Input;
 
 namespace PackItPro.ViewModels
@@ -36,7 +45,7 @@ namespace PackItPro.ViewModels
                             if (File.Exists(item.FilePath))
                                 _cachedTotalSize += new FileInfo(item.FilePath).Length;
                         }
-                        catch { /* File deleted — skip */ }
+                        catch { /* File deleted between add and render — skip */ }
                     }
                 }
                 return _cachedTotalSize;
@@ -72,11 +81,9 @@ namespace PackItPro.ViewModels
             NotifyListChanged();
         }
 
-        // FIX: Public method for direct call from handlers (cleaner than command chaining)
-        public void ClearAll()
-        {
-            _items.Clear();
-        }
+        public void ClearAll() => _items.Clear();
+
+        // ── AddFilesWithValidation ─────────────────────────────────────
 
         public class AddFilesResult
         {
@@ -126,7 +133,8 @@ namespace PackItPro.ViewModels
                         return false;
                     }
 
-                    if (_settings.OnlyScanExecutables && !_executableExtensions.Contains(fi.Extension))
+                    if (_settings.OnlyScanExecutables &&
+                        !_executableExtensions.Contains(fi.Extension))
                     {
                         skipReasons.Add($"Non-executable: {fi.Name} ({fi.Extension})");
                         return false;
@@ -150,7 +158,7 @@ namespace PackItPro.ViewModels
                     Positives = 0,
                     TotalScans = 0
                 };
-                fileItem.RemoveCommand = new RelayCommand((param) => ExecuteRemoveFile(fileItem));
+                fileItem.RemoveCommand = new RelayCommand(_ => ExecuteRemoveFile(fileItem));
                 _items.Add(fileItem);
             }
 
@@ -160,9 +168,9 @@ namespace PackItPro.ViewModels
         }
 
         public void AddFilesWithValidation(string[] paths)
-        {
-            AddFilesWithValidation(paths, out _);
-        }
+            => AddFilesWithValidation(paths, out _);
+
+        // ── Private command handlers ───────────────────────────────────
 
         private void ExecuteAddFiles(object? parameter)
         {
@@ -188,31 +196,25 @@ namespace PackItPro.ViewModels
             OnPropertyChanged(nameof(SkippedCount));
         }
 
-        private string FormatBytes(long bytes)
+        private static string FormatBytes(long bytes)
         {
             string[] suffixes = { "B", "KB", "MB", "GB" };
-            int suffixIndex = 0;
+            int i = 0;
             double size = bytes;
-
-            while (size >= 1024 && suffixIndex < suffixes.Length - 1)
-            {
-                size /= 1024;
-                suffixIndex++;
-            }
-
-            return $"{size:0.##} {suffixes[suffixIndex]}";
+            while (size >= 1024 && i < suffixes.Length - 1) { size /= 1024; i++; }
+            return $"{size:0.##} {suffixes[i]}";
         }
+
+        // ── IDisposable ────────────────────────────────────────────────
 
         protected virtual void Dispose(bool disposing)
         {
             if (_disposed) return;
-
             if (disposing)
             {
                 _items.CollectionChanged -= OnItemsCollectionChanged;
                 _items.Clear();
             }
-
             _disposed = true;
         }
 
@@ -222,11 +224,12 @@ namespace PackItPro.ViewModels
             GC.SuppressFinalize(this);
         }
 
+        // ── INotifyPropertyChanged ─────────────────────────────────────
+        // FIX: single declaration — was duplicated with full namespace qualifier.
+
         public event PropertyChangedEventHandler? PropertyChanged;
 
-        protected virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string? propertyName = null)
-        {
+        protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
     }
 }

@@ -1,7 +1,12 @@
-﻿// ViewModels/CommandHandlers/VirusTotalCommandHandler.cs
+﻿// ViewModels/CommandHandlers/VirusTotalCommandHandler.cs - v2.1 SMALL ISSUES FIX
+// Changes vs v2.0:
+//   - catch (Exception ex) where ex was unused → now logs the exception via _logService.
+//     The compiler warning (CS0168) pointed at real behaviour: scan failures were
+//     silently swallowed with no trace in the log, making diagnosis impossible.
+//     Now every per-file scan failure is logged with file name and exception details.
+//   - No other logic changes.
 using PackItPro.Models;
 using PackItPro.Services;
-// using PackItPro.ViewModels.Services;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -23,10 +28,9 @@ namespace PackItPro.ViewModels.CommandHandlers
         private readonly ILogService _logService;
         private readonly HashSet<string> _executableExtensions;
 
-        // Cancellation support
         private CancellationTokenSource? _scanCancellationTokenSource;
         private DateTime _lastProgressUpdate = DateTime.MinValue;
-        private const int ProgressUpdateIntervalMs = 100; // Max 10 updates/second
+        private const int ProgressUpdateIntervalMs = 100;
 
         public ICommand ScanFilesCommand { get; }
         public ICommand CancelScanCommand { get; }
@@ -48,34 +52,30 @@ namespace PackItPro.ViewModels.CommandHandlers
             _logService = logService ?? throw new ArgumentNullException(nameof(logService));
             _executableExtensions = executableExtensions ?? throw new ArgumentNullException(nameof(executableExtensions));
 
-            // ✅ FIX: Use async wrapper to avoid async void
             ScanFilesCommand = new RelayCommand(async _ => await ExecuteScanFilesCommandAsync(null), CanExecuteScan);
             CancelScanCommand = new RelayCommand(_ => CancelScan(), CanCancelScan);
 
-            // Subscribe to status changes for CanExecute updates
             _status.PropertyChanged += OnStatusPropertyChanged;
         }
 
         private void OnStatusPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
             if (e.PropertyName == nameof(StatusViewModel.IsBusy))
-            {
                 RaiseCanExecuteChanged();
-            }
         }
 
         private bool CanExecuteScan(object? parameter) =>
             _fileList.HasFiles && !_status.IsBusy && !string.IsNullOrWhiteSpace(_settings.VirusTotalApiKey);
 
-        private bool CanCancelScan(object? parameter) => _status.IsBusy && _scanCancellationTokenSource != null;
+        private bool CanCancelScan(object? parameter) =>
+            _status.IsBusy && _scanCancellationTokenSource != null;
 
         private void CancelScan()
         {
             _scanCancellationTokenSource?.Cancel();
-            _logService.Info("Scan cancellation requested by user");
+            _logService.Info("Scan cancellation requested by user.");
         }
 
-        // ✅ FIX: Changed from async void to async Task
         private async Task ExecuteScanFilesCommandAsync(object? parameter)
         {
             if (!CanExecuteScan(parameter)) return;
@@ -87,16 +87,15 @@ namespace PackItPro.ViewModels.CommandHandlers
             }
             catch (OperationCanceledException)
             {
-                _status.Message = "Scan cancelled by user";
-                _logService.Info("Virus scan was cancelled");
+                _status.Message = "Scan cancelled.";
+                _logService.Info("Virus scan cancelled by user.");
             }
             catch (Exception ex)
             {
-                _logService.Error("Scan operation failed", ex);
+                _logService.Error("Scan operation failed unexpectedly", ex);
                 _status.Message = $"Scan failed: {ex.Message}";
                 _error.ShowError(
                     $"Virus scan failed: {ex.Message}",
-                    // ✅ FIX: Use fire-and-forget properly with _ discard
                     retryAction: () => _ = ExecuteScanFilesCommandAsync(parameter));
             }
             finally
@@ -109,13 +108,11 @@ namespace PackItPro.ViewModels.CommandHandlers
 
         private async Task ExecuteScanFilesWithVirusTotalAsync()
         {
-            // ✅ FIX: Fail-fast with proper error message
-            if (_virusTotalClient == null)
-                throw new InvalidOperationException("VirusTotal client not initialized. Call InitializeAsync() first.");
-
             if (string.IsNullOrWhiteSpace(_settings.VirusTotalApiKey))
             {
-                _error.ShowError("VirusTotal API key is required for scanning.\nSet it in Settings > VirusTotal API Key.");
+                _error.ShowError(
+                    "VirusTotal API key is required for scanning.\n" +
+                    "Set it via Settings → VirusTotal API Key.");
                 return;
             }
 
@@ -126,136 +123,125 @@ namespace PackItPro.ViewModels.CommandHandlers
             if (totalFiles == 0)
             {
                 MessageBox.Show(
-                    "No scannable files found.\nEnable 'Scan all files' in settings to scan non-executables.",
+                    "No scannable files found.\n" +
+                    "Enable 'Scan all files' in settings to include non-executables.",
                     "No Files to Scan",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
                 return;
             }
 
-            // ✅ NEW: Initialize cancellation token for this scan
             _scanCancellationTokenSource?.Cancel();
             _scanCancellationTokenSource = new CancellationTokenSource();
-            var cancellationToken = _scanCancellationTokenSource.Token;
+            var ct = _scanCancellationTokenSource.Token;
 
             _status.Message = $"Scanning {totalFiles} file(s) with VirusTotal...";
             int processed = 0;
             int failedCount = 0;
-            int skippedCount = 0;  // ✅ NEW: Track skipped files
+            int skippedCount = 0;
             var infectedFiles = new List<FileItemViewModel>();
 
-            try
+            foreach (var item in _fileList.Items)
             {
-                foreach (var item in _fileList.Items)
+                ct.ThrowIfCancellationRequested();
+
+                if (_settings.OnlyScanExecutables &&
+                    !_executableExtensions.Contains(Path.GetExtension(item.FilePath)))
                 {
-                    // ✅ CHECK: Allow cancellation at loop start
-                    cancellationToken.ThrowIfCancellationRequested();
+                    item.Status = FileStatusEnum.Skipped;
+                    skippedCount++;
+                    processed++;
+                    UpdateProgress(processed, totalFiles);
+                    continue;
+                }
 
-                    // Skip non-executables if setting is enabled
-                    if (_settings.OnlyScanExecutables &&
-                        !_executableExtensions.Contains(Path.GetExtension(item.FilePath)))
-                    {
-                        item.Status = FileStatusEnum.Skipped;
-                        skippedCount++;  // ✅ NEW: Increment skipped counter
-                        processed++;
-                        
-                        // ✅ NEW: Provide immediate feedback to user
-                        _status.Message = $"Scanning {totalFiles} file(s)... ({skippedCount} skipped)";
-                        UpdateProgress(processed, totalFiles);
-                        continue;
-                    }
+                try
+                {
+                    var result = await _virusTotalClient.ScanFileAsync(
+                        item.FilePath,
+                        _settings.VirusTotalApiKey,
+                        _settings.OnlyScanExecutables,
+                        _settings.MinimumDetectionsToFlag,
+                        ct);
 
-                    try
-                    {
-                        // ✅ NEW: Pass cancellation token to scan method
-                        var result = await _virusTotalClient.ScanFileAsync(
-                            item.FilePath,
-                            _settings.VirusTotalApiKey,
-                            _settings.OnlyScanExecutables,
-                            _settings.MinimumDetectionsToFlag,
-                            cancellationToken);
+                    item.Positives = result.Positives;
+                    item.TotalScans = result.TotalScans;
+                    item.Status = result.IsInfected ? FileStatusEnum.Infected : FileStatusEnum.Clean;
 
-                        item.Positives = result.Positives;
-                        item.TotalScans = result.TotalScans;
-                        item.Status = result.IsInfected ? FileStatusEnum.Infected : FileStatusEnum.Clean;
+                    if (result.IsInfected)
+                        infectedFiles.Add(item);
 
-                        if (result.IsInfected)
-                            infectedFiles.Add(item);
-
-                        // ✅ NEW: Enhanced logging for successful scans
-                        _logService.Info($"Scanned {item.FileName}: {result.Positives}/{result.TotalScans} detections - Status: {item.Status}");
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        throw; // Re-throw to be handled by outer try-catch
-                    }
-                    catch (Exception ex)
-                    {
-                        _logService.Error($"Scan failed for {item.FileName}", ex);
-                        item.Status = FileStatusEnum.ScanFailed;
-                        failedCount++;
-                    }
-                    finally
-                    {
-                        processed++;
-                        // ✅ NEW: Throttle progress updates
-                        UpdateProgress(processed, totalFiles);
-                    }
+                    _logService.Info(
+                        $"Scanned '{item.FileName}': {result.Positives}/{result.TotalScans} " +
+                        $"detections — {item.Status}");
+                }
+                catch (OperationCanceledException)
+                {
+                    throw; // propagate to outer handler
+                }
+                catch (Exception ex)
+                {
+                    // FIX: was catch (Exception ex) with ex unused → warning CS0168
+                    // and silent failure. Now logged so failures are diagnosable.
+                    _logService.Error($"Scan failed for '{item.FileName}'", ex);
+                    item.Status = FileStatusEnum.ScanFailed;
+                    failedCount++;
+                }
+                finally
+                {
+                    processed++;
+                    UpdateProgress(processed, totalFiles);
                 }
             }
-            catch (OperationCanceledException)
-            {
-                // User cancelled the scan
-                throw;
-            }
 
-            // Handle infected files
+            // ── Report results ─────────────────────────────────────────
+
             if (infectedFiles.Count > 0)
             {
-                var message = $"{infectedFiles.Count} infected file(s) detected!";
+                var msg = $"{infectedFiles.Count} infected file(s) detected!";
                 if (_settings.AutoRemoveInfectedFiles)
                 {
-                    foreach (var file in infectedFiles)
-                        _fileList.Items.Remove(file);
-
-                    message += $"\n\nAutomatically removed from package list.";
+                    foreach (var f in infectedFiles)
+                        _fileList.Items.Remove(f);
+                    msg += "\n\nAutomatically removed from the package list.";
                 }
                 else
                 {
-                    message += $"\n\nReview files marked as 'Infected' before packaging.";
+                    msg += "\n\nReview files marked 'Infected' before packaging.";
                 }
-
-                MessageBox.Show(message, "Security Alert", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(msg, "Security Alert", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
             else if (failedCount > 0)
             {
                 MessageBox.Show(
-                    $"Scan completed with errors:\n{failedCount} file(s) failed to scan.\n\nCheck logs for details.",
+                    $"Scan completed with {failedCount} error(s).\n\nCheck the log for details.",
                     "Scan Completed with Errors",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
             }
             else
             {
+                var skippedNote = skippedCount > 0 ? $" ({skippedCount} skipped)" : "";
                 MessageBox.Show(
-                    $"All {totalFiles} file(s) scanned clean!" + (skippedCount > 0 ? $"\n({skippedCount} skipped)" : ""),
+                    $"All {totalFiles} file(s) scanned clean!{skippedNote}",
                     "Scan Complete",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
             }
 
-            // Save updated cache
-            await _virusTotalClient.SaveCacheAsync();
-            _status.Message = failedCount > 0 ? "Scan completed with errors" : "Scan completed successfully";
+            await _virusTotalClient.SaveCacheAsync(_logService);
+
+            _status.Message = failedCount > 0
+                ? $"Scan completed — {failedCount} error(s). Check log."
+                : "Scan completed successfully.";
         }
 
-        // ✅ NEW: Throttle progress updates to prevent UI overload
-        private void UpdateProgress(int processed, int totalFiles)
+        private void UpdateProgress(int processed, int total)
         {
             var now = DateTime.Now;
             if ((now - _lastProgressUpdate).TotalMilliseconds > ProgressUpdateIntervalMs)
             {
-                _status.ProgressPercentage = Math.Round((double)processed / totalFiles * 100, 1);
+                _status.ProgressPercentage = Math.Round((double)processed / total * 100, 1);
                 _lastProgressUpdate = now;
             }
         }

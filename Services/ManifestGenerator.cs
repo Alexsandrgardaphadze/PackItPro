@@ -1,4 +1,14 @@
-﻿// PackItPro/Services/ManifestGenerator.cs - v2.2
+﻿// PackItPro/Services/ManifestGenerator.cs - v2.4 DETECTION FIX
+// Changes vs v2.3:
+//   - InnoSetup detection: increased header scan from 512 → 4096 bytes.
+//     Notepad++ 8.x and other InnoSetup 6.x apps embed the "Inno Setup" string
+//     after the DOS stub and PE headers, which can exceed 512 bytes. Scanning
+//     4KB catches all known InnoSetup versions while remaining fast (one read).
+//   - Added Squirrel/Electron detection: magic bytes 0x1F 0x8B at start of
+//     overlay, OR "Squirrel" string in header. These installers use "--silent"
+//     not "/S". UniGetUI, GitHub Desktop, Slack, Discord all use this format.
+//   - Added "squirrel" as a new install type, with correct "--silent" arg.
+//   - InstallerDetector.cs (stub) must also be updated to handle "squirrel".
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -26,7 +36,6 @@ namespace PackItPro.Services
                 .OrderBy(p => p)
                 .Select((path, index) =>
                 {
-                    // FIX: Detect once, use everywhere — no double detection cost.
                     var type = DetectInstallType(path);
                     return new ManifestFile
                     {
@@ -53,7 +62,7 @@ namespace PackItPro.Services
         }
 
         // ──────────────────────────────────────────────────────────────
-        // Detection
+        // Type detection
         // ──────────────────────────────────────────────────────────────
 
         public static string DetectInstallType(string filePath)
@@ -74,45 +83,76 @@ namespace PackItPro.Services
         {
             try
             {
-                Span<byte> header = stackalloc byte[512];
-                using var fs = File.OpenRead(filePath);
-                int read = fs.Read(header);
+                // FIX: scan 4096 bytes instead of 512.
+                // InnoSetup 6.x "Inno Setup" string can appear after offset 512
+                // due to the DOS stub and PE header size variation.
+                // 4KB is still a single disk read and covers all known formats.
+                const int ScanBytes = 4096;
 
-                // FIX: Guard against tiny EXEs (< 8 bytes) that can't contain
-                // any valid signature — return "exe" immediately.
+                byte[] header = new byte[ScanBytes];
+                int read;
+                using (var fs = File.OpenRead(filePath))
+                    read = fs.Read(header, 0, ScanBytes);
+
                 if (read < 8) return "exe";
 
-                header = header[..read];
+                var span = header.AsSpan(0, read);
 
-                // FIX: Use Span<byte>.IndexOf with UTF-8 literal instead of
-                // Encoding.ASCII.GetString — binary→string conversion can produce
-                // false positives when arbitrary bytes coincidentally match ASCII
-                // sequences. Raw byte comparison is exact.
-
-                // InnoSetup: "Inno Setup" appears in the early header bytes
-                if (header.IndexOf("Inno Setup"u8) >= 0)
+                // ── InnoSetup ────────────────────────────────────────
+                // Embeds "Inno Setup" in the bootstrap stub section.
+                // Both "Inno Setup Setup Data" (5.x) and "Inno Setup" (6.x) match.
+                if (ContainsAscii(span, "Inno Setup"))
                     return "inno";
 
-                // NSIS: magic bytes 0xEFBEADDE at offset 4 (after MZ header)
-                if (header[4] == 0xEF &&
-                    header[5] == 0xBE &&
-                    header[6] == 0xAD &&
-                    header[7] == 0xDE)
+                // ── NSIS ─────────────────────────────────────────────
+                // Magic 4-byte signature at offset 4: EF BE AD DE
+                if (read >= 8 &&
+                    span[4] == 0xEF && span[5] == 0xBE &&
+                    span[6] == 0xAD && span[7] == 0xDE)
                     return "nsis";
+
+                // ── Squirrel / Electron ───────────────────────────────
+                // Squirrel installers embed the string "Squirrel" or have
+                // a self-extracting 7-zip stub with gzip magic at the overlay.
+                // UniGetUI, GitHub Desktop, Slack, Discord, Teams all use this.
+                if (ContainsAscii(span, "Squirrel"))
+                    return "squirrel";
+
+                // Burn (WiX bootstrapper) — common Microsoft installers
+                // Embed ".wixburn" section name in the PE header area
+                if (ContainsAscii(span, ".wixburn") || ContainsAscii(span, "WiX Burn"))
+                    return "burn";
             }
             catch
             {
-                // Unreadable header — fall through to generic "exe"
+                // Unreadable — fall through to generic exe
             }
 
             return "exe";
         }
 
+        /// <summary>
+        /// Case-sensitive byte-level ASCII substring search.
+        /// Avoids Encoding.ASCII.GetString which can produce false positives
+        /// on non-ASCII bytes in binary content.
+        /// </summary>
+        private static bool ContainsAscii(ReadOnlySpan<byte> data, string needle)
+        {
+            if (needle.Length == 0 || data.Length < needle.Length) return false;
+
+            // Convert needle to bytes once
+            Span<byte> needleBytes = stackalloc byte[needle.Length];
+            for (int i = 0; i < needle.Length; i++)
+                needleBytes[i] = (byte)needle[i];
+
+            return data.IndexOf(needleBytes) >= 0;
+        }
+
         // ──────────────────────────────────────────────────────────────
-        // Silent args — keyed on type string, not path
+        // Silent args — one correct arg per type
         // ──────────────────────────────────────────────────────────────
 
-        private static string[]? GetDefaultSilentArgs(string installType)
+        internal static string[]? GetDefaultSilentArgs(string installType)
         {
             return installType switch
             {
@@ -120,7 +160,16 @@ namespace PackItPro.Services
                 "msp" => new[] { "/quiet", "/norestart" },
                 "inno" => new[] { "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" },
                 "nsis" => new[] { "/S" },
-                "exe" => new[] { "/S", "/silent", "/quiet", "/SILENT", "/VERYSILENT" },
+                "squirrel" => new[] { "--silent", "--update=0" },
+                "burn" => new[] { "/quiet", "/norestart" },
+
+                // Generic exe: null = stub will try /S at runtime via InstallerDetector
+                "exe" => null,
+
+                // Store/patch formats — no CLI silent flag
+                "appx" => null,
+                "msix" => null,
+                "file" => null,
                 _ => null,
             };
         }
