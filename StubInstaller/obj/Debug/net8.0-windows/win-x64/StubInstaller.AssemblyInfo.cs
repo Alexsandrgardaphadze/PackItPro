@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("PackItPro Team")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.3.2.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.3.2")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.3.2+c3ea4bfe097e64a4d401e3bdab07c13ab56a1b17")]
 [assembly: System.Reflection.AssemblyProductAttribute("StubInstaller")]
 [assembly: System.Reflection.AssemblyTitleAttribute("StubInstaller")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.3.2.0")]

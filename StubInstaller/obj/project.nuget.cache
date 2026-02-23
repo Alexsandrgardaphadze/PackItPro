@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "AuwGDQSMnxc=",
+  "dgSpecHash": "lJgcHGGBM7Q=",
   "success": true,
-  "projectFilePath": "C:\\Users\\Alex\\Desktop\\Visual Studio 2022 Projects\\StubInstaller\\StubInstaller.csproj",
+  "projectFilePath": "C:\\Users\\Alex\\Desktop\\Visual Studio 2022 Projects\\PackItPro-repo\\StubInstaller\\StubInstaller.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\Alex\\.nuget\\packages\\microsoft.net.illink.tasks\\8.0.23\\microsoft.net.illink.tasks.8.0.23.nupkg.sha512",
     "C:\\Users\\Alex\\.nuget\\packages\\microsoft.netcore.platforms\\3.1.9\\microsoft.netcore.platforms.3.1.9.nupkg.sha512",
