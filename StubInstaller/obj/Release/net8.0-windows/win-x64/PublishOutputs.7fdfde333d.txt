@@ -1,0 +1,2 @@
+C:\Users\Alex\Desktop\Visual Studio 2022 Projects\StubInstaller\publish\StubInstaller.pdb
+C:\Users\Alex\Desktop\Visual Studio 2022 Projects\StubInstaller\publish\StubInstaller.exe

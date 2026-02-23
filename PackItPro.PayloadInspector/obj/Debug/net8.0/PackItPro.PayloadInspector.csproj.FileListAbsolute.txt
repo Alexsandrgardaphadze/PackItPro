@@ -1,0 +1,4 @@
+C:\Users\Alex\Desktop\Visual Studio 2022 Projects\PackItPro.PayloadInspector\obj\Debug\net8.0\PackItPro.PayloadInspector.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Alex\Desktop\Visual Studio 2022 Projects\PackItPro.PayloadInspector\obj\Debug\net8.0\PackItPro.PayloadInspector.AssemblyInfoInputs.cache
+C:\Users\Alex\Desktop\Visual Studio 2022 Projects\PackItPro.PayloadInspector\obj\Debug\net8.0\PackItPro.PayloadInspector.AssemblyInfo.cs
+C:\Users\Alex\Desktop\Visual Studio 2022 Projects\PackItPro.PayloadInspector\obj\Debug\net8.0\PackItPro.PayloadInspector.csproj.CoreCompileInputs.cache
