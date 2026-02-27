@@ -1,10 +1,12 @@
-﻿// StubInstaller/Manifest.cs - v1.2
-// Changes vs v1.1:
-//   - Added DetectionSource property to ManifestFile.
-//     Written by PackItPro at packaging time; read by the stub at install time.
-//     Values: "extension" | "header" | "manifest"
-//     Logged during install so users see detection confidence immediately.
-//     Default is "extension" so old packages without this field still deserialize.
+﻿// StubInstaller/Manifest.cs - v1.3
+// Changes vs v1.2:
+//   - Three optional prerequisite fields added to PackageManifest:
+//       MinWindowsBuild (int?)  — minimum Windows build number (default: 18362 = Win10 1903)
+//       RequiresX64 (bool)      — true if package requires a 64-bit OS (default: false)
+//       MinFreeDiskMB (int?)    — minimum free MB required; null = auto-estimate from payload
+//     Defaults are chosen so existing manifests (without these fields) produce reasonable
+//     checks without packager changes: all packages get a Win10 1903 minimum and a
+//     disk space estimate. Set fields explicitly in the manifest to tighten or relax.
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
@@ -32,6 +34,32 @@ namespace StubInstaller
 
         [JsonPropertyName("cleanup")]
         public bool Cleanup { get; set; } = true;
+
+        // ── Prerequisites ─────────────────────────────────────────────────────
+        // All optional. Null/false means "no requirement" or "auto-detect".
+        // Checked by PrerequisiteChecker in Program.cs before extraction begins.
+
+        /// <summary>
+        /// Minimum Windows build number required. Null = default (18362 = Win10 1903).
+        /// Examples: 18362 = Win10 1903, 19041 = Win10 2004, 22000 = Win11.
+        /// </summary>
+        [JsonPropertyName("minWindowsBuild")]
+        public int? MinWindowsBuild { get; set; }
+
+        /// <summary>
+        /// True if the package requires a 64-bit (x64) operating system.
+        /// False (default) means any architecture is accepted.
+        /// </summary>
+        [JsonPropertyName("requiresX64")]
+        public bool RequiresX64 { get; set; } = false;
+
+        /// <summary>
+        /// Minimum free disk space in MB. Null = auto-estimate from payload size.
+        /// Set explicitly if the installed software requires significantly more space
+        /// than the installer payload (e.g. a game that extracts 50 GB).
+        /// </summary>
+        [JsonPropertyName("minFreeDiskMB")]
+        public int? MinFreeDiskMB { get; set; }
     }
 
     public class ManifestFile
