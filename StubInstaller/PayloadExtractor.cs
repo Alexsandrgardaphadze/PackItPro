@@ -359,6 +359,7 @@ namespace StubInstaller
 
         /// <summary>
         /// Extracts the provided payload bytes (assumed to be a ZIP archive) to a temporary directory.
+        /// SECURITY: Validates all extraction paths to prevent Zip Slip (directory traversal) attacks.
         /// </summary>
         public static string ExtractPayloadToTempDirectory(byte[] payloadData)
         {
@@ -376,6 +377,11 @@ namespace StubInstaller
 
             try
             {
+                // SECURITY: Normalize the extraction root for path validation
+                // Add separator to ensure extracted paths are within this directory
+                string fullTempPath = Path.GetFullPath(tempPath + Path.DirectorySeparatorChar);
+                LogDebug($"Extraction root (normalized): {fullTempPath}");
+
                 // Extract ZIP from memory
                 using (var zipStream = new MemoryStream(payloadData))
                 {
@@ -392,10 +398,24 @@ namespace StubInstaller
                             if (string.IsNullOrEmpty(entry.Name))
                                 continue;
 
-                            var destPath = Path.Combine(tempPath, entry.FullName);
+                            // SECURITY: Validate entry path to prevent Zip Slip (CWE-22)
+                            // This prevents malicious ZIPs with paths like "../../../etc/passwd"
+                            string destPath = Path.Combine(tempPath, entry.FullName);
+                            string fullDestPath = Path.GetFullPath(destPath);
+
+                            // Ensure the normalized destination path is within the extraction root
+                            if (!fullDestPath.StartsWith(fullTempPath, StringComparison.OrdinalIgnoreCase))
+                            {
+                                throw new InvalidOperationException(
+                                    $"SECURITY VIOLATION: ZIP entry path attempts to escape extraction directory.\n" +
+                                    $"Entry: {entry.FullName}\n" +
+                                    $"Resolves to: {fullDestPath}\n" +
+                                    $"Extraction root: {fullTempPath}\n" +
+                                    $"This ZIP archive may be malicious or corrupted. Extraction aborted.");
+                            }
 
                             // Create directory if needed
-                            var destDir = Path.GetDirectoryName(destPath);
+                            var destDir = Path.GetDirectoryName(fullDestPath);
                             if (!string.IsNullOrEmpty(destDir) && !Directory.Exists(destDir))
                             {
                                 Directory.CreateDirectory(destDir);
@@ -403,7 +423,7 @@ namespace StubInstaller
 
                             LogDebug($"  [{extracted + 1}/{archive.Entries.Count}] Extracting: {entry.FullName} ({FormatBytes(entry.Length)})");
 
-                            entry.ExtractToFile(destPath, overwrite: true);
+                            entry.ExtractToFile(fullDestPath, overwrite: true);
                             extracted++;
                         }
 

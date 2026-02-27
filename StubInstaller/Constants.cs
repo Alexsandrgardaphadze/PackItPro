@@ -6,7 +6,7 @@ namespace StubInstaller
     internal static class Constants
     {
         // ── Stub version — update with every release ──────────────────────────
-        internal const string StubVersion = "1.3.3";
+        internal const string StubVersion = "1.3.4";
         internal const string StubBuildDate = "2026-02-27";
 
         // ── Command-line arguments ────────────────────────────────────────────
