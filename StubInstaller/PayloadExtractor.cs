@@ -1,22 +1,31 @@
-﻿// StubInstaller/PayloadExtractor.cs - FINAL CORRECTED VERSION
+﻿// StubInstaller/PayloadExtractor.cs - FINAL CORRECTED VERSION v2.0
+// Updated to extract and verify payload using footer-based SHA256 hash.
+// Supports both old (v2.2: 18 bytes) and new (v2.3: 50 bytes) footer formats.
 using System;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
+using System.Security.Cryptography;
 using System.Text;
 
 namespace StubInstaller
 {
     public static class PayloadExtractor
     {
-        // Constants matching the packer format
+        // Constants for new v2.3 footer format with hash
         private const string PAYLOAD_MARKER = "PACKIT_END"; // 10 bytes ASCII
         private const int MARKER_LENGTH = 10;
         private const int SIZE_LENGTH = sizeof(long); // 8 bytes
-        private const int FOOTER_LENGTH = SIZE_LENGTH + MARKER_LENGTH; // 18 bytes total
+        private const int HASH_LENGTH = 32; // SHA256 output is 32 bytes
+        private const int FOOTER_LENGTH_V23 = SIZE_LENGTH + HASH_LENGTH + MARKER_LENGTH; // 50 bytes
+        
+        // Legacy v2.2 format
+        private const int FOOTER_LENGTH_V22 = SIZE_LENGTH + MARKER_LENGTH; // 18 bytes
 
         /// <summary>
         /// Extracts the payload that was appended to the end of this executable file.
+        /// Verifies integrity by computing SHA256 hash of extracted payload and comparing
+        /// to hash stored in footer (if v2.3 format is detected).
         /// </summary>
         public static byte[] ExtractPayloadFromEndOfFile()
         {
@@ -96,39 +105,76 @@ namespace StubInstaller
             // ============================================================
             LogDebug("Step 2: Validating file size...");
 
-            if (fileInfo.Length < FOOTER_LENGTH)
+            // Try v2.3 first, fall back to v2.2
+            int footerSize = FOOTER_LENGTH_V23;
+            if (fileInfo.Length < FOOTER_LENGTH_V23)
             {
-                throw new InvalidOperationException(
-                    $"File is too small ({fileInfo.Length} bytes) to contain payload footer ({FOOTER_LENGTH} bytes).\n" +
-                    $"This EXE may not be a packaged installer.\n" +
-                    $"Expected: Packaged installer with embedded payload\n" +
-                    $"Found: Raw stub executable");
+                if (fileInfo.Length < FOOTER_LENGTH_V22)
+                {
+                    throw new InvalidOperationException(
+                        $"File is too small ({fileInfo.Length} bytes) to contain payload footer.\n" +
+                        $"Minimum required: {FOOTER_LENGTH_V22} bytes (v2.2) or {FOOTER_LENGTH_V23} bytes (v2.3).\n" +
+                        $"This EXE may not be a packaged installer.\n" +
+                        $"Expected: Packaged installer with embedded payload\n" +
+                        $"Found: Raw stub executable");
+                }
+                // File is large enough for v2.2 but not v2.3, will detect version in step 3
+                footerSize = -1; // Let step 3 decide
             }
 
             // ============================================================
-            // STEP 3: READ FOOTER
+            // STEP 3: READ AND DETECT FOOTER VERSION
             // ============================================================
-            LogDebug("Step 3: Reading footer...");
+            LogDebug("Step 3: Reading and analyzing footer...");
 
             byte[] footer;
+            int detectedFooterSize;
+
             using (var fs = File.OpenRead(exePath))
             {
-                fs.Seek(-FOOTER_LENGTH, SeekOrigin.End);
-                footer = new byte[FOOTER_LENGTH];
+                // Try reading v2.3 footer first (50 bytes)
+                fs.Seek(-FOOTER_LENGTH_V23, SeekOrigin.End);
+                footer = new byte[FOOTER_LENGTH_V23];
 
                 int totalRead = 0;
-                while (totalRead < FOOTER_LENGTH)
+                while (totalRead < FOOTER_LENGTH_V23)
                 {
-                    int bytesRead = fs.Read(footer, totalRead, FOOTER_LENGTH - totalRead);
+                    int bytesRead = fs.Read(footer, totalRead, FOOTER_LENGTH_V23 - totalRead);
                     if (bytesRead <= 0)
                     {
                         throw new InvalidOperationException(
-                            $"Failed to read footer. Read {totalRead}/{FOOTER_LENGTH} bytes.");
+                            $"Failed to read footer. Read {totalRead}/{FOOTER_LENGTH_V23} bytes.");
                     }
                     totalRead += bytesRead;
                 }
 
                 LogDebug($"Footer read successfully: {totalRead} bytes");
+            }
+
+            // Check marker position to determine version
+            string marker23 = Encoding.ASCII.GetString(footer, SIZE_LENGTH + HASH_LENGTH, MARKER_LENGTH);
+            string marker22 = Encoding.ASCII.GetString(footer, SIZE_LENGTH, MARKER_LENGTH);
+
+            if (marker23 == PAYLOAD_MARKER)
+            {
+                detectedFooterSize = FOOTER_LENGTH_V23;
+                LogDebug("✅ Detected footer version: v2.3 (with SHA256 hash)");
+            }
+            else if (marker22 == PAYLOAD_MARKER)
+            {
+                detectedFooterSize = FOOTER_LENGTH_V22;
+                LogDebug("ℹ️  Detected footer version: v2.2 (without hash) — falling back");
+                // Trim footer to v2.2 size
+                Array.Resize(ref footer, FOOTER_LENGTH_V22);
+            }
+            else
+            {
+                throw new InvalidOperationException(
+                    $"Invalid payload marker.\n" +
+                    $"Expected: '{PAYLOAD_MARKER}'\n" +
+                    $"Found (v2.3 pos): '{marker23}'\n" +
+                    $"Found (v2.2 pos): '{marker22}'\n\n" +
+                    $"This file may not be a packaged installer, or it may be corrupted.");
             }
 
             // ============================================================
@@ -155,49 +201,40 @@ namespace StubInstaller
                     $"Make sure you are running the packaged EXE created by PackItPro, not StubInstaller.exe directly!");
             }
 
-            if (payloadSize > fileInfo.Length - FOOTER_LENGTH)
+            if (payloadSize > fileInfo.Length - detectedFooterSize)
             {
                 throw new InvalidOperationException(
                     $"Payload size ({FormatBytes(payloadSize)}) is larger than available space.\n" +
                     $"File size: {FormatBytes(fileInfo.Length)}\n" +
-                    $"Footer size: {FOOTER_LENGTH} bytes\n" +
-                    $"Max payload: {FormatBytes(fileInfo.Length - FOOTER_LENGTH)}");
+                    $"Footer size: {detectedFooterSize} bytes\n" +
+                    $"Max payload: {FormatBytes(fileInfo.Length - detectedFooterSize)}");
             }
 
             // ============================================================
-            // STEP 5: VERIFY MARKER
+            // STEP 5: EXTRACT PAYLOAD HASH (if v2.3)
             // ============================================================
-            LogDebug("Step 5: Verifying marker...");
-
-            byte[] markerBytes = new byte[MARKER_LENGTH];
-            Array.Copy(footer, SIZE_LENGTH, markerBytes, 0, MARKER_LENGTH);
-            string marker = Encoding.ASCII.GetString(markerBytes);
-
-            LogDebug($"Raw marker bytes: {BitConverter.ToString(markerBytes)}");
-            LogDebug($"Parsed marker: '{marker}'");
-            LogDebug($"Expected marker: '{PAYLOAD_MARKER}'");
-
-            if (marker != PAYLOAD_MARKER)
+            byte[]? expectedPayloadHash = null;
+            if (detectedFooterSize == FOOTER_LENGTH_V23)
             {
-                throw new InvalidOperationException(
-                    $"Invalid payload marker.\n" +
-                    $"Expected: '{PAYLOAD_MARKER}'\n" +
-                    $"Found: '{marker}'\n" +
-                    $"Raw bytes: {BitConverter.ToString(markerBytes)}\n\n" +
-                    $"This file may not be a packaged installer, or it may be corrupted.");
+                LogDebug("Step 5: Extracting payload hash from footer...");
+                expectedPayloadHash = new byte[HASH_LENGTH];
+                Array.Copy(footer, SIZE_LENGTH, expectedPayloadHash, 0, HASH_LENGTH);
+                LogDebug($"Expected hash: {Convert.ToBase64String(expectedPayloadHash)}");
             }
-
-            LogDebug("✅ Marker verified successfully");
+            else
+            {
+                LogDebug("Step 5: Skipped (v2.2 format has no hash)");
+            }
 
             // ============================================================
             // STEP 6: CALCULATE PAYLOAD OFFSET
             // ============================================================
             LogDebug("Step 6: Calculating payload offset...");
 
-            long payloadOffset = fileInfo.Length - FOOTER_LENGTH - payloadSize;
+            long payloadOffset = fileInfo.Length - detectedFooterSize - payloadSize;
 
             LogDebug($"File size: {fileInfo.Length}");
-            LogDebug($"Footer size: {FOOTER_LENGTH}");
+            LogDebug($"Footer size: {detectedFooterSize}");
             LogDebug($"Payload size: {payloadSize}");
             LogDebug($"Calculated offset: {payloadOffset}");
 
@@ -209,12 +246,15 @@ namespace StubInstaller
             }
 
             // ============================================================
-            // STEP 7: EXTRACT PAYLOAD
+            // STEP 7: EXTRACT PAYLOAD (and compute hash if needed)
             // ============================================================
             LogDebug("Step 7: Extracting payload...");
 
             byte[] payload = new byte[payloadSize];
+            byte[]? computedPayloadHash = null;
+
             using (var fs = File.OpenRead(exePath))
+            using (var sha = expectedPayloadHash != null ? SHA256.Create() : null)
             {
                 fs.Seek(payloadOffset, SeekOrigin.Begin);
 
@@ -232,6 +272,12 @@ namespace StubInstaller
                             $"Read {totalRead}/{payloadSize} bytes.");
                     }
 
+                    // Hash as we read (streaming hash)
+                    if (sha != null)
+                    {
+                        sha.TransformBlock(payload, totalRead, bytesRead, null, 0);
+                    }
+
                     totalRead += bytesRead;
 
                     if (totalRead % (1024 * 1024) == 0) // Log every MB
@@ -240,13 +286,55 @@ namespace StubInstaller
                     }
                 }
 
+                // Finalize hash if computing
+                if (sha != null)
+                {
+                    sha.TransformFinalBlock(payload, 0, 0);
+                    computedPayloadHash = sha.Hash;
+                }
+
                 LogDebug($"✅ Payload extracted: {FormatBytes(totalRead)}");
             }
 
             // ============================================================
-            // STEP 8: VERIFY ZIP HEADER
+            // STEP 8: VERIFY PAYLOAD INTEGRITY (if v2.3)
             // ============================================================
-            LogDebug("Step 8: Verifying ZIP header...");
+            if (expectedPayloadHash != null && computedPayloadHash != null)
+            {
+                LogDebug("Step 8: Verifying payload integrity...");
+
+                string expectedHashStr = Convert.ToBase64String(expectedPayloadHash);
+                string computedHashStr = Convert.ToBase64String(computedPayloadHash);
+
+                LogDebug($"Expected: {expectedHashStr}");
+                LogDebug($"Computed: {computedHashStr}");
+
+                if (!ByteArraysEqual(expectedPayloadHash, computedPayloadHash))
+                {
+                    throw new InvalidOperationException(
+                        $"⚠️ PAYLOAD INTEGRITY CHECK FAILED!\n\n" +
+                        $"The ZIP payload has been modified or corrupted.\n\n" +
+                        $"Expected hash: {expectedHashStr}\n" +
+                        $"Computed hash: {computedHashStr}\n\n" +
+                        $"Possible causes:\n" +
+                        $"  • File was tampered with\n" +
+                        $"  • Disk corruption during transfer\n" +
+                        $"  • Network transmission error\n" +
+                        $"  • Antivirus modification\n\n" +
+                        $"Installation cannot proceed.");
+                }
+
+                LogDebug("✅ Payload integrity verified successfully!");
+            }
+            else if (detectedFooterSize == FOOTER_LENGTH_V22)
+            {
+                LogDebug("Step 8: Skipped (v2.2 format has no hash to verify)");
+            }
+
+            // ============================================================
+            // STEP 9: VERIFY ZIP HEADER
+            // ============================================================
+            LogDebug("Step 9: Verifying ZIP header...");
 
             if (payload.Length >= 4)
             {
@@ -375,6 +463,16 @@ namespace StubInstaller
             {
                 return null;
             }
+        }
+
+        private static bool ByteArraysEqual(byte[] a, byte[] b)
+        {
+            if (a.Length != b.Length) return false;
+            for (int i = 0; i < a.Length; i++)
+            {
+                if (a[i] != b[i]) return false;
+            }
+            return true;
         }
 
         private static void LogDebug(string message)

@@ -85,6 +85,18 @@ namespace StubInstaller
                 payloadData = PayloadExtractor.ExtractPayloadFromEndOfFile();
                 StubLogger.Log($"✅ Payload: {Util.FormatBytes(payloadData.Length)}");
             }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("PAYLOAD INTEGRITY CHECK FAILED"))
+            {
+                // Special handling for payload integrity failures
+                StubLogger.LogError("FATAL: Payload integrity verification failed", ex);
+                StubUI.ShowError(
+                    $"Package integrity check failed!\n\n" +
+                    $"The payload may have been corrupted or tampered with.\n\n" +
+                    $"Error: {ex.Message}\n\n" +
+                    $"Installation cannot proceed.",
+                    "Integrity Verification Failed");
+                return 1;
+            }
             catch (Exception ex)
             {
                 StubLogger.LogError("FATAL: Failed to extract payload", ex);

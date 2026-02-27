@@ -55,6 +55,10 @@
 		</Content>
 	</ItemGroup>
 
+	<ItemGroup>
+	  <Folder Include="StubInstaller.Tests\" />
+	</ItemGroup>
+
 
 	<!-- Custom target to copy StubInstaller after it's built 
 	<Target Name="CopyStubInstaller" AfterTargets="Build">
