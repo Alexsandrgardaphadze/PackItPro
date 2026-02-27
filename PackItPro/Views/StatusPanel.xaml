@@ -1,0 +1,98 @@
+﻿<!-- Views/StatusPanel.xaml - FIXED VERSION -->
+<UserControl x:Class="PackItPro.Views.StatusPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:PackItPro.Views"
+             mc:Ignorable="d" 
+             d:DesignHeight="70" d:DesignWidth="800">
+
+    <Grid>
+        <!-- STATUS MESSAGE & ACTION AREA -->
+        <Grid x:Name="StatusMessageArea">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <!-- Status Icon -->
+                <ColumnDefinition Width="*"/>
+                <!-- Message -->
+                <ColumnDefinition Width="Auto"/>
+                <!-- Progress -->
+                <ColumnDefinition Width="Auto"/>
+                <!-- Action Button -->
+            </Grid.ColumnDefinitions>
+
+            <!-- Status Icon Circle -->
+            <Border Grid.Column="0"
+                   x:Name="StatusIcon"
+                   Width="36" Height="36"
+                   Background="{StaticResource AppPanelHoverColor}"
+                   CornerRadius="18"
+                   Margin="0,0,12,0"
+                   VerticalAlignment="Center">
+                <TextBlock x:Name="StatusIconText"
+                          Text="✓"
+                          FontSize="18"
+                          Foreground="{StaticResource AppStatusCleanColor}"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center"
+                          FontWeight="Bold"/>
+            </Border>
+
+            <!-- Status Message with Progress Bar -->
+            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                <TextBlock x:Name="StatusMessageTextBlock"
+                          Text="{Binding Message}"
+                          Foreground="{StaticResource AppTextColor}"
+                          FontFamily="Segoe UI"
+                          FontSize="13"
+                          FontWeight="Medium"
+                          Margin="0,0,0,4"/>
+
+                <!-- Inline Progress Bar (shown during operations) -->
+                <ProgressBar x:Name="ProcessingProgressBar"
+                            Height="4"
+                            Minimum="0"
+                            Maximum="100"
+                            Value="{Binding ProgressPercentage}"
+                            Foreground="{StaticResource AppPrimaryColor}"
+                            Background="{StaticResource AppBorderColor}"
+                            Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}"
+                            Style="{StaticResource RoundedProgressBarStyle}"/>
+            </StackPanel>
+
+            <!-- Progress Percentage -->
+            <TextBlock Grid.Column="2"
+                      x:Name="ProgressPercentTextBlock"
+                      Text="{Binding ProgressPercentage, StringFormat={}{0:F0}%}"
+                      Foreground="{StaticResource AppTextTertiaryColor}"
+                      FontFamily="Consolas"
+                      FontSize="12"
+                      FontWeight="SemiBold"
+                      VerticalAlignment="Center"
+                      Margin="12,0"
+                      Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}"/>
+
+            <!-- Pack Button - FIXED BINDINGS -->
+            <Button x:Name="PackButton"
+                   Grid.Column="3"
+                   Content="Pack Now"
+                   Command="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=DataContext.PackCommand}"
+                   Style="{StaticResource Win11Button}"
+                   Height="40"
+                   FontSize="13"
+                   FontWeight="SemiBold"
+                   IsEnabled="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=DataContext.FileList.HasFiles}"
+                   MinWidth="120"
+                   Padding="20,0"
+                   Cursor="Hand">
+                <Button.Effect>
+                    <DropShadowEffect Color="{Binding Source={StaticResource AppPrimaryColor}, Path=Color}" 
+                                    Opacity="0.4" 
+                                    BlurRadius="15" 
+                                    ShadowDepth="0"/>
+                </Button.Effect>
+            </Button>
+        </Grid>
+    </Grid>
+</UserControl>

@@ -1,0 +1,39 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <AssemblyName>StubInstaller</AssemblyName>
+    <RootNamespace>StubInstaller</RootNamespace>
+    <Version>1.3.4</Version>
+    <Authors>PackItPro Team</Authors>
+    <UseWindowsForms>true</UseWindowsForms>
+    <UseWPF>true</UseWPF>
+
+    <!-- Single-file publishing configuration -->
+    <!-- Note: For development, we'll build normally. For release, we'll publish. -->
+    <!-- This enables building a self-contained single EXE for PackItPro -->
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+  </PropertyGroup>
+1.3.4
+  <!-- Configuration for Release builds to automatically publish -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <PublishDir>$(OutputPath)publish\</PublishDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+    <PackageReference Include="Vestris.ResourceLib" Version="2.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="placeholder.zip" />
+  </ItemGroup>
+
+</Project>
