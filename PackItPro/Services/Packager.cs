@@ -1,5 +1,4 @@
-﻿// PackItPro/Services/Packager.cs - v2.2
-using ICSharpCode.SharpZipLib.Zip;
+﻿using ICSharpCode.SharpZipLib.Zip;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -10,22 +9,32 @@ using System.Threading.Tasks;
 
 namespace PackItPro.Services
 {
-    // FIX: Static event removed entirely — it accumulates handlers across packaging
-    // operations, leaking memory. Callers use IProgress<> instead.
-    // public static event ProgressReportHandler? ProgressChanged;  ← DELETED
-
     public static class Packager
     {
-        // Deterministic ZIP timestamp — same content always produces same bytes.
-        // Professional packagers (NuGet, npm, Debian) do this.
+        // Deterministic ZIP timestamp so identical content always produces identical bytes.
         private static readonly DateTime ZipEpoch = new(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        /// <summary>
+        /// Maps the UI ComboBox index to a SharpZipLib compression level:
+        ///   0 = None     → store only (level 0)
+        ///   1 = Fast     → deflate default (level 6)
+        ///   2 = Maximum  → maximum deflate (level 9)
+        /// </summary>
+        private static int MapCompressionLevel(int uiIndex) => uiIndex switch
+        {
+            0 => 0,
+            1 => 6,
+            2 => 9,
+            _ => 6,
+        };
 
         public static async Task<string> CreatePackageAsync(
             List<string> filePaths,
             string outputDirectory,
             string packageName,
             bool requiresAdmin,
-            bool useLZMACompression,
+            int compressionLevel,
+            bool includeWingetUpdateScript,
             IProgress<(int percentage, string message)>? progress = null,
             ILogService? log = null,
             CancellationToken ct = default)
@@ -41,11 +50,9 @@ namespace PackItPro.Services
                 Directory.CreateDirectory(tempDir);
                 Report(progress, 5, "Preparing files...");
                 log.Info("========== PACKAGE CREATION START ==========");
-                log.Info($"Package: '{packageName}' | Files: {filePaths.Count} | Admin: {requiresAdmin}");
+                log.Info($"Package: '{packageName}' | Files: {filePaths.Count} | Admin: {requiresAdmin} | Compression: {compressionLevel} | Winget: {includeWingetUpdateScript}");
 
-                // ============================================================
-                // STEP 1: COPY FILES TO TEMP
-                // ============================================================
+                // STEP 1: Copy source files to temp directory
                 Report(progress, 8, "Copying files...");
                 log.Info($"STEP 1: Copying {filePaths.Count} file(s)...");
 
@@ -58,7 +65,6 @@ namespace PackItPro.Services
 
                     try
                     {
-                        // Verify accessible before committing to copy
                         using (File.Open(src, FileMode.Open, FileAccess.Read, FileShare.Read)) { }
                         File.Copy(src, dest, overwrite: true);
                         log.Info($"  [{i + 1}/{filePaths.Count}] {Path.GetFileName(src)} ({FormatBytes(new FileInfo(src).Length)})");
@@ -73,31 +79,36 @@ namespace PackItPro.Services
                     }
                     catch (IOException ex)
                     {
-                        // FIX: Catch all IOExceptions (not just sharing violations) and
-                        // give an actionable message for whichever error occurred.
                         throw new IOException(
                             $"Cannot read '{Path.GetFileName(src)}': {ex.Message}\n" +
                             "Ensure the file is not locked by another program.", ex);
                     }
                 }
 
-                // ============================================================
-                // STEP 2: GENERATE MANIFEST (no checksum yet)
-                // ============================================================
+                // STEP 1b: Write update_all.bat when Winget Updater is enabled.
+                // The manifest references this filename — the file must exist in the ZIP.
+                if (includeWingetUpdateScript)
+                {
+                    var batPath = Path.Combine(tempDir, "update_all.bat");
+                    await File.WriteAllTextAsync(batPath, WingetUpdaterScript(), ct);
+                    log.Info("  Winget updater script added: update_all.bat");
+                }
+
+                // STEP 2: Generate manifest
                 Report(progress, 20, "Generating manifest...");
                 log.Info("STEP 2: Generating manifest...");
 
-                var manifestJson = ManifestGenerator.Generate(filePaths, packageName, requiresAdmin);
+                var manifestJson = ManifestGenerator.Generate(
+                    filePaths,
+                    packageName,
+                    requiresAdmin,
+                    includeWingetUpdateScript);
+
                 var manifestPath = Path.Combine(tempDir, "packitmeta.json");
                 await File.WriteAllTextAsync(manifestPath, manifestJson, ct);
                 log.Info("  Manifest written (checksum pending).");
 
-                // ============================================================
-                // STEP 3: HASH INSTALLER FILES ONLY
-                // FileHasher.DefaultExclusions permanently skips packitmeta.json
-                // and install.log — no extra args needed.
-                // SHA256 over hundreds of MB is CPU-bound, run on thread pool.
-                // ============================================================
+                // STEP 3: Hash all files and embed the checksum in the manifest
                 Report(progress, 25, "Computing integrity hash...");
                 log.Info("STEP 3: Hashing installer files...");
 
@@ -112,12 +123,7 @@ namespace PackItPro.Services
                 await File.WriteAllTextAsync(manifestPath, manifestJson, ct);
                 log.Info("  Manifest updated with checksum.");
 
-                // ============================================================
-                // STEP 4: CREATE ZIP ARCHIVE
-                // SharpZipLib is synchronous — mixing async reads with sync ZIP
-                // writes creates fake async that blocks the thread pool.
-                // We push the ENTIRE compression work onto a background thread.
-                // ============================================================
+                // STEP 4: Create ZIP archive
                 Report(progress, 30, "Creating ZIP archive...");
                 log.Info("STEP 4: Compressing payload...");
 
@@ -125,9 +131,9 @@ namespace PackItPro.Services
 
                 var allFiles = Directory.GetFiles(tempDir, "*", SearchOption.AllDirectories).ToList();
                 long totalBytes = allFiles.Sum(f => new FileInfo(f).Length);
-                int level = useLZMACompression ? 9 : 6;
+                int zipLevel = MapCompressionLevel(compressionLevel);
 
-                log.Info($"  {allFiles.Count} file(s) | {FormatBytes(totalBytes)} | level {level}");
+                log.Info($"  {allFiles.Count} file(s) | {FormatBytes(totalBytes)} | ZIP level {zipLevel}");
 
                 long processedBytes = 0;
 
@@ -135,9 +141,9 @@ namespace PackItPro.Services
                 {
                     using var fs = new FileStream(zipPath, FileMode.Create, FileAccess.Write, FileShare.None, 1 << 20);
                     using var zip = new ZipOutputStream(fs);
-                    zip.SetLevel(level);
+                    zip.SetLevel(zipLevel);
 
-                    // Manifest first — stub needs it before anything else
+                    // Manifest goes first — stub reads it before extracting anything else
                     AddFileToZipSync(zip, manifestPath, "packitmeta.json", ZipEpoch);
 
                     var installers = allFiles
@@ -169,9 +175,7 @@ namespace PackItPro.Services
 
                 log.Info($"  ZIP: {FormatBytes(zipInfo.Length)} ({zipInfo.Length * 100.0 / Math.Max(totalBytes, 1):F1}% of original)");
 
-                // ============================================================
-                // STEP 5: INJECT PAYLOAD INTO STUB
-                // ============================================================
+                // STEP 5: Inject payload into the stub executable
                 Report(progress, 68, "Injecting payload into stub...");
                 log.Info("STEP 5: Injecting payload...");
 
@@ -187,9 +191,7 @@ namespace PackItPro.Services
 
                 log.Info("  Injection verified ✓");
 
-                // ============================================================
-                // STEP 6: MOVE TO FINAL LOCATION
-                // ============================================================
+                // STEP 6: Move to final output path
                 Report(progress, 92, "Finalizing...");
                 log.Info("STEP 6: Writing output...");
 
@@ -206,7 +208,7 @@ namespace PackItPro.Services
                 }
 
                 File.Move(finalTemp, outputPath, overwrite: true);
-                finalTemp = null; // consumed — don't delete in finally
+                finalTemp = null;
 
                 log.Info($"  Output: {outputPath} ({FormatBytes(new FileInfo(outputPath).Length)})");
                 Report(progress, 100, "Package created successfully!");
@@ -232,9 +234,31 @@ namespace PackItPro.Services
             }
         }
 
-        // ──────────────────────────────────────────────────────────────
-        // Sync ZIP helper — must be called from inside Task.Run
-        // ──────────────────────────────────────────────────────────────
+        // Embedded winget updater script. No external file dependency.
+        private static string WingetUpdaterScript() =>
+            """
+            @echo off
+            echo ============================================
+            echo  PackItPro - Winget Updater
+            echo  Updating all installed applications...
+            echo ============================================
+            echo.
+            where winget >nul 2>&1
+            if %ERRORLEVEL% NEQ 0 (
+                echo ERROR: winget is not installed or not in PATH.
+                echo Please install the App Installer from the Microsoft Store.
+                pause
+                exit /b 1
+            )
+            echo Running: winget upgrade --all --silent --accept-source-agreements
+            echo.
+            winget upgrade --all --silent --accept-source-agreements --accept-package-agreements
+            echo.
+            echo ============================================
+            echo  Update complete.
+            echo ============================================
+            pause
+            """;
 
         private static void AddFileToZipSync(
             ZipOutputStream zip, string filePath, string entryName, DateTime timestamp)
@@ -255,10 +279,6 @@ namespace PackItPro.Services
             zip.CloseEntry();
         }
 
-        // ──────────────────────────────────────────────────────────────
-        // Helpers
-        // ──────────────────────────────────────────────────────────────
-
         private static void TryDelete(string? path, bool isDir, ILogService log)
         {
             if (string.IsNullOrEmpty(path)) return;
@@ -271,9 +291,7 @@ namespace PackItPro.Services
         }
 
         private static void Report(IProgress<(int, string)>? p, int pct, string msg)
-        {
-            p?.Report((pct, msg));
-        }
+            => p?.Report((pct, msg));
 
         private static string FormatBytes(long b)
         {

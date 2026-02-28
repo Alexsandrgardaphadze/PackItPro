@@ -37,7 +37,7 @@ namespace StubInstaller
                     "========================================\n" +
                     "PackItPro Stub Installer Log\n" +
                     $"Stub version: {version}  Build: {buildDate}\n" +
-                    $"Started:    {DateTime.Now:yyyy-MM-dd HH:mm:ss}\n" +
+                    $"Started:    {DateTime.Now:dd-MM-yyyy HH:mm:ss}\n" +
                     $"Executable: {Environment.ProcessPath}\n" +
                     "========================================\n\n",
                     _utf8Bom);
@@ -49,7 +49,7 @@ namespace StubInstaller
         {
             var content =
                 "\n========================================\n" +
-                $"[ELEVATED RESUME] {DateTime.Now:yyyy-MM-dd HH:mm:ss}\n" +
+                $"[ELEVATED RESUME] {DateTime.Now:dd-MM-yyyy HH:mm:ss}\n" +
                 $"Process ID: {Process.GetCurrentProcess().Id}\n" +
                 "========================================\n\n";
 

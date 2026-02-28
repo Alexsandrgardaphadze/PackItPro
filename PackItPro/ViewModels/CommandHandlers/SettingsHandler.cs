@@ -1,5 +1,4 @@
-﻿// ViewModels/CommandHandlers/SettingsHandler.cs
-using PackItPro.Services;
+﻿using PackItPro.Services;
 using PackItPro.Views;
 using System;
 using System.IO;
@@ -9,9 +8,6 @@ using System.Windows.Input;
 
 namespace PackItPro.ViewModels.CommandHandlers
 {
-    /// <summary>
-    /// Handles all settings-related operations (Output Location, API Key, Cache, Logs)
-    /// </summary>
     public class SettingsHandler : CommandHandlerBase
     {
         private readonly SettingsViewModel _settings;
@@ -69,7 +65,6 @@ namespace PackItPro.ViewModels.CommandHandlers
 
             try
             {
-                // Test write permissions
                 var testFile = Path.Combine(dialog.SelectedPath, $"packitpro_test_{Guid.NewGuid()}.tmp");
                 await File.WriteAllTextAsync(testFile, "test");
                 File.Delete(testFile);
@@ -157,11 +152,29 @@ namespace PackItPro.ViewModels.CommandHandlers
 
         private void ExecuteExportLogs(object? parameter)
         {
-            var logPath = Path.Combine(_appDataDir, "packitpro.log");
-            if (!File.Exists(logPath))
+            // Check all candidate paths in priority order.
+            // The log location varies by App.xaml.cs revision, so we check all three.
+            string? logPath = null;
+            var candidates = new[]
+            {
+                Path.Combine(_appDataDir, "packitpro.log"),
+                Path.Combine(_appDataDir, "Logs", "packitpro.log"),
+                Path.Combine(_appDataDir, "Logs", "crash.log"),
+            };
+
+            foreach (var candidate in candidates)
+            {
+                if (File.Exists(candidate))
+                {
+                    logPath = candidate;
+                    break;
+                }
+            }
+
+            if (logPath == null)
             {
                 MessageBox.Show(
-                    "No log file exists yet.",
+                    $"No log file found yet.\n\nLooked in:\n{string.Join("\n", candidates)}",
                     "No Logs",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);

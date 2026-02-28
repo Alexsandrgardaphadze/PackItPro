@@ -1,5 +1,4 @@
-﻿// ViewModels/MainViewModel.cs - v2.7 ULTIMATE FIX
-using PackItPro.Services;
+﻿using PackItPro.Services;
 using PackItPro.ViewModels.CommandHandlers;
 using System;
 using System.Collections.Generic;
@@ -11,8 +10,8 @@ using System.Windows.Input;
 namespace PackItPro.ViewModels
 {
     /// <summary>
-    /// Main ViewModel — orchestrates CommandHandlers with proper command initialization.
-    /// FIX v2.7: Notifies UI when commands become available after InitializeAsync().
+    /// Main ViewModel — orchestrates CommandHandlers and sub-ViewModels.
+    /// Initializes all command handlers after async dependencies load.
     /// </summary>
     public class MainViewModel : INotifyPropertyChanged, IDisposable
     {

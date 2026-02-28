@@ -1,11 +1,4 @@
-﻿// ViewModels/CommandHandlers/VirusTotalCommandHandler.cs - v2.1 SMALL ISSUES FIX
-// Changes vs v2.0:
-//   - catch (Exception ex) where ex was unused → now logs the exception via _logService.
-//     The compiler warning (CS0168) pointed at real behaviour: scan failures were
-//     silently swallowed with no trace in the log, making diagnosis impossible.
-//     Now every per-file scan failure is logged with file name and exception details.
-//   - No other logic changes.
-using PackItPro.Models;
+﻿using PackItPro.Models;
 using PackItPro.Services;
 using System;
 using System.Collections.Generic;
@@ -56,6 +49,7 @@ namespace PackItPro.ViewModels.CommandHandlers
             CancelScanCommand = new RelayCommand(_ => CancelScan(), CanCancelScan);
 
             _status.PropertyChanged += OnStatusPropertyChanged;
+            _settings.PropertyChanged += OnSettingsPropertyChanged;
         }
 
         private void OnStatusPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -64,8 +58,18 @@ namespace PackItPro.ViewModels.CommandHandlers
                 RaiseCanExecuteChanged();
         }
 
+        private void OnSettingsPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName is nameof(SettingsViewModel.ScanWithVirusTotal)
+                               or nameof(SettingsViewModel.VirusTotalApiKey))
+                RaiseCanExecuteChanged();
+        }
+
         private bool CanExecuteScan(object? parameter) =>
-            _fileList.HasFiles && !_status.IsBusy && !string.IsNullOrWhiteSpace(_settings.VirusTotalApiKey);
+            _settings.ScanWithVirusTotal &&
+            _fileList.HasFiles &&
+            !_status.IsBusy &&
+            !string.IsNullOrWhiteSpace(_settings.VirusTotalApiKey);
 
         private bool CanCancelScan(object? parameter) =>
             _status.IsBusy && _scanCancellationTokenSource != null;
@@ -108,14 +112,6 @@ namespace PackItPro.ViewModels.CommandHandlers
 
         private async Task ExecuteScanFilesWithVirusTotalAsync()
         {
-            if (string.IsNullOrWhiteSpace(_settings.VirusTotalApiKey))
-            {
-                _error.ShowError(
-                    "VirusTotal API key is required for scanning.\n" +
-                    "Set it via Settings → VirusTotal API Key.");
-                return;
-            }
-
             var totalFiles = _fileList.Items.Count(f =>
                 !_settings.OnlyScanExecutables ||
                 _executableExtensions.Contains(Path.GetExtension(f.FilePath)));
@@ -172,17 +168,14 @@ namespace PackItPro.ViewModels.CommandHandlers
                         infectedFiles.Add(item);
 
                     _logService.Info(
-                        $"Scanned '{item.FileName}': {result.Positives}/{result.TotalScans} " +
-                        $"detections — {item.Status}");
+                        $"Scanned '{item.FileName}': {result.Positives}/{result.TotalScans} detections — {item.Status}");
                 }
                 catch (OperationCanceledException)
                 {
-                    throw; // propagate to outer handler
+                    throw;
                 }
                 catch (Exception ex)
                 {
-                    // FIX: was catch (Exception ex) with ex unused → warning CS0168
-                    // and silent failure. Now logged so failures are diagnosable.
                     _logService.Error($"Scan failed for '{item.FileName}'", ex);
                     item.Status = FileStatusEnum.ScanFailed;
                     failedCount++;
@@ -193,8 +186,6 @@ namespace PackItPro.ViewModels.CommandHandlers
                     UpdateProgress(processed, totalFiles);
                 }
             }
-
-            // ── Report results ─────────────────────────────────────────
 
             if (infectedFiles.Count > 0)
             {
@@ -249,6 +240,7 @@ namespace PackItPro.ViewModels.CommandHandlers
         public override void Dispose()
         {
             _status.PropertyChanged -= OnStatusPropertyChanged;
+            _settings.PropertyChanged -= OnSettingsPropertyChanged;
             _scanCancellationTokenSource?.Cancel();
             _scanCancellationTokenSource?.Dispose();
             base.Dispose();

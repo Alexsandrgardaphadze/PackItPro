@@ -1,14 +1,4 @@
-﻿// ViewModels/CommandHandlers/PackagingCommandHandler.cs - v2.5 SMALL ISSUES FIX
-// Changes vs v2.4 (Phase 1):
-//   - PackCommand now uses AsyncRelayCommand instead of RelayCommand.
-//     Previously: new RelayCommand(async _ => await ExecutePackAsync(), CanExecutePack)
-//     The async lambda assigned to Action<object?> becomes async void, which means
-//     any exception thrown inside ExecutePackAsync() after the first await would be
-//     lost to the thread pool and crash the app without showing an error dialog.
-//     AsyncRelayCommand properly wraps the async execution and prevents double-clicks
-//     during an in-progress pack via its _isExecuting guard.
-//   - No other logic changes from v2.4.
-using Microsoft.Win32;
+﻿using Microsoft.Win32;
 using PackItPro.Services;
 using System;
 using System.IO;
@@ -46,8 +36,6 @@ namespace PackItPro.ViewModels.CommandHandlers
             _error = error ?? throw new ArgumentNullException(nameof(error));
             _log = log ?? throw new ArgumentNullException(nameof(log));
 
-            // FIX: Use AsyncRelayCommand so async exceptions are not swallowed.
-            // RelayCommand(async _ => ...) produces async void which loses exceptions.
             PackCommand = new AsyncRelayCommand(ExecutePackAsync, CanExecutePack);
             TestPackageCommand = new RelayCommand(ExecuteTestPackage);
 
@@ -76,14 +64,12 @@ namespace PackItPro.ViewModels.CommandHandlers
 
             try
             {
-                // ── Validate ─────────────────────────────────────────────
                 if (!_settings.ValidateSettings(out var settingsError))
                 {
                     _error.ShowError($"Cannot create package: {settingsError}");
                     return;
                 }
 
-                // ── Choose output path ────────────────────────────────────
                 var saveDialog = new SaveFileDialog
                 {
                     Filter = "PackItPro Executable (*.exe)|*.exe",
@@ -95,7 +81,34 @@ namespace PackItPro.ViewModels.CommandHandlers
 
                 if (saveDialog.ShowDialog() != true) return;
 
-                // ── Begin ─────────────────────────────────────────────────
+                // Generate manifest and validate before packing starts
+                string packageName = Path.GetFileNameWithoutExtension(saveDialog.FileName);
+                var filePaths = _fileList.Items.Select(f => f.FilePath).ToList();
+
+                try
+                {
+                    var manifestJson = ManifestGenerator.Generate(
+                        filePaths,
+                        packageName,
+                        _settings.RequiresAdmin,
+                        _settings.IncludeWingetUpdateScript);
+
+                    var manifestObj = System.Text.Json.JsonSerializer.Deserialize<PackageManifest>(manifestJson)
+                        ?? throw new InvalidOperationException("Failed to deserialize manifest.");
+
+                    // Validate manifest before showing summary
+                    ManifestValidator.Validate(manifestObj);
+
+                    // Show summary to user
+                    ShowPackagingSummary(packageName, filePaths);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    _log.Error("Manifest validation failed", ex);
+                    _error.ShowError($"Package configuration invalid:\n\n{ex.Message}");
+                    return;
+                }
+
                 _status.SetStatusPacking();
                 _packCts = new CancellationTokenSource();
 
@@ -107,16 +120,16 @@ namespace PackItPro.ViewModels.CommandHandlers
                 });
 
                 string outputPath = await Packager.CreatePackageAsync(
-                    _fileList.Items.Select(f => f.FilePath).ToList(),
-                    Path.GetDirectoryName(saveDialog.FileName) ?? _settings.OutputLocation,
-                    Path.GetFileNameWithoutExtension(saveDialog.FileName),
-                    _settings.RequiresAdmin,
-                    _settings.UseLZMACompression,
-                    progress,
-                    _log,
-                    _packCts.Token);
+                    filePaths: filePaths,
+                    outputDirectory: Path.GetDirectoryName(saveDialog.FileName) ?? _settings.OutputLocation,
+                    packageName: packageName,
+                    requiresAdmin: _settings.RequiresAdmin,
+                    compressionLevel: _settings.CompressionLevel,
+                    includeWingetUpdateScript: _settings.IncludeWingetUpdateScript,
+                    progress: progress,
+                    log: _log,
+                    ct: _packCts.Token);
 
-                // ── Success ───────────────────────────────────────────────
                 succeeded = true;
                 _status.SetStatusSuccess($"Package created — {Path.GetFileName(outputPath)}");
 
@@ -190,6 +203,32 @@ namespace PackItPro.ViewModels.CommandHandlers
             }
         }
 
+        private void ShowPackagingSummary(string packageName, System.Collections.Generic.List<string> filePaths)
+        {
+            var summary = new PackagingSummaryViewModel();
+            summary.UpdateFromSettings(
+                packageName: packageName,
+                fileCount: filePaths.Count,
+                compressionMethod: _settings.SettingsModel.CompressionMethod,
+                requiresAdmin: _settings.RequiresAdmin,
+                includeWingetUpdater: _settings.IncludeWingetUpdateScript,
+                verifyIntegrity: _settings.VerifyIntegrity,
+                filePaths: filePaths);
+
+            var msg = $"Package Summary\n" +
+                      $"═══════════════════════════════════════\n" +
+                      $"Name:                  {summary.PackageName}\n" +
+                      $"Files:                 {summary.FileCount}\n" +
+                      $"Estimated Size:        {summary.EstimatedSize}\n" +
+                      $"Compression:           {summary.CompressionMethod}\n" +
+                      $"Requires Admin:        {(summary.RequiresAdmin ? "Yes" : "No")}\n" +
+                      $"Integrity Verification: {(summary.VerifyIntegrity ? "Yes" : "No")}\n" +
+                      $"Winget Updater:        {(summary.IncludeWingetUpdater ? "Yes" : "No")}\n" +
+                      $"═══════════════════════════════════════";
+
+            _log.Info(msg);
+        }
+
         private void ExecuteTestPackage(object? parameter)
         {
             MessageBox.Show(
@@ -213,8 +252,6 @@ namespace PackItPro.ViewModels.CommandHandlers
                 "   copy publish\\StubInstaller.exe ..\\PackItPro\\Resources\\StubInstaller.exe\n" +
                 "4. Rebuild PackItPro.");
         }
-
-        // ── Helpers ──────────────────────────────────────────────────────
 
         private static bool IsFileLockedException(IOException ex)
         {
