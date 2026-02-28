@@ -428,7 +428,7 @@
     "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
   },
   "project": {
-    "version": "1.3.3",
+    "version": "1.3.4",
     "restore": {
       "projectUniqueName": "C:\\Users\\Alex\\Desktop\\Visual Studio 2022 Projects\\PackItPro-repo\\StubInstaller\\StubInstaller.csproj",
       "projectName": "StubInstaller",
