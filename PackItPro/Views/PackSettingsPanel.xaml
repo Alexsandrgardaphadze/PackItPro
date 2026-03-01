@@ -196,7 +196,8 @@
                       FontSize="13"
                       Background="{StaticResource AppCardColor}"
                       Foreground="{StaticResource AppTextColor}"
-                      BorderBrush="{StaticResource AppBorderColor}">
+                      BorderBrush="{StaticResource AppBorderColor}"
+                      ToolTip="Choose compression method for the final .exe package">
 
                 <!-- ✅ FIX: Override system colors AND ComboBox dropdown style -->
                 <ComboBox.Resources>
@@ -231,9 +232,15 @@
                     </Style>
                 </ComboBox.ItemContainerStyle>
 
-                <ComboBoxItem Content="None (Fastest)"/>
-                <ComboBoxItem Content="Fast (Recommended)"/>
-                <ComboBoxItem Content="Maximum (Smallest)"/>
+                <ComboBoxItem ToolTip="No compression. Fastest packing, largest output. Use when packaging already-compressed files (video, installers).">
+                    None (Fastest)
+                </ComboBoxItem>
+                <ComboBoxItem ToolTip="Standard DEFLATE compression (level 6). Good balance between packing speed and output size. Recommended for most packages.">
+                    Fast (Recommended)
+                </ComboBoxItem>
+                <ComboBoxItem ToolTip="Maximum DEFLATE compression (level 9). Slowest packing but best compression, especially for text/source files.">
+                    Maximum (Smallest)
+                </ComboBoxItem>
             </ComboBox>
 
             <!-- Require Admin -->

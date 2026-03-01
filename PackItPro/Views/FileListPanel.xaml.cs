@@ -1,8 +1,9 @@
-﻿// Views/FileListPanel.xaml.cs - UPDATED VERSION
+﻿// Views/FileListPanel.xaml.cs - FINAL VERSION
 using PackItPro.ViewModels;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 
@@ -11,6 +12,8 @@ namespace PackItPro.Views
     public partial class FileListPanel : UserControl
     {
         private Storyboard? _pulseAnimation;
+        private int _draggedIndex = -1;
+        private int _dragOverIndex = -1;
 
         public FileListPanel()
         {
@@ -35,6 +38,87 @@ namespace PackItPro.Views
                 _pulseAnimation?.Stop();
             }
         }
+
+        // ── Drag-to-Reorder Support ───────────────────────────────────────────
+
+        private void FileListView_PreviewMouseMove(object sender, MouseEventArgs e)
+        {
+            if (e.LeftButton != MouseButtonState.Pressed) return;
+            if (sender is not ListView lv) return;
+
+            var hit = lv.InputHitTest(e.GetPosition(lv)) as DependencyObject;
+            var listViewItem = WalkUpVisualTree<ListViewItem>(hit);
+            if (listViewItem == null) return;
+
+            var fileItem = listViewItem.DataContext as FileItemViewModel;
+            if (fileItem == null) return;
+
+            _draggedIndex = lv.Items.IndexOf(fileItem);
+            DragDrop.DoDragDrop(lv, fileItem, DragDropEffects.Move);
+        }
+
+        private void FileListView_DragEnter(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetData(typeof(FileItemViewModel)) != null)
+            {
+                e.Effects = DragDropEffects.Move;
+            }
+            e.Handled = true;
+        }
+
+        private void FileListView_DragLeave(object sender, DragEventArgs e)
+        {
+            e.Handled = true;
+        }
+
+        private void FileListView_Drop(object sender, DragEventArgs e)
+        {
+            if (sender is not ListView lv) return;
+            if (e.Data.GetData(typeof(FileItemViewModel)) is not FileItemViewModel fileItem) return;
+
+            int fromIndex = lv.Items.IndexOf(fileItem);
+            int toIndex = GetInsertIndex(lv, e.GetPosition(lv));
+
+            if (fromIndex < 0 || toIndex < 0 || fromIndex == toIndex) return;
+
+            var vm = (FileListViewModel)lv.DataContext;
+            vm.Items.Move(fromIndex, toIndex);
+
+            // Update InstallOrder to match list position
+            for (int i = 0; i < vm.Items.Count; i++)
+            {
+                vm.Items[i].InstallOrder = i;
+            }
+
+            e.Handled = true;
+        }
+
+        private int GetInsertIndex(ListView lv, Point point)
+        {
+            var item = lv.InputHitTest(point) as DependencyObject;
+            var listViewItem = WalkUpVisualTree<ListViewItem>(item);
+
+            if (listViewItem == null)
+                return lv.Items.Count;
+
+            int index = lv.Items.IndexOf(listViewItem.DataContext);
+            var rect = VisualTreeHelper.GetDescendantBounds(listViewItem);
+
+            // Drop in upper half = before this item, lower half = after
+            return point.Y < rect.Height / 2 ? index : index + 1;
+        }
+
+        private static T? WalkUpVisualTree<T>(DependencyObject? element) where T : DependencyObject
+        {
+            while (element != null)
+            {
+                if (element is T match) return match;
+                element = VisualTreeHelper.GetParent(element);
+            }
+            return null;
+        }
+
+        // ── File Drop Support (External Files) ─────────────────────────────────
 
         private void UserControl_DragEnter(object sender, DragEventArgs e)
         {

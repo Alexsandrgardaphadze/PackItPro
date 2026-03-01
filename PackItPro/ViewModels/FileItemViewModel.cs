@@ -59,6 +59,7 @@ namespace PackItPro.ViewModels
         private FileStatusEnum _status = FileStatusEnum.Pending;
         private int _positives;
         private int _totalScans;
+        private int _installOrder;
 
         // ── Properties ─────────────────────────────────────────────────
 
@@ -103,6 +104,17 @@ namespace PackItPro.ViewModels
         {
             get => _totalScans;
             set { _totalScans = value; OnPropertyChanged(); }
+        }
+
+        /// <summary>
+        /// Install order for packaging. Set to match list position during drag-to-reorder.
+        /// Default 0 is ignored by packager (uses list order instead), so this is purely
+        /// a visual aid to show users the install sequence.
+        /// </summary>
+        public int InstallOrder
+        {
+            get => _installOrder;
+            set { _installOrder = value; OnPropertyChanged(); }
         }
 
         public ICommand? RemoveCommand { get; set; }

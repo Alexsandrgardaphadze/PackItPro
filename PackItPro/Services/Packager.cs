@@ -48,12 +48,12 @@ namespace PackItPro.Services
             try
             {
                 Directory.CreateDirectory(tempDir);
-                Report(progress, 5, "Preparing files...");
+                Report(progress, 5, "Step 1 of 6 — Preparing files...");
                 log.Info("========== PACKAGE CREATION START ==========");
                 log.Info($"Package: '{packageName}' | Files: {filePaths.Count} | Admin: {requiresAdmin} | Compression: {compressionLevel} | Winget: {includeWingetUpdateScript}");
 
                 // STEP 1: Copy source files to temp directory
-                Report(progress, 8, "Copying files...");
+                Report(progress, 8, "Step 1 of 6 — Copying files...");
                 log.Info($"STEP 1: Copying {filePaths.Count} file(s)...");
 
                 for (int i = 0; i < filePaths.Count; i++)
@@ -69,7 +69,7 @@ namespace PackItPro.Services
                         File.Copy(src, dest, overwrite: true);
                         log.Info($"  [{i + 1}/{filePaths.Count}] {Path.GetFileName(src)} ({FormatBytes(new FileInfo(src).Length)})");
                         Report(progress, 8 + (int)((i + 1.0) / filePaths.Count * 12),
-                            $"Copying files ({i + 1}/{filePaths.Count})...");
+                            $"Step 1 of 6 — Copying files ({i + 1}/{filePaths.Count})...");
                     }
                     catch (UnauthorizedAccessException ex)
                     {
@@ -95,7 +95,7 @@ namespace PackItPro.Services
                 }
 
                 // STEP 2: Generate manifest
-                Report(progress, 20, "Generating manifest...");
+                Report(progress, 20, "Step 2 of 6 — Generating manifest...");
                 log.Info("STEP 2: Generating manifest...");
 
                 var manifestJson = ManifestGenerator.Generate(
@@ -109,7 +109,7 @@ namespace PackItPro.Services
                 log.Info("  Manifest written (checksum pending).");
 
                 // STEP 3: Hash all files and embed the checksum in the manifest
-                Report(progress, 25, "Computing integrity hash...");
+                Report(progress, 25, "Step 3 of 6 — Computing integrity hash...");
                 log.Info("STEP 3: Hashing installer files...");
 
                 string dirHash = await Task.Run(
@@ -124,7 +124,7 @@ namespace PackItPro.Services
                 log.Info("  Manifest updated with checksum.");
 
                 // STEP 4: Create ZIP archive
-                Report(progress, 30, "Creating ZIP archive...");
+                Report(progress, 30, "Step 4 of 6 — Compressing payload (will take a moment)...");
                 log.Info("STEP 4: Compressing payload...");
 
                 zipPath = Path.Combine(Path.GetTempPath(), $"payload_{Guid.NewGuid()}.zip");
@@ -132,8 +132,15 @@ namespace PackItPro.Services
                 var allFiles = Directory.GetFiles(tempDir, "*", SearchOption.AllDirectories).ToList();
                 long totalBytes = allFiles.Sum(f => new FileInfo(f).Length);
                 int zipLevel = MapCompressionLevel(compressionLevel);
+                string compressionDesc = compressionLevel switch
+                {
+                    0 => "Store (no compression)",
+                    1 => "Fast (level 6)",
+                    2 => "Maximum (level 9)",
+                    _ => "Default"
+                };
 
-                log.Info($"  {allFiles.Count} file(s) | {FormatBytes(totalBytes)} | ZIP level {zipLevel}");
+                log.Info($"  {allFiles.Count} file(s) | {FormatBytes(totalBytes)} | ZIP level {zipLevel} ({compressionDesc})");
 
                 long processedBytes = 0;
 
@@ -163,7 +170,7 @@ namespace PackItPro.Services
                         processedBytes += fileSize;
                         int pct = 30 + (int)(processedBytes / (double)totalBytes * 35);
                         Report(progress, Math.Min(pct, 65),
-                            $"Compressing {Path.GetFileName(filePath)} ({i + 1}/{installers.Count})...");
+                            $"Step 4 of 6 — Compressing {Path.GetFileName(filePath)} ({i + 1}/{installers.Count})...");
                     }
 
                     zip.Finish();
@@ -176,7 +183,7 @@ namespace PackItPro.Services
                 log.Info($"  ZIP: {FormatBytes(zipInfo.Length)} ({zipInfo.Length * 100.0 / Math.Max(totalBytes, 1):F1}% of original)");
 
                 // STEP 5: Inject payload into the stub executable
-                Report(progress, 68, "Injecting payload into stub...");
+                Report(progress, 68, "Step 5 of 6 — Injecting payload into stub...");
                 log.Info("STEP 5: Injecting payload...");
 
                 string stubPath = StubLocator.FindStubInstaller(log);
@@ -192,7 +199,7 @@ namespace PackItPro.Services
                 log.Info("  Injection verified ✓");
 
                 // STEP 6: Move to final output path
-                Report(progress, 92, "Finalizing...");
+                Report(progress, 92, "Step 6 of 6 — Finalizing...");
                 log.Info("STEP 6: Writing output...");
 
                 string outputPath = Path.Combine(outputDirectory, $"{packageName}.exe");
@@ -211,7 +218,7 @@ namespace PackItPro.Services
                 finalTemp = null;
 
                 log.Info($"  Output: {outputPath} ({FormatBytes(new FileInfo(outputPath).Length)})");
-                Report(progress, 100, "Package created successfully!");
+                Report(progress, 100, "✅ Package created successfully!");
                 log.Info("========== PACKAGE CREATION SUCCESS ==========");
 
                 return outputPath;
