@@ -102,10 +102,12 @@ namespace PackItPro.Views
                 return lv.Items.Count;
 
             int index = lv.Items.IndexOf(listViewItem.DataContext);
-            var rect = VisualTreeHelper.GetDescendantBounds(listViewItem);
+            var itemPos = listViewItem.TranslatePoint(new Point(0, 0), lv);
+            var itemHeight = listViewItem.ActualHeight;
 
-            // Drop in upper half = before this item, lower half = after
-            return point.Y < rect.Height / 2 ? index : index + 1;
+            return point.Y < itemPos.Y + itemHeight / 2
+                ? index
+                : index + 1;
         }
 
         private static T? WalkUpVisualTree<T>(DependencyObject? element) where T : DependencyObject
