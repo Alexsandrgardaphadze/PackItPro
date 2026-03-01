@@ -1,21 +1,20 @@
-﻿using PackItPro.Services;
+﻿// PackItPro/ViewModels/MainViewModel.cs
+using PackItPro.Services;
 using PackItPro.ViewModels.CommandHandlers;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
+using System.Net.Http;
 using System.Threading.Tasks;
 using System.Windows.Input;
 
 namespace PackItPro.ViewModels
 {
-    /// <summary>
-    /// Main ViewModel — orchestrates CommandHandlers and sub-ViewModels.
-    /// Initializes all command handlers after async dependencies load.
-    /// </summary>
     public class MainViewModel : INotifyPropertyChanged, IDisposable
     {
         #region Fields
+
         private readonly string _appDataDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PackItPro");
         private readonly string _cacheFilePath;
@@ -25,30 +24,41 @@ namespace PackItPro.ViewModels
             ".scr", ".pif", ".gadget", ".application", ".msc", ".cpl", ".hta", ".reg",
             ".vb", ".vbe", ".jse", ".ws", ".wsf", ".wsc", ".wsh", ".lnk", ".inf", ".scf"
         };
+
         private VirusTotalClient? _virusTotalClient;
         private readonly ILogService _logService;
+        private readonly HttpClient _httpClient;
+        private readonly UpdateService _updateService;
         private bool _isInitialized;
         private bool _disposed;
+
         #endregion
 
         #region Sub-ViewModels
+
         public ErrorViewModel Error { get; }
         public FileListViewModel FileList { get; }
         public SettingsViewModel Settings { get; }
         public SummaryViewModel Summary { get; }
         public StatusViewModel Status { get; }
+
         #endregion
 
         #region Command Handlers
+
         private PackagingCommandHandler? _packagingHandler;
         private FileOperationsHandler? _fileOperationsHandler;
         private SettingsHandler? _settingsHandler;
         private VirusTotalCommandHandler? _virusTotalHandler;
         private HelpHandler? _helpHandler;
         private ApplicationHandler? _applicationHandler;
+
         #endregion
 
         #region Commands
+
+        private static readonly ICommand NullCommand = new RelayCommand(_ => { });
+
         public ICommand PackCommand => _packagingHandler?.PackCommand ?? NullCommand;
         public ICommand TestPackageCommand => _packagingHandler?.TestPackageCommand ?? NullCommand;
         public ICommand BrowseFilesCommand => _fileOperationsHandler?.BrowseFilesCommand ?? NullCommand;
@@ -69,7 +79,6 @@ namespace PackItPro.ViewModels
         public ICommand AboutCommand => _helpHandler?.AboutCommand ?? NullCommand;
         public ICommand ExitCommand => _applicationHandler?.ExitCommand ?? NullCommand;
 
-        private static readonly ICommand NullCommand = new RelayCommand(_ => { });
         #endregion
 
         public MainViewModel()
@@ -79,6 +88,10 @@ namespace PackItPro.ViewModels
 
             var logPath = Path.Combine(_appDataDir, "packitpro.log");
             _logService = new FileLogService(logPath);
+
+            // HttpClient is long-lived — one instance per application
+            _httpClient = new HttpClient();
+            _updateService = new UpdateService(_httpClient);
 
             Settings = new SettingsViewModel(Path.Combine(_appDataDir, "settings.json"));
             FileList = new FileListViewModel(Settings.SettingsModel, _executableExtensions);
@@ -91,8 +104,9 @@ namespace PackItPro.ViewModels
 
         private void EnsureAppDataDirectoryExists()
         {
-            if (!Directory.Exists(_appDataDir))
-                Directory.CreateDirectory(_appDataDir);
+            Directory.CreateDirectory(_appDataDir);
+            Directory.CreateDirectory(Path.Combine(_appDataDir, "Logs"));
+            Directory.CreateDirectory(Path.Combine(_appDataDir, "Cache"));
         }
 
         public async Task InitializeAsync()
@@ -111,8 +125,6 @@ namespace PackItPro.ViewModels
                 _logService.Info("VirusTotal initialized");
 
                 InitializeHandlers();
-
-                // ✅ CRITICAL FIX: Notify ALL command properties
                 NotifyAllCommandsAvailable();
 
                 _isInitialized = true;
@@ -133,12 +145,11 @@ namespace PackItPro.ViewModels
             _virusTotalHandler = new VirusTotalCommandHandler(FileList, Settings, Status, Error, _virusTotalClient!, _logService, _executableExtensions);
             _fileOperationsHandler = new FileOperationsHandler(FileList, Settings, ScanFilesCommand);
             _settingsHandler = new SettingsHandler(Settings, Status, Error, _virusTotalClient, _cacheFilePath, _appDataDir, _logService);
-            _helpHandler = new HelpHandler();
+            _helpHandler = new HelpHandler(_updateService, Status, _logService);
             _applicationHandler = new ApplicationHandler(Settings);
-            _logService.Info("Handlers initialized");
+            _logService.Info("All handlers initialized");
         }
 
-        // ✅ FIX: Tell WPF that commands are now available
         private void NotifyAllCommandsAvailable()
         {
             OnPropertyChanged(nameof(PackCommand));
@@ -168,7 +179,7 @@ namespace PackItPro.ViewModels
             if (_disposed) return;
             if (disposing)
             {
-                _logService.Info("Disposing...");
+                _logService.Info("Disposing MainViewModel...");
                 _packagingHandler?.Dispose();
                 _virusTotalHandler?.Dispose();
                 _fileOperationsHandler?.Dispose();
@@ -179,7 +190,7 @@ namespace PackItPro.ViewModels
                 Summary?.Dispose();
                 Settings?.Dispose();
                 _virusTotalClient?.Dispose();
-                _logService.Info("Disposed");
+                _httpClient?.Dispose();
             }
             _disposed = true;
         }
@@ -191,7 +202,9 @@ namespace PackItPro.ViewModels
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
-        protected virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string? propertyName = null) =>
+
+        protected virtual void OnPropertyChanged(
+            [System.Runtime.CompilerServices.CallerMemberName] string? propertyName = null) =>
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 }

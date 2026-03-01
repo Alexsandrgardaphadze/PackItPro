@@ -1,7 +1,9 @@
-﻿using PackItPro.Services;
+﻿// PackItPro/ViewModels/CommandHandlers/SettingsHandler.cs
+using PackItPro.Services;
 using PackItPro.Views;
 using System;
 using System.IO;
+using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
@@ -50,6 +52,8 @@ namespace PackItPro.ViewModels.CommandHandlers
             ViewCacheCommand = new RelayCommand(ExecuteViewCache);
         }
 
+        // ── Output Location ───────────────────────────────────────────────────
+
         private async Task ExecuteSetOutputLocationAsync()
         {
             var dialog = new System.Windows.Forms.FolderBrowserDialog
@@ -72,6 +76,7 @@ namespace PackItPro.ViewModels.CommandHandlers
                 _settings.OutputLocation = dialog.SelectedPath;
                 await _settings.SaveSettingsAsync();
                 _status.Message = $"Output location set to: {dialog.SelectedPath}";
+                _log.Info($"Output location changed to: {dialog.SelectedPath}");
             }
             catch (UnauthorizedAccessException)
             {
@@ -84,6 +89,8 @@ namespace PackItPro.ViewModels.CommandHandlers
             }
         }
 
+        // ── VirusTotal API Key ────────────────────────────────────────────────
+
         private void ExecuteSetVirusApiKey(object? parameter)
         {
             var dialog = new InputDialog(
@@ -93,7 +100,7 @@ namespace PackItPro.ViewModels.CommandHandlers
 
             if (dialog.ShowDialog() != true) return;
 
-            var key = dialog.Answer.Trim();
+            var key = dialog.Answer?.Trim() ?? "";
             if (string.IsNullOrWhiteSpace(key))
             {
                 _error.ShowError("API key cannot be empty.");
@@ -104,7 +111,7 @@ namespace PackItPro.ViewModels.CommandHandlers
             {
                 _error.ShowError(
                     "VirusTotal API keys must be exactly 64 characters long.\n\n" +
-                    "Get your key from: https://www.virustotal.com/gui/user-settings/apikey");
+                    "Get your free key at: https://www.virustotal.com/gui/user-settings/apikey");
                 return;
             }
 
@@ -114,16 +121,29 @@ namespace PackItPro.ViewModels.CommandHandlers
 
             MessageBox.Show(
                 "API key saved successfully!\n\n" +
-                "Note: Keys are stored locally and never transmitted by PackItPro.",
-                "Success",
+                "Keys are stored locally and never sent anywhere by PackItPro.",
+                "VirusTotal API Key Saved",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
+
+            _log.Info("VirusTotal API key updated.");
         }
+
+        // ── Clear Cache ───────────────────────────────────────────────────────
 
         private void ExecuteClearCache(object? parameter)
         {
+            // Show cache info before asking to clear
+            string sizeInfo = "";
+            if (File.Exists(_cacheFilePath))
+            {
+                var size = new FileInfo(_cacheFilePath).Length;
+                sizeInfo = $"\n\nCache file: {FormatBytes(size)}";
+            }
+
             var result = MessageBox.Show(
-                "Clear VirusTotal scan cache?\n\nThis will force re-scanning of all files on next scan.",
+                $"Clear VirusTotal scan cache?{sizeInfo}\n\n" +
+                "All cached scan results will be deleted. The next scan will re-submit every file to VirusTotal.",
                 "Clear Cache",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Warning);
@@ -133,10 +153,10 @@ namespace PackItPro.ViewModels.CommandHandlers
             try
             {
                 _virusTotalClient?.ClearCache();
-
                 if (File.Exists(_cacheFilePath))
                     File.Delete(_cacheFilePath);
 
+                _log.Info("VirusTotal scan cache cleared.");
                 MessageBox.Show(
                     "Scan cache cleared successfully.",
                     "Cache Cleared",
@@ -150,11 +170,10 @@ namespace PackItPro.ViewModels.CommandHandlers
             }
         }
 
+        // ── Export Logs ───────────────────────────────────────────────────────
+
         private void ExecuteExportLogs(object? parameter)
         {
-            // Check all candidate paths in priority order.
-            // The log location varies by App.xaml.cs revision, so we check all three.
-            string? logPath = null;
             var candidates = new[]
             {
                 Path.Combine(_appDataDir, "packitpro.log"),
@@ -162,20 +181,17 @@ namespace PackItPro.ViewModels.CommandHandlers
                 Path.Combine(_appDataDir, "Logs", "crash.log"),
             };
 
+            string? logPath = null;
             foreach (var candidate in candidates)
             {
-                if (File.Exists(candidate))
-                {
-                    logPath = candidate;
-                    break;
-                }
+                if (File.Exists(candidate)) { logPath = candidate; break; }
             }
 
             if (logPath == null)
             {
                 MessageBox.Show(
                     $"No log file found yet.\n\nLooked in:\n{string.Join("\n", candidates)}",
-                    "No Logs",
+                    "No Logs Found",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
                 return;
@@ -193,8 +209,9 @@ namespace PackItPro.ViewModels.CommandHandlers
             try
             {
                 File.Copy(logPath, dialog.FileName, overwrite: true);
+                _log.Info($"Log exported to: {dialog.FileName}");
                 MessageBox.Show(
-                    $"Logs exported to:\n{dialog.FileName}",
+                    $"Log exported to:\n{dialog.FileName}",
                     "Export Successful",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
@@ -202,26 +219,146 @@ namespace PackItPro.ViewModels.CommandHandlers
             catch (Exception ex)
             {
                 _log.Error("Log export failed", ex);
-                _error.ShowError($"Failed to export logs: {ex.Message}");
+                _error.ShowError($"Failed to export log: {ex.Message}");
             }
         }
 
+        // ── PackItPro Settings ────────────────────────────────────────────────
+        // Shows a dialog to edit all AppSettings fields that don't have
+        // dedicated UI controls elsewhere.
+
         private void ExecutePackItProSettings(object? parameter)
         {
-            MessageBox.Show(
-                "Settings dialog not yet implemented.\n\nUse Settings menu for now.",
-                "Settings",
-                MessageBoxButton.OK,
+            var current = _settings.SettingsModel;
+
+            var sb = new StringBuilder();
+            sb.AppendLine("Current settings (edit settings.json to change advanced options):\n");
+            sb.AppendLine($"  Output Location:          {current.OutputLocation}");
+            sb.AppendLine($"  Output File Name:         {current.OutputFileName}");
+            sb.AppendLine($"  Compression Level:        {current.CompressionLevel} (0=None, 1=Fast, 2=Max)");
+            sb.AppendLine($"  Requires Admin:           {current.RequiresAdmin}");
+            sb.AppendLine($"  Include Winget Updater:   {current.IncludeWingetUpdateScript}");
+            sb.AppendLine($"  Verify Integrity:         {current.VerifyIntegrity}");
+            sb.AppendLine($"  Scan With VirusTotal:     {current.ScanWithVirusTotal}");
+            sb.AppendLine($"  Only Scan Executables:    {current.OnlyScanExecutables}");
+            sb.AppendLine($"  Auto-Remove Infected:     {current.AutoRemoveInfectedFiles}");
+            sb.AppendLine($"  Min Detections to Flag:   {current.MinimumDetectionsToFlag}");
+            sb.AppendLine($"  Max Files in List:        {current.MaxFilesInList}");
+            sb.AppendLine($"\nSettings file:\n  {Path.Combine(_appDataDir, "settings.json")}");
+
+            var result = MessageBox.Show(
+                sb.ToString() +
+                "\n\nOpen the settings file in Notepad to edit advanced options?",
+                "PackItPro Settings",
+                MessageBoxButton.YesNo,
                 MessageBoxImage.Information);
+
+            if (result == MessageBoxResult.Yes)
+            {
+                var settingsPath = Path.Combine(_appDataDir, "settings.json");
+                if (!File.Exists(settingsPath))
+                {
+                    // Write current settings to disk first so Notepad has something to open
+                    _ = _settings.SaveSettingsAsync();
+                    System.Threading.Thread.Sleep(200); // give Save a moment
+                }
+
+                try
+                {
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = "notepad.exe",
+                        Arguments = $"\"{settingsPath}\"",
+                        UseShellExecute = true
+                    });
+                }
+                catch (Exception ex)
+                {
+                    _error.ShowError($"Could not open Notepad: {ex.Message}\n\nFile is at:\n{settingsPath}");
+                }
+            }
         }
+
+        // ── View Cache ────────────────────────────────────────────────────────
+        // Shows a human-readable summary of what's in the scan cache.
 
         private void ExecuteViewCache(object? parameter)
         {
-            MessageBox.Show(
-                "Cache viewer not yet implemented.",
-                "View Cache",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
+            if (!File.Exists(_cacheFilePath))
+            {
+                MessageBox.Show(
+                    "No scan cache exists yet.\n\n" +
+                    "The cache is created automatically after your first VirusTotal scan.",
+                    "Cache Empty",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            try
+            {
+                var fileInfo = new FileInfo(_cacheFilePath);
+                string json = File.ReadAllText(_cacheFilePath);
+
+                // Count entries — each top-level key is one cached file
+                int entryCount = CountJsonTopLevelKeys(json);
+
+                var result = MessageBox.Show(
+                    $"VirusTotal Scan Cache\n\n" +
+                    $"  Entries:     {entryCount} file(s)\n" +
+                    $"  Cache size:  {FormatBytes(fileInfo.Length)}\n" +
+                    $"  Last modified: {fileInfo.LastWriteTime:yyyy-MM-dd HH:mm:ss}\n" +
+                    $"  Location:    {_cacheFilePath}\n\n" +
+                    "Open cache file in Notepad to inspect individual entries?",
+                    "View Cache",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Information);
+
+                if (result == MessageBoxResult.Yes)
+                {
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = "notepad.exe",
+                        Arguments = $"\"{_cacheFilePath}\"",
+                        UseShellExecute = true
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Error("View cache failed", ex);
+                _error.ShowError($"Failed to read cache: {ex.Message}");
+            }
+        }
+
+        // ── Helpers ───────────────────────────────────────────────────────────
+
+        // Rough JSON key counter — counts `"hash":` patterns as a proxy for entry count.
+        // Avoids taking a full JSON library dependency just for a count.
+        private static int CountJsonTopLevelKeys(string json)
+        {
+            // Each cache entry starts with a quoted SHA hash key.
+            // Count occurrences of `":` after a `"` that follows `{` or `,` — good enough.
+            int count = 0;
+            bool inString = false;
+            int depth = 0;
+            for (int i = 0; i < json.Length; i++)
+            {
+                char c = json[i];
+                if (c == '"' && (i == 0 || json[i - 1] != '\\')) inString = !inString;
+                if (inString) continue;
+                if (c == '{') depth++;
+                else if (c == '}') depth--;
+                else if (c == ':' && depth == 1) count++;
+            }
+            return count;
+        }
+
+        private static string FormatBytes(long bytes)
+        {
+            if (bytes >= 1_048_576) return $"{bytes / 1_048_576.0:0.##} MB";
+            if (bytes >= 1024) return $"{bytes / 1024.0:0.##} KB";
+            return $"{bytes} B";
         }
     }
 }
