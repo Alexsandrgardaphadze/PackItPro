@@ -1,4 +1,5 @@
-﻿using PackItPro.Models;
+﻿// PackItPro/ViewModels/FileListViewModel.cs
+using PackItPro.Models;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -123,6 +124,16 @@ namespace PackItPro.ViewModels
                     }
                     return true;
                 })
+                // ✅ Validate file type — only accepted installer/script types
+                .Where(fi =>
+                {
+                    string ext = Path.GetExtension(fi!.Name).ToLowerInvariant();
+                    if (_executableExtensions.Contains(ext))
+                        return true;
+
+                    skipReasons.Add($"Unsupported file type: {fi.Name} ({ext})\n  PackItPro packages installer files (.exe, .msi, .bat, .zip, etc.)");
+                    return false;
+                })
                 .Select(fi => fi!.FullName)
                 .Take(_settings.MaxFilesInList - _items.Count)
                 .ToList();
@@ -137,10 +148,11 @@ namespace PackItPro.ViewModels
                     Size = FormatBytes(fileInfo.Length),
                     Status = FileStatusEnum.Pending,
                     Positives = 0,
-                    TotalScans = 0
+                    TotalScans = 0,
+                    InstallOrder = 0  // ✅ Initialize to prevent null reference on removal
                 };
                 fileItem.RemoveCommand = new RelayCommand(_ => ExecuteRemoveFile(fileItem));
-                _items.Add(fileItem);
+                _items.Add(fileItem); // Add AFTER all properties are set
             }
 
             result.SuccessCount = validFiles.Count;
@@ -159,8 +171,18 @@ namespace PackItPro.ViewModels
 
         private void ExecuteRemoveFile(object? parameter)
         {
-            if (parameter is FileItemViewModel item)
-                _items.Remove(item);
+            try
+            {
+                if (parameter is FileItemViewModel item && item != null && _items.Contains(item))
+                {
+                    _items.Remove(item);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[FileListViewModel] Remove file failed: {ex.Message}");
+                // Silent fail — prevents app crash
+            }
         }
 
         private void NotifyListChanged()

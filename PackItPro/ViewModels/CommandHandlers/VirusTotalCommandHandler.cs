@@ -104,7 +104,12 @@ namespace PackItPro.ViewModels.CommandHandlers
             }
             finally
             {
-                _status.SetStatusReady();
+                // ✅ FIX: Only reset to Ready if we didn't reach a success state.
+                // SetStatusSuccess() sets IsSuccess = true — if that happened,
+                // leave it alone so the "Done" state stays visible.
+                if (!_status.IsSuccess)
+                    _status.SetStatusReady();
+
                 _scanCancellationTokenSource?.Dispose();
                 _scanCancellationTokenSource = null;
             }
@@ -201,6 +206,8 @@ namespace PackItPro.ViewModels.CommandHandlers
                     msg += "\n\nReview files marked 'Infected' before packaging.";
                 }
                 MessageBox.Show(msg, "Security Alert", MessageBoxButton.OK, MessageBoxImage.Warning);
+                
+                _status.SetStatusSuccess($"Scan complete — {infectedFiles.Count} infected, {totalFiles - infectedFiles.Count} clean");
             }
             else if (failedCount > 0)
             {
@@ -209,6 +216,8 @@ namespace PackItPro.ViewModels.CommandHandlers
                     "Scan Completed with Errors",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
+                
+                _status.SetStatusSuccess($"Scan complete — {failedCount} error(s)");
             }
             else
             {
@@ -218,13 +227,11 @@ namespace PackItPro.ViewModels.CommandHandlers
                     "Scan Complete",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
+                
+                _status.SetStatusSuccess($"Scan complete — all {totalFiles} file(s) clean");
             }
 
             await _virusTotalClient.SaveCacheAsync(_logService);
-
-            _status.Message = failedCount > 0
-                ? $"Scan completed — {failedCount} error(s). Check log."
-                : "Scan completed successfully.";
         }
 
         private void UpdateProgress(int processed, int total)

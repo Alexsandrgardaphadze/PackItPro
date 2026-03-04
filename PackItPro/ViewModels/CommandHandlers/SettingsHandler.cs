@@ -77,6 +77,10 @@ namespace PackItPro.ViewModels.CommandHandlers
                 await _settings.SaveSettingsAsync();
                 _status.Message = $"Output location set to: {dialog.SelectedPath}";
                 _log.Info($"Output location changed to: {dialog.SelectedPath}");
+
+                // FIX: Reset status after 3 seconds so the message doesn't linger forever
+                await Task.Delay(3000);
+                _status.SetStatusReady();
             }
             catch (UnauthorizedAccessException)
             {

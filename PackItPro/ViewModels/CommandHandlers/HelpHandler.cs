@@ -2,7 +2,6 @@
 using PackItPro.Services;
 using System;
 using System.Diagnostics;
-using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -127,7 +126,7 @@ namespace PackItPro.ViewModels.CommandHandlers
             }
             finally
             {
-                _status.Message = string.Empty;
+                _status.SetStatusReady();
                 _checkCts?.Dispose();
                 _checkCts = null;
             }
