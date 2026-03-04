@@ -1,5 +1,4 @@
-﻿// PackItPro/ViewModels/SettingsViewModel.cs - v2.2
-using PackItPro.Models;
+﻿using PackItPro.Models;
 using System;
 using System.ComponentModel;
 using System.IO;

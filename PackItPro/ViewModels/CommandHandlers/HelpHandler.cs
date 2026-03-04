@@ -1,111 +1,182 @@
-﻿// ViewModels/CommandHandlers/HelpHandler.cs - v2.2 FIXED
+﻿// PackItPro/ViewModels/CommandHandlers/HelpHandler.cs
+using PackItPro.Services;
 using System;
 using System.Diagnostics;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 
 namespace PackItPro.ViewModels.CommandHandlers
 {
-    /// <summary>
-    /// Handles all help-related operations (Documentation, GitHub, About, etc.)
-    /// </summary>
     public class HelpHandler : CommandHandlerBase
     {
+        private const string GitHubRepo = "https://github.com/Alexsandrgardaphadze/PackItPro";
+        private const string DocumentationUrl = "https://github.com/Alexsandrgardaphadze/PackItPro/wiki";
+        private const string ReportIssueUrl = "https://github.com/Alexsandrgardaphadze/PackItPro/issues/new";
+
+        private readonly UpdateService _updateService;
+        private readonly StatusViewModel _status;
+        private readonly ILogService _log;
+
+        private CancellationTokenSource? _checkCts;
+
         public ICommand DocumentationCommand { get; }
         public ICommand GitHubCommand { get; }
         public ICommand ReportIssueCommand { get; }
         public ICommand CheckUpdatesCommand { get; }
         public ICommand AboutCommand { get; }
 
-        public HelpHandler()
+        public HelpHandler(UpdateService updateService, StatusViewModel status, ILogService log)
         {
-            DocumentationCommand = new RelayCommand(ExecuteDocumentation);
-            GitHubCommand = new RelayCommand(ExecuteGitHub);
-            ReportIssueCommand = new RelayCommand(ExecuteReportIssue);
-            CheckUpdatesCommand = new RelayCommand(ExecuteCheckUpdates);
-            AboutCommand = new RelayCommand(ExecuteAbout);
+            _updateService = updateService ?? throw new ArgumentNullException(nameof(updateService));
+            _status = status ?? throw new ArgumentNullException(nameof(status));
+            _log = log ?? throw new ArgumentNullException(nameof(log));
+
+            DocumentationCommand = new RelayCommand(_ => OpenUrl(DocumentationUrl));
+            GitHubCommand = new RelayCommand(_ => OpenUrl(GitHubRepo));
+            ReportIssueCommand = new RelayCommand(_ => OpenUrl(ReportIssueUrl));
+            CheckUpdatesCommand = new AsyncRelayCommand(ExecuteCheckUpdatesAsync, _ => !_status.IsBusy);
+            AboutCommand = new RelayCommand(_ => ExecuteAbout());
+
+            _status.PropertyChanged += (s, e) =>
+            {
+                if (e.PropertyName == nameof(StatusViewModel.IsBusy))
+                    RaiseCanExecuteChanged();
+            };
         }
 
-        private void ExecuteDocumentation(object? parameter)
+        // ── Check for Updates ─────────────────────────────────────────────────
+
+        private async Task ExecuteCheckUpdatesAsync(object? _)
         {
+            _status.Message = "Checking for updates...";
+            _checkCts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+            _log.Info($"Checking for updates. Current: {UpdateService.CurrentVersion}");
+
             try
             {
-                Process.Start(new ProcessStartInfo
+                var result = await _updateService.CheckAsync(_checkCts.Token);
+
+                if (!result.Success)
                 {
-                    FileName = "https://github.com/Alexsandrgardaphadze/PackItPro/wiki",
-                    UseShellExecute = true
-                });
+                    _log.Warning($"Update check failed: {result.ErrorMessage}");
+                    MessageBox.Show(
+                        $"Could not check for updates.\n\n{result.ErrorMessage}",
+                        "PackItPro — Update Check Failed",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
+                }
+
+                if (result.NoReleasesPublished)
+                {
+                    MessageBox.Show(
+                        $"You're running PackItPro {UpdateService.CurrentVersion}.\n\n" +
+                        "No releases have been published yet — you already have the latest build.",
+                        "PackItPro — Up to Date",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                    return;
+                }
+
+                _log.Info($"Latest: {result.LatestVersion}, Newer: {result.UpdateAvailable}");
+
+                if (!result.UpdateAvailable)
+                {
+                    MessageBox.Show(
+                        $"You're up to date!\n\n" +
+                        $"Current version:  {result.CurrentVersion}\n" +
+                        $"Latest release:   {result.LatestVersion}",
+                        "PackItPro — Up to Date",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                    return;
+                }
+
+                string publishedWhen = result.PublishedAt.HasValue
+                    ? $"\nPublished: {result.PublishedAt.Value.ToLocalTime():MMM d, yyyy}"
+                    : "";
+
+                string notes = !string.IsNullOrWhiteSpace(result.ReleaseNotes)
+                    ? $"\n\nWhat's new:\n{Truncate(result.ReleaseNotes, 300)}"
+                    : "";
+
+                var response = MessageBox.Show(
+                    $"A new version of PackItPro is available!\n\n" +
+                    $"Current version:  {result.CurrentVersion}\n" +
+                    $"Latest version:   {result.LatestVersion}{publishedWhen}" +
+                    $"{notes}\n\n" +
+                    "Open the release page to download?",
+                    "PackItPro — Update Available",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Information);
+
+                if (response == MessageBoxResult.Yes)
+                    OpenUrl(result.ReleaseUrl ?? GitHubRepo);
             }
-            catch
+            catch (OperationCanceledException)
             {
+                _log.Warning("Update check timed out.");
                 MessageBox.Show(
-                    "Could not open documentation.\nVisit: https://github.com/Alexsandrgardaphadze/PackItPro/wiki",
-                    "Error",
+                    "Update check timed out after 15 seconds.\n\nCheck your internet connection and try again.",
+                    "PackItPro — Timeout",
                     MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                    MessageBoxImage.Warning);
+            }
+            finally
+            {
+                _status.SetStatusReady();
+                _checkCts?.Dispose();
+                _checkCts = null;
             }
         }
 
-        private void ExecuteGitHub(object? parameter)
-        {
-            try
-            {
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = "https://github.com/Alexsandrgardaphadze/PackItPro",
-                    UseShellExecute = true
-                });
-            }
-            catch
-            {
-                MessageBox.Show(
-                    "Could not open GitHub repository.\nVisit: https://github.com/Alexsandrgardaphadze/PackItPro",
-                    "Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-            }
-        }
+        // ── About ─────────────────────────────────────────────────────────────
 
-        private void ExecuteReportIssue(object? parameter)
-        {
-            try
-            {
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = "https://github.com/Alexsandrgardaphadze/PackItPro/issues",
-                    UseShellExecute = true
-                });
-            }
-            catch
-            {
-                MessageBox.Show(
-                    "Could not open issue tracker.\nVisit: https://github.com/Alexsandrgardaphadze/PackItPro/issues",
-                    "Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-            }
-        }
-
-        private void ExecuteCheckUpdates(object? parameter)
+        private void ExecuteAbout()
         {
             MessageBox.Show(
-                "Update check feature not yet implemented.",
-                "Check for Updates",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
-        }
-
-        private void ExecuteAbout(object? parameter)
-        {
-            MessageBox.Show(
-                "PackItPro v0.6.2\n\n" +
-                "A secure package builder for bundling multiple applications.\n\n" +
-                "Still in development, but already close to finishing.\n\n" +
-                "© 2026 Maybe all rights reserved.\n\n" +
-                "GitHub: https://github.com/Alexsandrgardaphadze/PackItPro",
+                $"PackItPro  {UpdateService.CurrentVersion}\n\n" +
+                "Modern Windows installer packager.\n" +
+                "Bundles multiple installers into a single self-extracting executable " +
+                "with silent installation, integrity verification, and optional VirusTotal scanning.\n\n" +
+                "GitHub: github.com/Alexsandrgardaphadze/PackItPro\n\n" +
+                $"Runtime: .NET {Environment.Version}  |  OS: {Environment.OSVersion.VersionString}",
                 "About PackItPro",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
+        }
+
+        // ── Helpers ───────────────────────────────────────────────────────────
+
+        private static void OpenUrl(string url)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Could not open browser.\n\nVisit manually:\n{url}\n\nError: {ex.Message}",
+                    "PackItPro",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+        }
+
+        private static string Truncate(string text, int max)
+        {
+            if (text.Length <= max) return text;
+            return text[..max].TrimEnd() + "\n…(see release page for full notes)";
+        }
+
+        public override void Dispose()
+        {
+            _checkCts?.Cancel();
+            _checkCts?.Dispose();
+            base.Dispose();
         }
     }
 }

@@ -1,6 +1,7 @@
-﻿// ViewModels/SummaryViewModel.cs - v2.2
+﻿// PackItPro/ViewModels/SummaryViewModel.cs
 using System;
 using System.ComponentModel;
+using System.IO;
 using System.Runtime.CompilerServices;
 
 namespace PackItPro.ViewModels
@@ -10,6 +11,10 @@ namespace PackItPro.ViewModels
         private readonly FileListViewModel _fileListViewModel;
         private readonly SettingsViewModel _settingsViewModel;
         private bool _disposed;
+
+        // Cached stub size so we're not hitting disk on every property change.
+        // Lazily loaded on first access, null means not yet measured.
+        private long? _cachedStubBytes;
 
         public SummaryViewModel(FileListViewModel fileListViewModel, SettingsViewModel settingsViewModel)
         {
@@ -22,33 +27,41 @@ namespace PackItPro.ViewModels
 
         private void OnFileListPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName == nameof(_fileListViewModel.Items) ||
-                e.PropertyName == nameof(_fileListViewModel.Count) ||
-                e.PropertyName == nameof(_fileListViewModel.CleanCount) ||
-                e.PropertyName == nameof(_fileListViewModel.InfectedCount) ||
-                e.PropertyName == nameof(_fileListViewModel.FailedCount) ||
-                e.PropertyName == nameof(_fileListViewModel.SkippedCount) ||
-                e.PropertyName == nameof(_fileListViewModel.TotalSize))
+            if (e.PropertyName is nameof(FileListViewModel.Count)
+                               or nameof(FileListViewModel.TotalSize)
+                               or nameof(FileListViewModel.CleanCount)
+                               or nameof(FileListViewModel.InfectedCount)
+                               or nameof(FileListViewModel.FailedCount)
+                               or nameof(FileListViewModel.SkippedCount))
             {
-                OnPropertyChanged(nameof(Files));
-                OnPropertyChanged(nameof(CleanFiles));
-                OnPropertyChanged(nameof(InfectedFiles));
-                OnPropertyChanged(nameof(FailedScans));
-                OnPropertyChanged(nameof(SkippedFiles));
-                OnPropertyChanged(nameof(TotalSize));
-                OnPropertyChanged(nameof(Status));
-                OnPropertyChanged(nameof(EstimatedPackageSize));
-                OnPropertyChanged(nameof(EstimatedTime));
+                NotifySummaryChanged();
             }
         }
 
         private void OnSettingsPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName == nameof(_settingsViewModel.RequiresAdmin))
+            if (e.PropertyName is nameof(SettingsViewModel.RequiresAdmin)
+                               or nameof(SettingsViewModel.CompressionLevel))
             {
-                OnPropertyChanged(nameof(RequiresAdminText));
+                NotifySummaryChanged();
             }
         }
+
+        private void NotifySummaryChanged()
+        {
+            OnPropertyChanged(nameof(Files));
+            OnPropertyChanged(nameof(CleanFiles));
+            OnPropertyChanged(nameof(InfectedFiles));
+            OnPropertyChanged(nameof(FailedScans));
+            OnPropertyChanged(nameof(SkippedFiles));
+            OnPropertyChanged(nameof(TotalSize));
+            OnPropertyChanged(nameof(Status));
+            OnPropertyChanged(nameof(EstimatedPackageSize));
+            OnPropertyChanged(nameof(EstimatedTime));
+            OnPropertyChanged(nameof(RequiresAdminText));
+        }
+
+        // ── File list summary ─────────────────────────────────────────────────
 
         public int Files => _fileListViewModel.Count;
         public long TotalSize => _fileListViewModel.TotalSize;
@@ -56,6 +69,7 @@ namespace PackItPro.ViewModels
         public int InfectedFiles => _fileListViewModel.InfectedCount;
         public int FailedScans => _fileListViewModel.FailedCount;
         public int SkippedFiles => _fileListViewModel.SkippedCount;
+        public string RequiresAdminText => _settingsViewModel.RequiresAdmin ? "Yes" : "No";
 
         public string Status
         {
@@ -68,27 +82,69 @@ namespace PackItPro.ViewModels
             }
         }
 
+        // ── Size estimation ───────────────────────────────────────────────────
+
+        /// <summary>
+        /// Shows an honest output size estimate: real payload bytes + real stub bytes.
+        /// Does NOT apply fake compression ratio multipliers — compression gain on
+        /// .exe/.msi/.mp4 files (the primary use case) is near zero, so false estimates
+        /// actively mislead users.
+        ///
+        /// What we DO show: a compression note that sets expectations correctly.
+        /// </summary>
         public string EstimatedPackageSize
         {
             get
             {
-                if (TotalSize == 0) return "~0 B";
-                long estimatedSize = (long)(TotalSize * 0.8);
-                return $"~{FormatBytes(estimatedSize)}";
+                if (TotalSize == 0) return "Add files to see estimate";
+
+                long stubBytes = GetStubSize();
+                long payloadBytes = TotalSize;
+                long totalBytes = payloadBytes + stubBytes;
+
+                string compressionNote = _settingsViewModel.CompressionLevel switch
+                {
+                    0 => " (no compression)",
+                    1 => " (may compress text/source files)",
+                    2 => " (may compress text/source files further)",
+                    _ => ""
+                };
+
+                if (stubBytes > 0)
+                {
+                    return $"~{FormatBytes(totalBytes)} total" +
+                           $"\n{FormatBytes(payloadBytes)} payload  +  {FormatBytes(stubBytes)} stub" +
+                           compressionNote;
+                }
+
+                // Stub not found — just show payload
+                return $"~{FormatBytes(payloadBytes)} payload{compressionNote}";
             }
         }
+
+        // ── Time estimation ───────────────────────────────────────────────────
 
         public string EstimatedTime
         {
             get
             {
-                if (TotalSize == 0) return "~0 sec";
+                if (TotalSize == 0) return "—";
 
-                long megabytes = TotalSize / (1024 * 1024);
-                long estimatedSeconds = megabytes + 5;
+                // Rough estimate: compression at ~100 MB/s for Fast, ~40 MB/s for Max
+                // plus ~200 MB/s for stub injection (IO bound)
+                double mbPerSecond = _settingsViewModel.CompressionLevel switch
+                {
+                    0 => 500.0,  // Store-only: just IO
+                    1 => 120.0,  // Deflate 6
+                    2 => 50.0,   // Deflate 9
+                    _ => 120.0
+                };
+
+                double mb = TotalSize / (1024.0 * 1024.0);
+                long estimatedSeconds = Math.Max(2, (long)(mb / mbPerSecond) + 3); // +3s for manifest/hash/inject
 
                 if (estimatedSeconds < 60)
-                    return $"~{Math.Max(1, estimatedSeconds)} sec";
+                    return $"~{estimatedSeconds} sec";
 
                 long minutes = estimatedSeconds / 60;
                 long seconds = estimatedSeconds % 60;
@@ -96,35 +152,49 @@ namespace PackItPro.ViewModels
             }
         }
 
-        public string RequiresAdminText => _settingsViewModel.RequiresAdmin ? "Yes" : "No";
+        // ── Stub size helper ──────────────────────────────────────────────────
 
-        private string FormatBytes(long bytes)
+        private long GetStubSize()
         {
-            string[] suffixes = { "B", "KB", "MB", "GB", "TB" };
-            int suffixIndex = 0;
-            double size = bytes;
-            while (size >= 1024 && suffixIndex < suffixes.Length - 1)
+            if (_cachedStubBytes.HasValue) return _cachedStubBytes.Value;
+
+            try
             {
-                size /= 1024;
-                suffixIndex++;
+                // Ask the same locator the Packager uses — consistent path resolution.
+                // If it throws (stub not built yet), we return 0 and don't cache,
+                // so it retries on the next property access.
+                var stubPath = Services.StubLocator.FindStubInstaller(null);
+                _cachedStubBytes = new FileInfo(stubPath).Length;
+                return _cachedStubBytes.Value;
             }
-            return $"{size:0.##} {suffixes[suffixIndex]}";
+            catch
+            {
+                return 0; // Stub not found yet — show payload-only estimate
+            }
         }
 
-        // FIX: Proper disposal to prevent memory leaks
+        // ── Helpers ───────────────────────────────────────────────────────────
+
+        private static string FormatBytes(long bytes)
+        {
+            if (bytes <= 0) return "0 B";
+            string[] suffixes = { "B", "KB", "MB", "GB" };
+            int i = 0;
+            double size = bytes;
+            while (size >= 1024 && i < suffixes.Length - 1) { size /= 1024; i++; }
+            return $"{size:0.##} {suffixes[i]}";
+        }
+
+        // ── Disposal ──────────────────────────────────────────────────────────
+
         protected virtual void Dispose(bool disposing)
         {
             if (_disposed) return;
-
             if (disposing)
             {
-                if (_fileListViewModel != null)
-                    _fileListViewModel.PropertyChanged -= OnFileListPropertyChanged;
-
-                if (_settingsViewModel != null)
-                    _settingsViewModel.PropertyChanged -= OnSettingsPropertyChanged;
+                _fileListViewModel.PropertyChanged -= OnFileListPropertyChanged;
+                _settingsViewModel.PropertyChanged -= OnSettingsPropertyChanged;
             }
-
             _disposed = true;
         }
 

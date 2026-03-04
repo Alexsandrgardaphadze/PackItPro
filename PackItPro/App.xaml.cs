@@ -71,7 +71,7 @@ namespace PackItPro
                 if (!string.IsNullOrEmpty(_logPath))
                 {
                     File.AppendAllText(_logPath,
-                        $"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}] {message}\n\n");
+                        $"[{DateTime.UtcNow:dd-MM-yyyy HH:mm:ss}] {message}\n\n");
                 }
             }
             catch { /* Can't log - fail silently */ }

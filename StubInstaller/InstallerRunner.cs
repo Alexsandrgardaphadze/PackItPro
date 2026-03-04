@@ -1,20 +1,5 @@
-﻿// StubInstaller/InstallerRunner.cs - v2.4
-// Changes vs v2.3:
-//   [1] Installer name prefix on all captured output lines.
-//       Format: "[npp.8.7.4.Installer.x64.exe OUT] ..."
-//               "[npp.8.7.4.Installer.x64.exe ERR] ..."
-//       Makes multi-installer logs readable at a glance without scrolling back
-//       to find which installer header a given output line belongs to.
-//
-//   [2] Buffer-then-conditional-flush for stdout/stderr.
-//       Lines are accumulated in memory during the run. On SUCCESS the buffer is
-//       discarded — successful installs produce no [OUT]/[ERR] noise in the log.
-//       On FAILURE (non-zero, non-reboot exit code) the full buffer is flushed
-//       to the log so the complete output is available for diagnosis.
-//       This keeps clean install logs concise while preserving full detail
-//       for the cases that actually need it.
-//       Thread safety: List<string> access is locked since DataReceived callbacks
-//       fire on arbitrary thread pool threads.
+﻿// StubInstaller/InstallerRunner.cs
+// Async installer orchestration with output capture, MSI verbose logging, and timeout handling.
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -27,9 +12,6 @@ namespace StubInstaller
 {
     public static class InstallerRunner
     {
-        // ── [4] String constants ──────────────────────────────────────────────
-        // Must stay in sync with ManifestGenerator.cs and InstallerDetector.cs
-
         public const string TypeMsi = "msi";
         public const string TypeMsp = "msp";
         public const string TypeInno = "inno";
@@ -40,8 +22,6 @@ namespace StubInstaller
         public const string TypeAppx = "appx";
         public const string TypeMsix = "msix";
         public const string TypeFile = "file";
-
-        // ── Public API ────────────────────────────────────────────────────────
 
         /// <summary>
         /// Runs all installers in order. Returns true if all succeeded
@@ -129,7 +109,9 @@ namespace StubInstaller
 
         /// <summary>
         /// Backward-compatible overload without tempDir (MSI verbose log skipped).
+        /// Use the 6-argument overload to enable MSI verbose logging.
         /// </summary>
+        [Obsolete("Use the 6-argument overload that accepts tempDir — omitting it silently disables MSI verbose logging.", false)]
         public static Task<int> RunSingleInstallerAsync(
             ManifestFile file, string filePath, string[] silentArgs,
             Action<string> logInfo, Action<string> logError) =>

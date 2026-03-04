@@ -1,8 +1,7 @@
-﻿// ViewModels/CommandHandlers/FileOperationsHandler.cs - v2.7 ULTIMATE
-using Microsoft.Win32;
+﻿// PackItPro/ViewModels/CommandHandlers/FileOperationsHandler.cs
 using System;
 using System.IO;
-using System.Linq;
+using System.Text;
 using System.Windows;
 using System.Windows.Input;
 
@@ -14,14 +13,9 @@ namespace PackItPro.ViewModels.CommandHandlers
         private readonly SettingsViewModel _settings;
         private readonly ICommand _scanFilesCommand;
 
-        // ✅ Store ALL commands as fields for proper CanExecute refresh
-        private readonly RelayCommand _browseFilesCommand;
-        private readonly RelayCommand _clearAllFilesCommand;
-        private readonly RelayCommand _exportListCommand;
-
-        public ICommand BrowseFilesCommand => _browseFilesCommand;
-        public ICommand ClearAllFilesCommand => _clearAllFilesCommand;
-        public ICommand ExportListCommand => _exportListCommand;
+        public ICommand BrowseFilesCommand { get; }
+        public ICommand ClearAllFilesCommand { get; }
+        public ICommand ExportListCommand { get; }
 
         public FileOperationsHandler(
             FileListViewModel fileList,
@@ -30,32 +24,31 @@ namespace PackItPro.ViewModels.CommandHandlers
         {
             _fileList = fileList ?? throw new ArgumentNullException(nameof(fileList));
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
-            _scanFilesCommand = scanFilesCommand ?? throw new ArgumentNullException(nameof(scanFilesCommand));
+            _scanFilesCommand = scanFilesCommand;
 
-            _browseFilesCommand = new RelayCommand(ExecuteBrowseFiles);
-            _clearAllFilesCommand = new RelayCommand(ExecuteClearAllFiles, CanExecuteClearAll);
-            _exportListCommand = new RelayCommand(ExecuteExportList, CanExecuteExportList);
+            BrowseFilesCommand = new RelayCommand(ExecuteBrowseFiles);
+            ClearAllFilesCommand = new RelayCommand(ExecuteClearAllFiles, _ => _fileList.HasFiles);
+            ExportListCommand = new RelayCommand(ExecuteExportList, _ => _fileList.HasFiles);
 
-            // ✅ Subscribe to FileList changes and refresh COMMAND state
             _fileList.PropertyChanged += (s, e) =>
             {
-                if (e.PropertyName == nameof(_fileList.HasFiles))
-                {
-                    _clearAllFilesCommand.RaiseCanExecuteChanged();
-                    _exportListCommand.RaiseCanExecuteChanged();
-                }
+                if (e.PropertyName == nameof(FileListViewModel.HasFiles))
+                    RaiseCanExecuteChanged();
             };
         }
 
+        // ── Browse Files ──────────────────────────────────────────────────────
+
         private void ExecuteBrowseFiles(object? parameter)
         {
-            var dialog = new OpenFileDialog
+            var dialog = new Microsoft.Win32.OpenFileDialog
             {
+                Title = "Add Files to Package",
                 Multiselect = true,
-                Title = "Select Files to Pack",
-                Filter = "All Files (*.*)|*.*",
-                CheckFileExists = true,
-                CheckPathExists = true
+                Filter = "All Files (*.*)|*.*" +
+                              "|Executables (*.exe;*.msi)|*.exe;*.msi" +
+                              "|Scripts (*.bat;*.cmd;*.ps1)|*.bat;*.cmd;*.ps1" +
+                              "|Archives (*.zip;*.7z)|*.zip;*.7z"
             };
 
             if (dialog.ShowDialog() != true) return;
@@ -64,26 +57,25 @@ namespace PackItPro.ViewModels.CommandHandlers
 
             if (result.SkippedCount > 0)
             {
-                var message = $"Added {result.SuccessCount} file(s).\n\nSkipped {result.SkippedCount}:\n" +
-                             string.Join("\n", result.SkipReasons.Take(3));
-                if (result.SkipReasons.Count > 3)
-                    message += $"\n...and {result.SkipReasons.Count - 3} more";
-                MessageBox.Show(message, "Files Added", MessageBoxButton.OK, MessageBoxImage.Information);
+                var reasons = string.Join("\n  • ", result.SkipReasons);
+                MessageBox.Show(
+                    $"{result.SuccessCount} file(s) added.\n" +
+                    $"{result.SkippedCount} file(s) skipped:\n\n  • {reasons}",
+                    "Some Files Skipped",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
             }
-
-            if (_settings.ScanWithVirusTotal && !string.IsNullOrWhiteSpace(_settings.VirusTotalApiKey))
-                _scanFilesCommand.Execute(null);
         }
 
-        private bool CanExecuteClearAll(object? parameter) => _fileList.HasFiles;
+        // ── Clear All Files ───────────────────────────────────────────────────
 
         private void ExecuteClearAllFiles(object? parameter)
         {
-            if (!_fileList.HasFiles) return;
+            if (_fileList.Count == 0) return;
 
             var result = MessageBox.Show(
-                $"Remove all {_fileList.Count} files?",
-                "Confirm Clear",
+                $"Remove all {_fileList.Count} file(s) from the list?",
+                "Clear File List",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question);
 
@@ -91,21 +83,27 @@ namespace PackItPro.ViewModels.CommandHandlers
                 _fileList.ClearAll();
         }
 
-        private bool CanExecuteExportList(object? parameter) => _fileList.HasFiles;
+        // ── Export List ───────────────────────────────────────────────────────
+        // Saves the current file list as a CSV (usable in Excel) or plain text.
 
         private void ExecuteExportList(object? parameter)
         {
             if (!_fileList.HasFiles)
             {
-                MessageBox.Show("No files to export.", "Export List",
-                    MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show(
+                    "No files in the list to export.",
+                    "Nothing to Export",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
                 return;
             }
 
-            var dialog = new SaveFileDialog
+            var dialog = new Microsoft.Win32.SaveFileDialog
             {
-                Filter = "Text Files (*.txt)|*.txt|CSV Files (*.csv)|*.csv",
-                FileName = $"PackItPro_FileList_{DateTime.Now:yyyyMMdd_HHmmss}.txt",
+                Title = "Export File List",
+                Filter = "CSV File (*.csv)|*.csv|Text File (*.txt)|*.txt",
+                FileName = $"PackItPro_FileList_{DateTime.Now:yyyyMMdd_HHmmss}",
+                DefaultExt = "csv",
                 InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Desktop)
             };
 
@@ -113,16 +111,74 @@ namespace PackItPro.ViewModels.CommandHandlers
 
             try
             {
-                var content = string.Join("\n", _fileList.Items.Select(f => $"{f.FileName} - {f.Size}"));
-                File.WriteAllText(dialog.FileName, content);
-                MessageBox.Show($"List exported to:\n{dialog.FileName}", "Success",
-                    MessageBoxButton.OK, MessageBoxImage.Information);
+                bool isCsv = Path.GetExtension(dialog.FileName)
+                    .Equals(".csv", StringComparison.OrdinalIgnoreCase);
+
+                string content = isCsv
+                    ? BuildCsvExport()
+                    : BuildTextExport();
+
+                File.WriteAllText(dialog.FileName, content, Encoding.UTF8);
+
+                MessageBox.Show(
+                    $"File list exported to:\n{dialog.FileName}\n\n{_fileList.Count} file(s) listed.",
+                    "Export Complete",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Export failed: {ex.Message}", "Error",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(
+                    $"Failed to export file list:\n{ex.Message}",
+                    "Export Failed",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
             }
         }
+
+        private string BuildCsvExport()
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("File Name,File Path,Size,Status,Detections,Total Scans");
+
+            foreach (var item in _fileList.Items)
+            {
+                sb.AppendLine(
+                    $"\"{EscapeCsv(item.FileName)}\"," +
+                    $"\"{EscapeCsv(item.FilePath)}\"," +
+                    $"\"{EscapeCsv(item.Size)}\"," +
+                    $"\"{item.Status}\"," +
+                    $"{item.Positives}," +
+                    $"{item.TotalScans}");
+            }
+
+            return sb.ToString();
+        }
+
+        private string BuildTextExport()
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine($"PackItPro — File List Export");
+            sb.AppendLine($"Generated: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+            sb.AppendLine($"Files: {_fileList.Count}");
+            sb.AppendLine(new string('-', 60));
+            sb.AppendLine();
+
+            int i = 1;
+            foreach (var item in _fileList.Items)
+            {
+                sb.AppendLine($"{i++,3}. {item.FileName}");
+                sb.AppendLine($"      Path:   {item.FilePath}");
+                sb.AppendLine($"      Size:   {item.Size}");
+                sb.AppendLine($"      Status: {item.Status}" +
+                    (item.TotalScans > 0 ? $"  ({item.Positives}/{item.TotalScans} detections)" : ""));
+                sb.AppendLine();
+            }
+
+            return sb.ToString();
+        }
+
+        private static string EscapeCsv(string value)
+            => value?.Replace("\"", "\"\"") ?? "";
     }
 }

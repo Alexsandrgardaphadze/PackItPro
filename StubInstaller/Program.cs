@@ -1,20 +1,4 @@
-﻿// StubInstaller/Program.cs
-// Orchestrator only — owns the installation step sequence and nothing else.
-// All helpers live in their own files; see the list in the header comment.
-//
-//   ArgParser.cs           — command-line parsing
-//   Cleanup.cs             — temp directory removal with retry
-//   Constants.cs           — version, file names, arg keys
-//   ElevationHelper.cs     — IsRunningAsAdmin, RestartElevated
-//   ExitCodeClassifier.cs  — installer exit code classification
-//   InstallerDetector.cs   — silent arg lookup by installer type
-//   InstallerRunner.cs     — process launch, stdout/stderr capture
-//   IntegrityChecker.cs    — SHA-256 directory hash
-//   Manifest.cs            — PackageManifest / ManifestFile models
-//   PrerequisiteChecker.cs — disk space, OS version, architecture checks
-//   StubLogger.cs          — log file state, Log/LogError
-//   StubUI.cs              — ShowError, ShowCompletion dialogs
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -27,10 +11,7 @@ namespace StubInstaller
 {
     internal class Program
     {
-        // Spans Steps 6 and 8 — the one piece of run state Program genuinely owns.
         private static bool _rebootRequired;
-
-        // ── Entry point ───────────────────────────────────────────────────────
 
         static async Task<int> Main(string[] args)
         {
@@ -47,7 +28,6 @@ namespace StubInstaller
             }
             else
             {
-                // Bootstrap log in %TEMP% until the extraction dir is ready (Step 2)
                 StubLogger.LogPath = Path.Combine(
                     Path.GetTempPath(),
                     $"PackItPro_Stub_{DateTime.Now:yyyyMMdd_HHmmss_fff}.log");
@@ -87,7 +67,6 @@ namespace StubInstaller
             }
             catch (InvalidOperationException ex) when (ex.Message.Contains("PAYLOAD INTEGRITY CHECK FAILED"))
             {
-                // Special handling for payload integrity failures
                 StubLogger.LogError("FATAL: Payload integrity verification failed", ex);
                 StubUI.ShowError(
                     $"Package integrity check failed!\n\n" +
@@ -129,9 +108,9 @@ namespace StubInstaller
             StubLogger.Log("");
             StubLogger.Log("STEP 3: Loading package manifest...");
             var manifest = await LoadManifestAsync(tempDir);
-            if (manifest == null) return 1; // error shown inside LoadManifestAsync
+            if (manifest == null) return 1;
 
-            // STEP 3.5 — Prerequisites (disk, OS version, architecture)
+            // STEP 3.5 — Prerequisites
             StubLogger.Log("");
             StubLogger.Log("STEP 3.5: Checking prerequisites...");
             var prereq = PrerequisiteChecker.Check(manifest, tempDir, StubLogger.Log);
@@ -154,19 +133,19 @@ namespace StubInstaller
                 StubLogger.Log($"  Temp dir: {tempDir}");
                 StubLogger.Log($"  Log path: {StubLogger.LogPath}");
                 ElevationHelper.RestartElevated(tempDir, StubLogger.LogPath);
-                return 0; // this process exits; elevated child picks up at Step 5
+                return 0;
             }
             StubLogger.Log($"✅ Running as admin: {ElevationHelper.IsRunningAsAdmin()}");
 
-            return await RunFromStep5Async(tempDir);
+            return await RunFromStep5Async(tempDir, manifest);
         }
 
         // ── STEPS 5–9: Shared by non-elevated and elevated runs ───────────────
+        // manifest: already loaded in the non-elevated path; null on elevated resume (reload from disk).
 
-        private static async Task<int> RunFromStep5Async(string tempDir)
+        private static async Task<int> RunFromStep5Async(string tempDir, PackageManifest? manifest = null)
         {
-            // Elevated child has a fresh process — reload the manifest
-            var manifest = await LoadManifestAsync(tempDir);
+            manifest ??= await LoadManifestAsync(tempDir);
             if (manifest == null) return 1;
 
             // STEP 5 — Integrity
@@ -207,7 +186,7 @@ namespace StubInstaller
             if (manifest.Cleanup)
             {
                 StubLogger.Log("STEP 9: Cleaning up...");
-                Cleanup.CleanupTempDirectory(tempDir, true,
+                await Cleanup.CleanupTempDirectoryAsync(tempDir, true,
                     StubLogger.Log, msg => StubLogger.LogError(msg, null));
             }
             else
@@ -303,12 +282,11 @@ namespace StubInstaller
                 return false;
             }
 
-            return false; // exhausted retries
+            return false;
         }
 
         // ── Private helpers ───────────────────────────────────────────────────
 
-        /// <summary>Loads and validates the manifest. Returns null and shows an error on failure.</summary>
         private static async Task<PackageManifest?> LoadManifestAsync(string tempDir)
         {
             string manifestPath = Path.Combine(tempDir, Constants.ManifestFileName);
@@ -360,7 +338,9 @@ namespace StubInstaller
             }
         }
 
-        /// <summary>Returns true if integrity is verified or skipped, false if the user aborts.</summary>
+        // FIX [1]: Removed the unreachable `await Task.CompletedTask` that was after
+        // the final `return true`. The method is still async because the MessageBox
+        // call path could benefit from it, and removing async would be a larger change.
         private static async Task<bool> VerifyIntegrityAsync(PackageManifest manifest, string tempDir)
         {
             if (string.IsNullOrEmpty(manifest.SHA256Checksum))
@@ -372,7 +352,7 @@ namespace StubInstaller
             try
             {
                 string actual = Convert.ToBase64String(
-                    IntegrityChecker.ComputeDirectoryHash(tempDir));
+                    await Task.Run(() => IntegrityChecker.ComputeDirectoryHash(tempDir)));
 
                 if (actual == manifest.SHA256Checksum)
                 {
@@ -404,13 +384,15 @@ namespace StubInstaller
             catch (Exception ex)
             {
                 StubLogger.LogError("Integrity check threw an exception — continuing", ex);
-                return true; // don't block on a check error
+                return true;
             }
-
-            // satisfy compiler — unreachable
-            await Task.CompletedTask;
         }
 
+        // FIX [2]: Script now runs without UseShellExecute=true so it inherits
+        // the current process's elevation token. Previously, UseShellExecute=true
+        // on an already-elevated process could spawn a new unelevated cmd.exe on
+        // some Windows configurations, causing winget to silently fail on protected
+        // system paths. Now the bat file runs directly in the same security context.
         private static async Task RunPostInstallScriptAsync(PackageManifest manifest, string tempDir)
         {
             if (string.IsNullOrEmpty(manifest.AutoUpdateScript)) return;
@@ -425,26 +407,40 @@ namespace StubInstaller
                 return;
             }
 
+            StubLogger.Log($"  Script: {scriptPath}");
+            StubLogger.Log($"  Elevated: {ElevationHelper.IsRunningAsAdmin()}");
+
             try
             {
-                var proc = Process.Start(new ProcessStartInfo(scriptPath)
+                // FIX [2]: UseShellExecute=false inherits elevation from current process.
+                // CreateNoWindow=false lets the bat window appear so users can see progress.
+                // cmd.exe /c is used so the bat runs in a proper cmd context with ERRORLEVEL etc.
+                var psi = new ProcessStartInfo
                 {
-                    UseShellExecute = true,
+                    FileName = "cmd.exe",
+                    Arguments = $"/c \"{scriptPath}\"",
+                    UseShellExecute = false,
+                    CreateNoWindow = false,
                     WorkingDirectory = tempDir,
-                });
-                proc?.WaitForExit();
-                StubLogger.Log($"Script exited with code: {proc?.ExitCode}");
+                };
+
+                var proc = Process.Start(psi);
+                if (proc != null)
+                {
+                    await Task.Run(() => proc.WaitForExit());
+                    StubLogger.Log($"  Script exited with code: {proc.ExitCode}");
+                }
+                else
+                {
+                    StubLogger.LogError("Failed to start post-install script process.", null);
+                }
             }
             catch (Exception ex)
             {
                 StubLogger.LogError("Post-install script failed", ex);
             }
-
-            await Task.CompletedTask;
         }
 
-        /// <summary>Atomically switches the log from the bootstrap temp file to install.log
-        /// inside the extraction dir, copying existing content first.</summary>
         private static void MigrateLogToTempDir(string tempDir)
         {
             string newLogPath = Path.Combine(tempDir, Constants.LogFileName);
@@ -478,7 +474,7 @@ namespace StubInstaller
                            (isElevated ? " [ELEVATED]" : ""));
             StubLogger.Log($"Build:         {Constants.StubBuildDate}");
             StubLogger.Log("========================================");
-            StubLogger.Log($"Time:          {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+            StubLogger.Log($"Time:          {DateTime.Now:dd-MM-yyyy HH:mm:ss}");
             StubLogger.Log($"OS:            {Environment.OSVersion}");
             StubLogger.Log($"64-bit:        {Environment.Is64BitOperatingSystem}");
             StubLogger.Log($"Process:       {Environment.ProcessPath}");
@@ -499,7 +495,7 @@ namespace StubInstaller
             StubLogger.Log($"Success:         {success}");
             StubLogger.Log($"Reboot required: {_rebootRequired}");
             StubLogger.Log($"Total duration:  {duration.TotalSeconds:0.0}s");
-            StubLogger.Log($"Finished:        {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+            StubLogger.Log($"Finished:        {DateTime.Now:dd-MM-yyyy HH:mm:ss}");
             StubLogger.Log("========================================");
         }
     }

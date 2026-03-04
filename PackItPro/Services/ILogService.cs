@@ -41,7 +41,7 @@ namespace PackItPro.Services
             {
                 WriteRaw(
                     "========================================\n" +
-                    $"PackItPro Log — {DateTime.Now:yyyy-MM-dd HH:mm:ss}\n" +
+                    $"PackItPro Log — {DateTime.Now:dd-MM-yyyy HH:mm:ss}\n" +
                     $"Machine: {Environment.MachineName} | User: {Environment.UserName}\n" +
                     "========================================\n");
             }

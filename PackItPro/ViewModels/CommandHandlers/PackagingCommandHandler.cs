@@ -1,13 +1,4 @@
-﻿// ViewModels/CommandHandlers/PackagingCommandHandler.cs - v2.5 SMALL ISSUES FIX
-// Changes vs v2.4 (Phase 1):
-//   - PackCommand now uses AsyncRelayCommand instead of RelayCommand.
-//     Previously: new RelayCommand(async _ => await ExecutePackAsync(), CanExecutePack)
-//     The async lambda assigned to Action<object?> becomes async void, which means
-//     any exception thrown inside ExecutePackAsync() after the first await would be
-//     lost to the thread pool and crash the app without showing an error dialog.
-//     AsyncRelayCommand properly wraps the async execution and prevents double-clicks
-//     during an in-progress pack via its _isExecuting guard.
-//   - No other logic changes from v2.4.
+﻿// PackItPro/ViewModels/CommandHandlers/PackagingCommandHandler.cs
 using Microsoft.Win32;
 using PackItPro.Services;
 using System;
@@ -29,6 +20,7 @@ namespace PackItPro.ViewModels.CommandHandlers
         private readonly ILogService _log;
 
         private CancellationTokenSource? _packCts;
+        private string? _lastPackedFile; // used by TestPackageCommand
 
         public ICommand PackCommand { get; }
         public ICommand TestPackageCommand { get; }
@@ -46,10 +38,8 @@ namespace PackItPro.ViewModels.CommandHandlers
             _error = error ?? throw new ArgumentNullException(nameof(error));
             _log = log ?? throw new ArgumentNullException(nameof(log));
 
-            // FIX: Use AsyncRelayCommand so async exceptions are not swallowed.
-            // RelayCommand(async _ => ...) produces async void which loses exceptions.
             PackCommand = new AsyncRelayCommand(ExecutePackAsync, CanExecutePack);
-            TestPackageCommand = new RelayCommand(ExecuteTestPackage);
+            TestPackageCommand = new RelayCommand(ExecuteTestPackage, CanTestPackage);
 
             _fileList.PropertyChanged += (s, e) =>
             {
@@ -65,8 +55,15 @@ namespace PackItPro.ViewModels.CommandHandlers
             };
         }
 
-        private bool CanExecutePack(object? parameter) =>
+        // ── Can Execute ───────────────────────────────────────────────────────
+
+        private bool CanExecutePack(object? _) =>
             _fileList.HasFiles && !_status.IsBusy;
+
+        private bool CanTestPackage(object? _) =>
+            !string.IsNullOrEmpty(_lastPackedFile) && File.Exists(_lastPackedFile);
+
+        // ── Pack ──────────────────────────────────────────────────────────────
 
         private async Task ExecutePackAsync(object? _)
         {
@@ -76,14 +73,12 @@ namespace PackItPro.ViewModels.CommandHandlers
 
             try
             {
-                // ── Validate ─────────────────────────────────────────────
                 if (!_settings.ValidateSettings(out var settingsError))
                 {
                     _error.ShowError($"Cannot create package: {settingsError}");
                     return;
                 }
 
-                // ── Choose output path ────────────────────────────────────
                 var saveDialog = new SaveFileDialog
                 {
                     Filter = "PackItPro Executable (*.exe)|*.exe",
@@ -95,7 +90,6 @@ namespace PackItPro.ViewModels.CommandHandlers
 
                 if (saveDialog.ShowDialog() != true) return;
 
-                // ── Begin ─────────────────────────────────────────────────
                 _status.SetStatusPacking();
                 _packCts = new CancellationTokenSource();
 
@@ -107,96 +101,129 @@ namespace PackItPro.ViewModels.CommandHandlers
                 });
 
                 string outputPath = await Packager.CreatePackageAsync(
-                    _fileList.Items.Select(f => f.FilePath).ToList(),
-                    Path.GetDirectoryName(saveDialog.FileName) ?? _settings.OutputLocation,
-                    Path.GetFileNameWithoutExtension(saveDialog.FileName),
-                    _settings.RequiresAdmin,
-                    _settings.UseLZMACompression,
-                    progress,
-                    _log,
-                    _packCts.Token);
+                    filePaths: _fileList.Items.Select(f => f.FilePath).ToList(),
+                    outputDirectory: Path.GetDirectoryName(saveDialog.FileName) ?? _settings.OutputLocation,
+                    packageName: Path.GetFileNameWithoutExtension(saveDialog.FileName),
+                    requiresAdmin: _settings.RequiresAdmin,
+                    compressionLevel: _settings.CompressionLevel,
+                    includeWingetUpdateScript: _settings.IncludeWingetUpdateScript,
+                    progress: progress,
+                    log: _log,
+                    ct: _packCts.Token);
 
-                // ── Success ───────────────────────────────────────────────
+                _lastPackedFile = outputPath;
                 succeeded = true;
                 _status.SetStatusSuccess($"Package created — {Path.GetFileName(outputPath)}");
+                RaiseCanExecuteChanged(); // enable TestPackageCommand
 
-                MessageBox.Show(
-                    $"Package created successfully!\n\nSaved to:\n{outputPath}",
+                var response = MessageBox.Show(
+                    $"Package created successfully!\n\nSaved to:\n{outputPath}\n\n" +
+                    "Open the containing folder?",
                     "PackItPro — Success",
-                    MessageBoxButton.OK,
+                    MessageBoxButton.YesNo,
                     MessageBoxImage.Information);
+
+                if (response == MessageBoxResult.Yes)
+                    OpenFolderAndSelect(outputPath);
             }
             catch (OperationCanceledException)
             {
-                _log.Info("Package creation cancelled by user.");
+                _log.Info("Package creation cancelled.");
                 _status.Message = "Packaging cancelled.";
             }
             catch (FileNotFoundException ex) when (
-                ex.Message.Contains("StubInstaller.exe") ||
+                ex.Message.Contains("StubInstaller") ||
                 ex.FileName?.Contains("StubInstaller") == true)
             {
                 HandleStubMissingError(ex);
             }
-            catch (IOException ex) when (IsFileLockedException(ex))
+            catch (IOException ex) when (IsFileLocked(ex))
             {
                 _log.Error("Packaging failed — file locked", ex);
                 _error.ShowErrorAsync(
                     "Cannot create package: a file is locked by another program.\n\n" +
-                    "Close any programs that might be using your installer files and try again.",
+                    "Close any programs using your installer files and try again.",
                     retryActionAsync: () => ExecutePackAsync(null));
             }
-            catch (IOException ex) when (IsDiskFullException(ex))
+            catch (IOException ex) when (IsDiskFull(ex))
             {
                 _log.Error("Packaging failed — disk full", ex);
-                _error.ShowError(
-                    "Cannot create package: your disk is full or nearly full.\n\n" +
-                    "Free up disk space and try again.");
+                _error.ShowError("Cannot create package: disk is full.\n\nFree up space and try again.");
             }
             catch (UnauthorizedAccessException ex)
             {
                 _log.Error("Packaging failed — access denied", ex);
                 _error.ShowErrorAsync(
                     "Cannot create package: access denied.\n\n" +
-                    "Check that you have write permission in the output folder, " +
-                    "or try running PackItPro as Administrator.",
+                    "Check write permissions on the output folder, or run PackItPro as Administrator.",
                     retryActionAsync: () => ExecutePackAsync(null));
-            }
-            catch (InvalidOperationException ex) when (ex.Message.Contains("self-contained"))
-            {
-                _log.Error("Packaging failed — stub is framework-dependent", ex);
-                _error.ShowError(
-                    "StubInstaller.exe is a framework-dependent build and cannot be used.\n\n" +
-                    "Fix:\n" +
-                    "  cd StubInstaller\n" +
-                    "  dotnet publish -c Release -r win-x64 --self-contained\n" +
-                    "  copy publish\\StubInstaller.exe PackItPro\\Resources\\StubInstaller.exe\n\n" +
-                    "Then rebuild PackItPro.");
             }
             catch (Exception ex)
             {
                 _log.Error("Packaging failed", ex);
                 _status.Message = "Packaging failed — see error panel.";
                 _error.ShowErrorAsync(
-                    $"Failed to create package.\n\nError: {ex.Message}\n\nCheck logs for full details.",
+                    $"Failed to create package.\n\nError: {ex.Message}\n\nCheck logs for details.",
                     retryActionAsync: () => ExecutePackAsync(null));
             }
             finally
             {
                 _packCts?.Dispose();
                 _packCts = null;
-
-                if (!succeeded)
-                    _status.SetStatusReady();
+                if (!succeeded) _status.SetStatusReady();
             }
         }
 
+        // ── Test Package ──────────────────────────────────────────────────────
+        // Opens the folder containing the last packed file and selects it in Explorer.
+        // This is the most useful "test" action short of running the installer —
+        // it lets users immediately drag it to a VM, share it, or run it manually.
+
         private void ExecuteTestPackage(object? parameter)
         {
-            MessageBox.Show(
-                "Test package feature coming in Phase 2.",
-                "PackItPro — Test Package",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
+            // If we have a recently packed file, reveal it in Explorer
+            if (!string.IsNullOrEmpty(_lastPackedFile) && File.Exists(_lastPackedFile))
+            {
+                OpenFolderAndSelect(_lastPackedFile);
+                return;
+            }
+
+            // Otherwise let them browse to a .exe to open its folder
+            var dialog = new OpenFileDialog
+            {
+                Title = "Select a PackItPro package to locate",
+                Filter = "Executable Files (*.exe)|*.exe",
+                InitialDirectory = _settings.OutputLocation,
+            };
+
+            if (dialog.ShowDialog() != true) return;
+
+            if (File.Exists(dialog.FileName))
+                OpenFolderAndSelect(dialog.FileName);
+        }
+
+        // ── Helpers ───────────────────────────────────────────────────────────
+
+        private static void OpenFolderAndSelect(string filePath)
+        {
+            try
+            {
+                // /select highlights the specific file in Explorer
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "explorer.exe",
+                    Arguments = $"/select,\"{filePath}\"",
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Could not open Explorer.\n\nFile is at:\n{filePath}\n\nError: {ex.Message}",
+                    "PackItPro",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
         }
 
         private void HandleStubMissingError(Exception ex)
@@ -204,30 +231,23 @@ namespace PackItPro.ViewModels.CommandHandlers
             _log.Error("StubInstaller.exe not found", ex);
             _error.ShowError(
                 "StubInstaller.exe was not found.\n\n" +
-                "To fix this:\n" +
-                "1. Open a terminal in the solution root.\n" +
-                "2. Run:\n" +
-                "   cd StubInstaller\n" +
-                "   dotnet publish -c Release -r win-x64 --self-contained -p:PublishSingleFile=true\n" +
-                "3. Copy the output:\n" +
-                "   copy publish\\StubInstaller.exe ..\\PackItPro\\Resources\\StubInstaller.exe\n" +
-                "4. Rebuild PackItPro.");
+                "Fix:\n" +
+                "1. Run:  .\\build.ps1 -SkipPackItPro\n" +
+                "   This publishes StubInstaller and copies it to Resources\\\n\n" +
+                "2. Rebuild PackItPro.");
         }
 
-        // ── Helpers ──────────────────────────────────────────────────────
-
-        private static bool IsFileLockedException(IOException ex)
+        private static bool IsFileLocked(IOException ex)
         {
-            int hResult = ex.HResult & 0xFFFF;
-            return hResult is 0x20 or 0x21
-                || ex.Message.Contains("being used by another process", StringComparison.OrdinalIgnoreCase)
-                || ex.Message.Contains("locked", StringComparison.OrdinalIgnoreCase);
+            int hr = ex.HResult & 0xFFFF;
+            return hr is 0x20 or 0x21
+                || ex.Message.Contains("being used by another process", StringComparison.OrdinalIgnoreCase);
         }
 
-        private static bool IsDiskFullException(IOException ex)
+        private static bool IsDiskFull(IOException ex)
         {
-            int hResult = ex.HResult & 0xFFFF;
-            return hResult is 0x70 or 0x27
+            int hr = ex.HResult & 0xFFFF;
+            return hr is 0x70 or 0x27
                 || ex.Message.Contains("disk full", StringComparison.OrdinalIgnoreCase)
                 || ex.Message.Contains("not enough space", StringComparison.OrdinalIgnoreCase);
         }

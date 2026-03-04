@@ -1,12 +1,4 @@
-﻿// ViewModels/FileListViewModel.cs - v2.6 SMALL ISSUES FIX
-// Changes vs v2.5:
-//   - Removed duplicate OnPropertyChanged declaration. The class had two:
-//       protected virtual void OnPropertyChanged([CallerMemberName] string? ...)  ← correct
-//       protected virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] ...)
-//     The second (with the full namespace qualifier) shadowed the first and compiled
-//     without error only because they had the same signature after resolution.
-//     Kept the cleaner form with the using directive at the top.
-//   - No logic changes.
+﻿// PackItPro/ViewModels/FileListViewModel.cs
 using PackItPro.Models;
 using System;
 using System.Collections.Generic;
@@ -45,7 +37,7 @@ namespace PackItPro.ViewModels
                             if (File.Exists(item.FilePath))
                                 _cachedTotalSize += new FileInfo(item.FilePath).Length;
                         }
-                        catch { /* File deleted between add and render — skip */ }
+                        catch { }
                     }
                 }
                 return _cachedTotalSize;
@@ -82,8 +74,6 @@ namespace PackItPro.ViewModels
         }
 
         public void ClearAll() => _items.Clear();
-
-        // ── AddFilesWithValidation ─────────────────────────────────────
 
         public class AddFilesResult
         {
@@ -132,15 +122,17 @@ namespace PackItPro.ViewModels
                         skipReasons.Add($"Zero-byte file: {fi.Name}");
                         return false;
                     }
-
-                    if (_settings.OnlyScanExecutables &&
-                        !_executableExtensions.Contains(fi.Extension))
-                    {
-                        skipReasons.Add($"Non-executable: {fi.Name} ({fi.Extension})");
-                        return false;
-                    }
-
                     return true;
+                })
+                // ✅ Validate file type — only accepted installer/script types
+                .Where(fi =>
+                {
+                    string ext = Path.GetExtension(fi!.Name).ToLowerInvariant();
+                    if (_executableExtensions.Contains(ext))
+                        return true;
+
+                    skipReasons.Add($"Unsupported file type: {fi.Name} ({ext})\n  PackItPro packages installer files (.exe, .msi, .bat, .zip, etc.)");
+                    return false;
                 })
                 .Select(fi => fi!.FullName)
                 .Take(_settings.MaxFilesInList - _items.Count)
@@ -156,10 +148,11 @@ namespace PackItPro.ViewModels
                     Size = FormatBytes(fileInfo.Length),
                     Status = FileStatusEnum.Pending,
                     Positives = 0,
-                    TotalScans = 0
+                    TotalScans = 0,
+                    InstallOrder = 0  // ✅ Initialize to prevent null reference on removal
                 };
                 fileItem.RemoveCommand = new RelayCommand(_ => ExecuteRemoveFile(fileItem));
-                _items.Add(fileItem);
+                _items.Add(fileItem); // Add AFTER all properties are set
             }
 
             result.SuccessCount = validFiles.Count;
@@ -170,8 +163,6 @@ namespace PackItPro.ViewModels
         public void AddFilesWithValidation(string[] paths)
             => AddFilesWithValidation(paths, out _);
 
-        // ── Private command handlers ───────────────────────────────────
-
         private void ExecuteAddFiles(object? parameter)
         {
             if (parameter is string[] filePaths)
@@ -180,8 +171,18 @@ namespace PackItPro.ViewModels
 
         private void ExecuteRemoveFile(object? parameter)
         {
-            if (parameter is FileItemViewModel item)
-                _items.Remove(item);
+            try
+            {
+                if (parameter is FileItemViewModel item && item != null && _items.Contains(item))
+                {
+                    _items.Remove(item);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[FileListViewModel] Remove file failed: {ex.Message}");
+                // Silent fail — prevents app crash
+            }
         }
 
         private void NotifyListChanged()
@@ -205,8 +206,6 @@ namespace PackItPro.ViewModels
             return $"{size:0.##} {suffixes[i]}";
         }
 
-        // ── IDisposable ────────────────────────────────────────────────
-
         protected virtual void Dispose(bool disposing)
         {
             if (_disposed) return;
@@ -223,9 +222,6 @@ namespace PackItPro.ViewModels
             Dispose(true);
             GC.SuppressFinalize(this);
         }
-
-        // ── INotifyPropertyChanged ─────────────────────────────────────
-        // FIX: single declaration — was duplicated with full namespace qualifier.
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
