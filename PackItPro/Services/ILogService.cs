@@ -1,5 +1,4 @@
-﻿// PackItPro/Services/ILogService.cs - v2.2
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
@@ -25,7 +24,7 @@ namespace PackItPro.Services
     {
         private readonly string _logPath;
         private readonly object _lock = new();
-        private bool _disabled = false; // FIX: one-time fallback on IO failure
+        private bool _disabled = false;
 
         public string LogPath => _logPath;
 
@@ -33,7 +32,7 @@ namespace PackItPro.Services
         {
             _logPath = logPath;
 
-            // FIX: Only write the header if the file is new/empty.
+            // Only write the header if the file is new/empty.
             // Multiple packaging operations in one session must NOT produce
             // multiple headers in the same log file.
             bool isNew = !File.Exists(logPath) || new FileInfo(logPath).Length == 0;
@@ -41,7 +40,7 @@ namespace PackItPro.Services
             {
                 WriteRaw(
                     "========================================\n" +
-                    $"PackItPro Log — {DateTime.Now:yyyy-MM-dd HH:mm:ss}\n" +
+                    $"PackItPro Log — {DateTime.Now:dd-MM-yyyy HH:mm:ss}\n" +
                     $"Machine: {Environment.MachineName} | User: {Environment.UserName}\n" +
                     "========================================\n");
             }
@@ -95,7 +94,7 @@ namespace PackItPro.Services
                 }
                 catch
                 {
-                    // FIX: Disk full or permissions error — disable logging permanently
+                    // Disk full or permissions error — disable logging permanently
                     // rather than burning CPU retrying on every subsequent log call.
                     _disabled = true;
                 }

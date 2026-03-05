@@ -501,16 +501,10 @@ namespace StubInstaller
             Debug.WriteLine(logMessage);
             Console.WriteLine(logMessage);
 
-            // Also write to temp log file
-            try
-            {
-                var logPath = Path.Combine(Path.GetTempPath(), "PackItPro_Extraction.log");
-                File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}] {logMessage}\n");
-            }
-            catch
-            {
-                // Ignore log write failures
-            }
+            // ✅ FIX: Route through StubLogger instead of hardcoded temp path
+            // This ensures extraction logs are properly captured in the main log file
+            // and not scattered across multiple temp files.
+            StubLogger.Log(logMessage);
         }
 
         private static string FormatBytes(long bytes)

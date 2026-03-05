@@ -16,11 +16,10 @@ namespace PackItPro.Views
         {
             InitializeComponent();
 
-            // ✅ FIX: Only start animation when empty state is visible
+            // Only start animation when empty state is visible
             EmptyDropState.IsVisibleChanged += EmptyDropState_IsVisibleChanged;
         }
 
-        // ✅ FIX: Control animation based on visibility
         private void EmptyDropState_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
             if (EmptyDropState.Visibility == Visibility.Visible)

@@ -1,13 +1,4 @@
-﻿// ViewModels/FileListViewModel.cs - v2.6 SMALL ISSUES FIX
-// Changes vs v2.5:
-//   - Removed duplicate OnPropertyChanged declaration. The class had two:
-//       protected virtual void OnPropertyChanged([CallerMemberName] string? ...)  ← correct
-//       protected virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] ...)
-//     The second (with the full namespace qualifier) shadowed the first and compiled
-//     without error only because they had the same signature after resolution.
-//     Kept the cleaner form with the using directive at the top.
-//   - No logic changes.
-using PackItPro.Models;
+﻿using PackItPro.Models;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -82,8 +73,6 @@ namespace PackItPro.ViewModels
         }
 
         public void ClearAll() => _items.Clear();
-
-        // ── AddFilesWithValidation ─────────────────────────────────────
 
         public class AddFilesResult
         {
@@ -170,8 +159,6 @@ namespace PackItPro.ViewModels
         public void AddFilesWithValidation(string[] paths)
             => AddFilesWithValidation(paths, out _);
 
-        // ── Private command handlers ───────────────────────────────────
-
         private void ExecuteAddFiles(object? parameter)
         {
             if (parameter is string[] filePaths)
@@ -205,8 +192,6 @@ namespace PackItPro.ViewModels
             return $"{size:0.##} {suffixes[i]}";
         }
 
-        // ── IDisposable ────────────────────────────────────────────────
-
         protected virtual void Dispose(bool disposing)
         {
             if (_disposed) return;
@@ -223,9 +208,6 @@ namespace PackItPro.ViewModels
             Dispose(true);
             GC.SuppressFinalize(this);
         }
-
-        // ── INotifyPropertyChanged ─────────────────────────────────────
-        // FIX: single declaration — was duplicated with full namespace qualifier.
 
         public event PropertyChangedEventHandler? PropertyChanged;
 

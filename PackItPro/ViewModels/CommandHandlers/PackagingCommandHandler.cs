@@ -1,14 +1,4 @@
-﻿// ViewModels/CommandHandlers/PackagingCommandHandler.cs - v2.5 SMALL ISSUES FIX
-// Changes vs v2.4 (Phase 1):
-//   - PackCommand now uses AsyncRelayCommand instead of RelayCommand.
-//     Previously: new RelayCommand(async _ => await ExecutePackAsync(), CanExecutePack)
-//     The async lambda assigned to Action<object?> becomes async void, which means
-//     any exception thrown inside ExecutePackAsync() after the first await would be
-//     lost to the thread pool and crash the app without showing an error dialog.
-//     AsyncRelayCommand properly wraps the async execution and prevents double-clicks
-//     during an in-progress pack via its _isExecuting guard.
-//   - No other logic changes from v2.4.
-using Microsoft.Win32;
+﻿using Microsoft.Win32;
 using PackItPro.Services;
 using System;
 using System.IO;
@@ -46,8 +36,6 @@ namespace PackItPro.ViewModels.CommandHandlers
             _error = error ?? throw new ArgumentNullException(nameof(error));
             _log = log ?? throw new ArgumentNullException(nameof(log));
 
-            // FIX: Use AsyncRelayCommand so async exceptions are not swallowed.
-            // RelayCommand(async _ => ...) produces async void which loses exceptions.
             PackCommand = new AsyncRelayCommand(ExecutePackAsync, CanExecutePack);
             TestPackageCommand = new RelayCommand(ExecuteTestPackage);
 
@@ -213,8 +201,6 @@ namespace PackItPro.ViewModels.CommandHandlers
                 "   copy publish\\StubInstaller.exe ..\\PackItPro\\Resources\\StubInstaller.exe\n" +
                 "4. Rebuild PackItPro.");
         }
-
-        // ── Helpers ──────────────────────────────────────────────────────
 
         private static bool IsFileLockedException(IOException ex)
         {

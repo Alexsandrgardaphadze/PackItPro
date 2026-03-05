@@ -1,5 +1,4 @@
-﻿// PackItPro/Services/StubLocator.cs - v2.2
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 
@@ -14,9 +13,9 @@ namespace PackItPro.Services
         // A framework-dependent stub is ~100–200 KB.
         // A self-contained single-file stub is typically 60–150 MB.
         // 10 MB threshold is well above framework-dependent and well below self-contained.
-        private const long MIN_SELF_CONTAINED_BYTES = 10L * 1024 * 1024; //  10 MB
-        private const long WARN_SIZE_MIN_BYTES = 50L * 1024 * 1024; //  50 MB — warn if suspiciously small
-        private const long WARN_SIZE_MAX_BYTES = 200L * 1024 * 1024; // 200 MB — warn if suspiciously large
+        private const long MIN_SELF_CONTAINED_BYTES = 10L * 1024 * 1024;
+        private const long WARN_SIZE_MIN_BYTES = 50L * 1024 * 1024;
+        private const long WARN_SIZE_MAX_BYTES = 200L * 1024 * 1024;
 
         /// <summary>
         /// Finds the StubInstaller.exe, validates it is self-contained, returns its full path.
@@ -25,20 +24,16 @@ namespace PackItPro.Services
         {
             log ??= NullLogService.Instance;
 
-            // FIX: Use AppContext.BaseDirectory instead of AppDomain.CurrentDomain.BaseDirectory.
-            // AppDomain is a legacy .NET Framework concept — AppContext is the correct
-            // .NET Core / .NET 5+ equivalent and avoids potential null-ref on trimmed builds.
             var baseDir = AppContext.BaseDirectory;
             log.Debug($"[StubLocator] BaseDirectory: {baseDir}");
 
             var searchPaths = new[]
             {
-                // ── Installed / published app ──────────────────────────────────
+                // Installed / published app
                 Path.Combine(baseDir, "Resources", "StubInstaller.exe"),
                 Path.Combine(baseDir, "StubInstaller.exe"),
 
-                // ── Development: running from bin\Debug or bin\Release ─────────
-                // Navigate up 3 levels (obj\Debug\net8.0-windows → project root) then into Resources
+                // Development: running from bin\Debug or bin\Release
                 Path.Combine(baseDir, "..", "..", "..", "Resources", "StubInstaller.exe"),
 
                 // Solution root layout: PackItPro\bin\..\ → solution root → Resources

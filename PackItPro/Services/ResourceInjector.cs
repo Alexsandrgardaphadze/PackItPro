@@ -1,5 +1,4 @@
-﻿// PackItPro/Services/ResourceInjector.cs - v2.3
-using System;
+﻿using System;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
@@ -93,9 +92,8 @@ namespace PackItPro.Services
 
                 output.Write(markerBytes, 0, MARKER_LENGTH);
 
-                // FIX: Flush(true) — forces OS write-through to disk before we
-                // read the file back for verification. Without this, the file system
-                // cache may serve stale data and verification will fail spuriously.
+                // Flush(true) forces OS write-through to disk before we read the file back for verification.
+                // Without this, the file system cache may serve stale data and verification will fail spuriously.
                 output.Flush(flushToDisk: true);
             }
 
@@ -160,10 +158,6 @@ namespace PackItPro.Services
                 return false;
             }
         }
-
-        // ──────────────────────────────────────────────────────────────
-        // Helpers
-        // ──────────────────────────────────────────────────────────────
 
         private static void CopyWithCancellation(Stream source, Stream dest, CancellationToken ct)
         {

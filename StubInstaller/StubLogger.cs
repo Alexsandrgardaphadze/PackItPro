@@ -1,9 +1,4 @@
 ﻿// StubInstaller/StubLogger.cs
-// Changes vs previous:
-//   [1] All file writes now use UTF-8 with BOM.
-//       The log contains emoji (✅ ⚠️) that are multi-byte in UTF-8. Without a
-//       BOM, Notepad and many Windows tools assume ANSI/CP1252 and display the
-//       emoji as "??" garbage. UTF-8 BOM tells every Windows tool to decode correctly.
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -37,7 +32,7 @@ namespace StubInstaller
                     "========================================\n" +
                     "PackItPro Stub Installer Log\n" +
                     $"Stub version: {version}  Build: {buildDate}\n" +
-                    $"Started:    {DateTime.Now:yyyy-MM-dd HH:mm:ss}\n" +
+                    $"Started:    {DateTime.Now:dd-MM-yyyy HH:mm:ss}\n" +
                     $"Executable: {Environment.ProcessPath}\n" +
                     "========================================\n\n",
                     _utf8Bom);
@@ -49,7 +44,7 @@ namespace StubInstaller
         {
             var content =
                 "\n========================================\n" +
-                $"[ELEVATED RESUME] {DateTime.Now:yyyy-MM-dd HH:mm:ss}\n" +
+                $"[ELEVATED RESUME] {DateTime.Now:dd-MM-yyyy HH:mm:ss}\n" +
                 $"Process ID: {Process.GetCurrentProcess().Id}\n" +
                 "========================================\n\n";
 

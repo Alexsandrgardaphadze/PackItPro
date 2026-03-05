@@ -1,5 +1,4 @@
-﻿// PackItPro/Services/Packager.cs - v2.2
-using ICSharpCode.SharpZipLib.Zip;
+﻿using ICSharpCode.SharpZipLib.Zip;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -10,14 +9,8 @@ using System.Threading.Tasks;
 
 namespace PackItPro.Services
 {
-    // FIX: Static event removed entirely — it accumulates handlers across packaging
-    // operations, leaking memory. Callers use IProgress<> instead.
-    // public static event ProgressReportHandler? ProgressChanged;  ← DELETED
-
     public static class Packager
     {
-        // Deterministic ZIP timestamp — same content always produces same bytes.
-        // Professional packagers (NuGet, npm, Debian) do this.
         private static readonly DateTime ZipEpoch = new(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
         public static async Task<string> CreatePackageAsync(
@@ -73,8 +66,6 @@ namespace PackItPro.Services
                     }
                     catch (IOException ex)
                     {
-                        // FIX: Catch all IOExceptions (not just sharing violations) and
-                        // give an actionable message for whichever error occurred.
                         throw new IOException(
                             $"Cannot read '{Path.GetFileName(src)}': {ex.Message}\n" +
                             "Ensure the file is not locked by another program.", ex);

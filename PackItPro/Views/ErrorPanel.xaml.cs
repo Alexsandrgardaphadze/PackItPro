@@ -16,7 +16,7 @@ namespace PackItPro.Views
         {
             InitializeComponent();
 
-            // ✅ FIX: Subscribe to DataContext changes to wire up animation
+            // Subscribe to DataContext changes to wire up animation
             DataContextChanged += OnDataContextChanged;
         }
 
@@ -35,7 +35,6 @@ namespace PackItPro.Views
             }
         }
 
-        // ✅ FIX: Trigger animation when error is shown
         private void OnErrorShown(object? sender, EventArgs e)
         {
             // Play the slide-in animation

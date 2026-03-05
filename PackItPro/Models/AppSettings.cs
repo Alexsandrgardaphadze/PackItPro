@@ -1,5 +1,4 @@
-﻿// PackItPro/Models/AppSettings.cs - v2.3 IMPROVED
-using System;
+﻿using System;
 
 namespace PackItPro.Models
 {
@@ -13,12 +12,10 @@ namespace PackItPro.Models
         public int MinimumDetectionsToFlag { get; set; } = 1;
         public bool IncludeWingetUpdateScript { get; set; } = false;
 
-        // FIX: Use enum instead of magic numbers (0, 1, 2)
-        // Old: public int CompressionLevel { get; set; } = 1;
         public CompressionMethodEnum CompressionMethod { get; set; } = CompressionMethodEnum.Fast;
 
-        // Kept for backward compatibility if settings are already saved with old field
-        // Maps old int value to new enum
+        // Kept for backward compatibility if settings are already saved with old field.
+        // Maps old int value to new enum.
         public int CompressionLevel
         {
             get => CompressionMethod switch
@@ -44,7 +41,6 @@ namespace PackItPro.Models
         public bool ScanWithVirusTotal { get; set; } = true;
         public int MaxFilesInList { get; set; } = 20;
 
-        // DEPRECATED: UseLZMACompression — use CompressionMethod instead
         // Kept for backward compatibility
         public bool UseLZMACompression
         {

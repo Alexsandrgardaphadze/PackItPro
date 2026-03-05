@@ -1,5 +1,4 @@
-﻿// ViewModels/MainViewModel.cs - v2.7 ULTIMATE FIX
-using PackItPro.Services;
+﻿using PackItPro.Services;
 using PackItPro.ViewModels.CommandHandlers;
 using System;
 using System.Collections.Generic;
@@ -12,7 +11,6 @@ namespace PackItPro.ViewModels
 {
     /// <summary>
     /// Main ViewModel — orchestrates CommandHandlers with proper command initialization.
-    /// FIX v2.7: Notifies UI when commands become available after InitializeAsync().
     /// </summary>
     public class MainViewModel : INotifyPropertyChanged, IDisposable
     {
@@ -113,7 +111,7 @@ namespace PackItPro.ViewModels
 
                 InitializeHandlers();
 
-                // ✅ CRITICAL FIX: Notify ALL command properties
+                // Notify all command properties so WPF updates their enabled state
                 NotifyAllCommandsAvailable();
 
                 _isInitialized = true;
@@ -139,7 +137,6 @@ namespace PackItPro.ViewModels
             _logService.Info("Handlers initialized");
         }
 
-        // ✅ FIX: Tell WPF that commands are now available
         private void NotifyAllCommandsAvailable()
         {
             OnPropertyChanged(nameof(PackCommand));

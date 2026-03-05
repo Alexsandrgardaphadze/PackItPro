@@ -1,5 +1,4 @@
-﻿// PackItPro/ViewModels/SettingsViewModel.cs - v2.2
-using PackItPro.Models;
+﻿using PackItPro.Models;
 using System;
 using System.ComponentModel;
 using System.IO;
@@ -95,7 +94,6 @@ namespace PackItPro.ViewModels
             _settingsFilePath = settingsFilePath ?? throw new ArgumentNullException(nameof(settingsFilePath));
         }
 
-        // FIX: Add CancellationToken support for async operations
         public async Task LoadSettingsAsync(CancellationToken cancellationToken = default)
         {
             try
@@ -132,7 +130,6 @@ namespace PackItPro.ViewModels
             }
         }
 
-        // FIX: Add CancellationToken support and cancel previous save if in progress
         public async Task SaveSettingsAsync(CancellationToken cancellationToken = default)
         {
             // Cancel any previous save operation
@@ -196,7 +193,6 @@ namespace PackItPro.ViewModels
             return true;
         }
 
-        // FIX: Proper disposal
         protected virtual void Dispose(bool disposing)
         {
             if (_disposed) return;

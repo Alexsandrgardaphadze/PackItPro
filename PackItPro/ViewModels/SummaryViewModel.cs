@@ -1,5 +1,4 @@
-﻿// ViewModels/SummaryViewModel.cs - v2.2
-using System;
+﻿using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
@@ -111,7 +110,6 @@ namespace PackItPro.ViewModels
             return $"{size:0.##} {suffixes[suffixIndex]}";
         }
 
-        // FIX: Proper disposal to prevent memory leaks
         protected virtual void Dispose(bool disposing)
         {
             if (_disposed) return;

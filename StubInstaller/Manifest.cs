@@ -1,13 +1,4 @@
-﻿// StubInstaller/Manifest.cs - v1.3
-// Changes vs v1.2:
-//   - Three optional prerequisite fields added to PackageManifest:
-//       MinWindowsBuild (int?)  — minimum Windows build number (default: 18362 = Win10 1903)
-//       RequiresX64 (bool)      — true if package requires a 64-bit OS (default: false)
-//       MinFreeDiskMB (int?)    — minimum free MB required; null = auto-estimate from payload
-//     Defaults are chosen so existing manifests (without these fields) produce reasonable
-//     checks without packager changes: all packages get a Win10 1903 minimum and a
-//     disk space estimate. Set fields explicitly in the manifest to tighten or relax.
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
 namespace StubInstaller
@@ -34,10 +25,6 @@ namespace StubInstaller
 
         [JsonPropertyName("cleanup")]
         public bool Cleanup { get; set; } = true;
-
-        // ── Prerequisites ─────────────────────────────────────────────────────
-        // All optional. Null/false means "no requirement" or "auto-detect".
-        // Checked by PrerequisiteChecker in Program.cs before extraction begins.
 
         /// <summary>
         /// Minimum Windows build number required. Null = default (18362 = Win10 1903).

@@ -1,15 +1,15 @@
 ﻿// StubInstaller.Cleanup.cs
 using System; // For Action<T> delegate
 using System.IO; // For Directory, Path, IOException
-using System.Security.Principal; // For WindowsPrincipal (though not used directly here)
+using System.Threading.Tasks; // For async/await
 
 namespace StubInstaller
 {
     public static class Cleanup
     {
-        // NEW: Method to clean up the temporary extraction directory
-        // NEW: Accepts logging delegates for flexibility
-        public static void CleanupTempDirectory(string tempDirectoryPath, bool shouldCleanup, Action<string> logInfo, Action<string> logError)
+        // ✅ FIX: Made async to avoid blocking thread pool during retries
+        // Changed from: public static void CleanupTempDirectory(...)
+        public static async Task CleanupTempDirectoryAsync(string tempDirectoryPath, bool shouldCleanup, Action<string> logInfo, Action<string> logError)
         {
             if (!shouldCleanup)
             {
@@ -25,7 +25,7 @@ namespace StubInstaller
 
             logInfo($"[CLEANUP] Attempting to delete temporary directory: {tempDirectoryPath}");
 
-            // NEW: Exponential backoff for cleanup retries
+            // Exponential backoff for cleanup retries
             int[] delays = { 1000, 2000, 4000, 8000 }; // 1s, 2s, 4s, 8s
             bool success = false;
 
@@ -53,21 +53,17 @@ namespace StubInstaller
 
                 if (!success && i < delays.Length - 1) // Don't sleep after the last attempt
                 {
-                    System.Threading.Thread.Sleep(delays[i]); // Wait with increasing delay
+                    // ✅ FIX: Use async Task.Delay instead of blocking Thread.Sleep
+                    await Task.Delay(delays[i]);
                 }
             }
 
             if (!success)
             {
-                // NEW: If retries fail, log the error and optionally schedule for reboot deletion
+                // If retries fail, log the error and optionally schedule for reboot deletion
                 logError($"[CLEANUP] Failed to delete temporary directory after {delays.Length} attempts: {tempDirectoryPath}");
                 logInfo("[CLEANUP] Consider deleting manually or scheduling for next reboot.");
-                // Scheduling for reboot deletion is possible but requires registry manipulation (e.g., MoveFileEx via P/Invoke)
-                // This is more complex and might not be necessary for all cases initially.
             }
         }
-
-        // NEW: Helper methods for logging (can be shared)
-        // REMOVED: LogInfo and LogError methods as they are now passed as delegates
     }
 }

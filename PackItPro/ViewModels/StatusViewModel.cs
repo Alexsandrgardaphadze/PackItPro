@@ -1,13 +1,4 @@
-﻿// ViewModels/StatusViewModel.cs - v2.1 PHASE 1 FIX
-// Changes vs v2.0:
-//   - SetStatusReady no longer resets ProgressPercentage to 0.
-//     Previously the finally block in PackagingCommandHandler called SetStatusReady()
-//     immediately after success, making the progress bar flash from 100% to 0%.
-//   - Added SetStatusSuccess(message) — call this on success to keep the bar at 100%
-//     with a "Done" state. SetStatusReady() resets to 0 only when the user adds new
-//     files or explicitly starts a new operation.
-//   - Added ElapsedSeconds to surface timing info to the UI (opt-in).
-using System;
+﻿using System;
 using System.ComponentModel;
 
 namespace PackItPro.ViewModels
@@ -21,8 +12,6 @@ namespace PackItPro.ViewModels
         private bool _isSuccess = false;
         private string _operationName = "Idle";
         private DateTime? _operationStartTime;
-
-        // ── Properties ────────────────────────────────────────────────
 
         public string Message
         {
@@ -81,20 +70,16 @@ namespace PackItPro.ViewModels
                 ? (int)(DateTime.Now - _operationStartTime.Value).TotalSeconds
                 : 0;
 
-        // ── Status setters ────────────────────────────────────────────
-
         /// <summary>
-        /// Resets to idle state and clears the progress bar.
-        /// Call this when the user starts a NEW operation (e.g. adds files),
-        /// NOT after a successful completion — use SetStatusSuccess() for that.
+        /// Resets to idle state. Call when the user starts a NEW operation (e.g. adds files),
+        /// NOT after successful completion — use SetStatusSuccess() for that.
+        /// Do NOT reset ProgressPercentage here; resetting in the finally block caused the
+        /// progress bar to flash 100% → 0%. Progress resets when SetStatusPacking/Scanning begins.
         /// </summary>
         public void SetStatusReady()
         {
             OperationName = "Idle";
             Message = "Ready to create .exe package";
-            // FIX: Do NOT reset ProgressPercentage here.
-            // Resetting in the finally block caused the bar to flash 100% → 0%.
-            // Progress resets when SetStatusPacking/Scanning begins a new run.
             IsPacking = false;
             IsScanning = false;
             IsSuccess = false;
@@ -120,7 +105,7 @@ namespace PackItPro.ViewModels
         {
             OperationName = "Scanning";
             Message = "Scanning files with VirusTotal...";
-            ProgressPercentage = 0;        // FIX: reset at START of operation
+            ProgressPercentage = 0;
             IsScanning = true;
             IsPacking = false;
             IsSuccess = false;
@@ -131,14 +116,12 @@ namespace PackItPro.ViewModels
         {
             OperationName = "Packing";
             Message = "Creating .exe package...";
-            ProgressPercentage = 0;        // FIX: reset at START of operation
+            ProgressPercentage = 0;
             IsPacking = true;
             IsScanning = false;
             IsSuccess = false;
             _operationStartTime = DateTime.Now;
         }
-
-        // ── INotifyPropertyChanged ────────────────────────────────────
 
         public event PropertyChangedEventHandler? PropertyChanged;
 

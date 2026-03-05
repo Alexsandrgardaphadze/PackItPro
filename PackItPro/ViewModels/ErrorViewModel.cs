@@ -1,5 +1,4 @@
-﻿// ViewModels/ErrorViewModel.cs - v2.2
-using System;
+﻿using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
@@ -16,7 +15,6 @@ namespace PackItPro.ViewModels
         private string _errorMessage = string.Empty;
         private bool _canRetry;
 
-        // FIX: Support both sync and async retry actions
         private Func<Task>? _retryActionAsync;
         private Action? _retryActionSync;
 
@@ -50,7 +48,6 @@ namespace PackItPro.ViewModels
 
         public ErrorViewModel()
         {
-            // FIX: Use async wrapper for retry command
             RetryCommand = new RelayCommand(async _ => await ExecuteRetryAsync(), CanExecuteRetry);
             DismissErrorCommand = new RelayCommand(ExecuteDismiss);
         }

@@ -1,5 +1,4 @@
-﻿// ViewModels/CommandHandlers/FileOperationsHandler.cs - v2.7 ULTIMATE
-using Microsoft.Win32;
+﻿using Microsoft.Win32;
 using System;
 using System.IO;
 using System.Linq;
@@ -14,7 +13,6 @@ namespace PackItPro.ViewModels.CommandHandlers
         private readonly SettingsViewModel _settings;
         private readonly ICommand _scanFilesCommand;
 
-        // ✅ Store ALL commands as fields for proper CanExecute refresh
         private readonly RelayCommand _browseFilesCommand;
         private readonly RelayCommand _clearAllFilesCommand;
         private readonly RelayCommand _exportListCommand;
@@ -36,7 +34,6 @@ namespace PackItPro.ViewModels.CommandHandlers
             _clearAllFilesCommand = new RelayCommand(ExecuteClearAllFiles, CanExecuteClearAll);
             _exportListCommand = new RelayCommand(ExecuteExportList, CanExecuteExportList);
 
-            // ✅ Subscribe to FileList changes and refresh COMMAND state
             _fileList.PropertyChanged += (s, e) =>
             {
                 if (e.PropertyName == nameof(_fileList.HasFiles))
