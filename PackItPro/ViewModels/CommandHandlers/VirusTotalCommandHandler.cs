@@ -1,11 +1,4 @@
-﻿// ViewModels/CommandHandlers/VirusTotalCommandHandler.cs - v2.1 SMALL ISSUES FIX
-// Changes vs v2.0:
-//   - catch (Exception ex) where ex was unused → now logs the exception via _logService.
-//     The compiler warning (CS0168) pointed at real behaviour: scan failures were
-//     silently swallowed with no trace in the log, making diagnosis impossible.
-//     Now every per-file scan failure is logged with file name and exception details.
-//   - No other logic changes.
-using PackItPro.Models;
+﻿using PackItPro.Models;
 using PackItPro.Services;
 using System;
 using System.Collections.Generic;
@@ -27,6 +20,7 @@ namespace PackItPro.ViewModels.CommandHandlers
         private readonly VirusTotalClient _virusTotalClient;
         private readonly ILogService _logService;
         private readonly HashSet<string> _executableExtensions;
+        private readonly TrustStore _trustStore;
 
         private CancellationTokenSource? _scanCancellationTokenSource;
         private DateTime _lastProgressUpdate = DateTime.MinValue;
@@ -35,6 +29,16 @@ namespace PackItPro.ViewModels.CommandHandlers
         public ICommand ScanFilesCommand { get; }
         public ICommand CancelScanCommand { get; }
 
+        /// <summary>
+        /// Right-click → "Mark as Trusted / False Positive".
+        /// CommandParameter: the FileItemViewModel being right-clicked.
+        /// Disabled for files flagged by a trusted engine — those cannot be overridden.
+        /// </summary>
+        public ICommand MarkAsTrustedCommand { get; }
+
+        /// <summary>Right-click → "Remove Trust" to un-mark a previously trusted file.</summary>
+        public ICommand RemoveTrustCommand { get; }
+
         public VirusTotalCommandHandler(
             FileListViewModel fileList,
             SettingsViewModel settings,
@@ -42,7 +46,8 @@ namespace PackItPro.ViewModels.CommandHandlers
             ErrorViewModel error,
             VirusTotalClient virusTotalClient,
             ILogService logService,
-            HashSet<string> executableExtensions)
+            HashSet<string> executableExtensions,
+            TrustStore trustStore)
         {
             _fileList = fileList ?? throw new ArgumentNullException(nameof(fileList));
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
@@ -51,12 +56,17 @@ namespace PackItPro.ViewModels.CommandHandlers
             _virusTotalClient = virusTotalClient ?? throw new ArgumentNullException(nameof(virusTotalClient));
             _logService = logService ?? throw new ArgumentNullException(nameof(logService));
             _executableExtensions = executableExtensions ?? throw new ArgumentNullException(nameof(executableExtensions));
+            _trustStore = trustStore ?? throw new ArgumentNullException(nameof(trustStore));
 
             ScanFilesCommand = new RelayCommand(async _ => await ExecuteScanFilesCommandAsync(null), CanExecuteScan);
             CancelScanCommand = new RelayCommand(_ => CancelScan(), CanCancelScan);
+            MarkAsTrustedCommand = new RelayCommand(async p => await ExecuteMarkAsTrustedAsync(p), CanMarkAsTrusted);
+            RemoveTrustCommand = new RelayCommand(async p => await ExecuteRemoveTrustAsync(p), CanRemoveTrust);
 
             _status.PropertyChanged += OnStatusPropertyChanged;
         }
+
+        // ── CanExecute ────────────────────────────────────────────────────────
 
         private void OnStatusPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
@@ -64,11 +74,22 @@ namespace PackItPro.ViewModels.CommandHandlers
                 RaiseCanExecuteChanged();
         }
 
-        private bool CanExecuteScan(object? parameter) =>
+        private bool CanExecuteScan(object? _) =>
             _fileList.HasFiles && !_status.IsBusy && !string.IsNullOrWhiteSpace(_settings.VirusTotalApiKey);
 
-        private bool CanCancelScan(object? parameter) =>
+        private bool CanCancelScan(object? _) =>
             _status.IsBusy && _scanCancellationTokenSource != null;
+
+        private bool CanMarkAsTrusted(object? parameter) =>
+            parameter is FileItemViewModel item &&
+            item.Status == FileStatusEnum.Infected &&
+            !item.FlaggedByTrustedEngine &&
+            !item.IsTrustedFalsePositive;
+
+        private bool CanRemoveTrust(object? parameter) =>
+            parameter is FileItemViewModel item && item.IsTrustedFalsePositive;
+
+        // ── Scan ──────────────────────────────────────────────────────────────
 
         private void CancelScan()
         {
@@ -116,11 +137,15 @@ namespace PackItPro.ViewModels.CommandHandlers
                 return;
             }
 
-            var totalFiles = _fileList.Items.Count(f =>
-                !_settings.OnlyScanExecutables ||
-                _executableExtensions.Contains(Path.GetExtension(f.FilePath)));
+            // Count only files that will actually be submitted — skipped files do not
+            // consume progress slots. This prevents the bar from stalling at e.g. 50%
+            // when half the list is non-executables.
+            var scannableItems = _fileList.Items
+                .Where(f => !_settings.OnlyScanExecutables ||
+                            _executableExtensions.Contains(Path.GetExtension(f.FilePath)))
+                .ToList();
 
-            if (totalFiles == 0)
+            if (scannableItems.Count == 0)
             {
                 MessageBox.Show(
                     "No scannable files found.\n" +
@@ -131,29 +156,24 @@ namespace PackItPro.ViewModels.CommandHandlers
                 return;
             }
 
+            // Mark non-scannable files as Skipped up front
+            foreach (var item in _fileList.Items.Except(scannableItems))
+                item.Status = FileStatusEnum.Skipped;
+
             _scanCancellationTokenSource?.Cancel();
             _scanCancellationTokenSource = new CancellationTokenSource();
             var ct = _scanCancellationTokenSource.Token;
 
-            _status.Message = $"Scanning {totalFiles} file(s) with VirusTotal...";
-            int processed = 0;
-            int failedCount = 0;
-            int skippedCount = 0;
+            _status.Message = $"Scanning {scannableItems.Count} file(s) with VirusTotal...";
+            int processed = 0, failedCount = 0, trustedFpCount = 0;
             var infectedFiles = new List<FileItemViewModel>();
+            var trustedEngineFiles = new List<FileItemViewModel>();
 
-            foreach (var item in _fileList.Items)
+            var trustedEngines = _settings.SettingsModel.TrustedEngines;
+
+            foreach (var item in scannableItems)
             {
                 ct.ThrowIfCancellationRequested();
-
-                if (_settings.OnlyScanExecutables &&
-                    !_executableExtensions.Contains(Path.GetExtension(item.FilePath)))
-                {
-                    item.Status = FileStatusEnum.Skipped;
-                    skippedCount++;
-                    processed++;
-                    UpdateProgress(processed, totalFiles);
-                    continue;
-                }
 
                 try
                 {
@@ -162,27 +182,45 @@ namespace PackItPro.ViewModels.CommandHandlers
                         _settings.VirusTotalApiKey,
                         _settings.OnlyScanExecutables,
                         _settings.MinimumDetectionsToFlag,
-                        ct);
+                        ct,
+                        trustedEngines: trustedEngines,
+                        trustStore: _trustStore);
 
                     item.Positives = result.Positives;
                     item.TotalScans = result.TotalScans;
-                    item.Status = result.IsInfected ? FileStatusEnum.Infected : FileStatusEnum.Clean;
+                    item.FlaggedByTrustedEngine = result.FlaggedByTrustedEngine;
+                    item.TrustedEngineName = result.TrustedEngineName;
 
-                    if (result.IsInfected)
-                        infectedFiles.Add(item);
+                    if (result.IsTrustedFalsePositive)
+                    {
+                        item.Status = FileStatusEnum.Clean;
+                        item.IsTrustedFalsePositive = true;
+                        trustedFpCount++;
+                        _logService.Info($"Scanned '{item.FileName}': trusted false positive — skipped VT.");
+                    }
+                    else
+                    {
+                        item.Status = result.IsInfected ? FileStatusEnum.Infected : FileStatusEnum.Clean;
 
-                    _logService.Info(
-                        $"Scanned '{item.FileName}': {result.Positives}/{result.TotalScans} " +
-                        $"detections — {item.Status}");
+                        if (result.IsInfected)
+                        {
+                            infectedFiles.Add(item);
+                            if (result.FlaggedByTrustedEngine)
+                                trustedEngineFiles.Add(item);
+                        }
+
+                        _logService.Info(
+                            $"Scanned '{item.FileName}': {result.Positives}/{result.TotalScans} detections" +
+                            (result.FlaggedByTrustedEngine ? $" [TRUSTED ENGINE: {result.TrustedEngineName}]" : "") +
+                            $" — {item.Status}");
+                    }
                 }
                 catch (OperationCanceledException)
                 {
-                    throw; // propagate to outer handler
+                    throw;
                 }
                 catch (Exception ex)
                 {
-                    // FIX: was catch (Exception ex) with ex unused → warning CS0168
-                    // and silent failure. Now logged so failures are diagnosable.
                     _logService.Error($"Scan failed for '{item.FileName}'", ex);
                     item.Status = FileStatusEnum.ScanFailed;
                     failedCount++;
@@ -190,25 +228,43 @@ namespace PackItPro.ViewModels.CommandHandlers
                 finally
                 {
                     processed++;
-                    UpdateProgress(processed, totalFiles);
+                    UpdateProgress(processed, scannableItems.Count);
                 }
             }
 
-            // ── Report results ─────────────────────────────────────────
+            // ── Results summary ───────────────────────────────────────────────
 
-            if (infectedFiles.Count > 0)
+            if (trustedEngineFiles.Count > 0)
             {
-                var msg = $"{infectedFiles.Count} infected file(s) detected!";
+                var names = string.Join("\n", trustedEngineFiles.Select(f =>
+                    $"  • {f.FileName} — flagged by {f.TrustedEngineName}"));
+                var msg = $"⚠ REAL MALWARE DETECTED\n\n" +
+                          $"The following file(s) were flagged by a trusted security engine:\n\n{names}\n\n" +
+                          $"These cannot be marked as false positives. Remove them before packaging.";
+
+                if (_settings.AutoRemoveInfectedFiles)
+                {
+                    foreach (var f in trustedEngineFiles)
+                        _fileList.Items.Remove(f);
+                    msg += "\n\nAutomatically removed from the package list.";
+                }
+
+                MessageBox.Show(msg, "Real Malware Detected", MessageBoxButton.OK, MessageBoxImage.Stop);
+            }
+            else if (infectedFiles.Count > 0)
+            {
+                var names = string.Join("\n", infectedFiles.Select(f =>
+                    $"  • {f.FileName} ({f.Positives}/{f.TotalScans} engines)"));
+                var msg = $"{infectedFiles.Count} file(s) flagged:\n\n{names}\n\n" +
+                          $"If these are false positives, right-click → 'Mark as Trusted'.";
+
                 if (_settings.AutoRemoveInfectedFiles)
                 {
                     foreach (var f in infectedFiles)
                         _fileList.Items.Remove(f);
                     msg += "\n\nAutomatically removed from the package list.";
                 }
-                else
-                {
-                    msg += "\n\nReview files marked 'Infected' before packaging.";
-                }
+
                 MessageBox.Show(msg, "Security Alert", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
             else if (failedCount > 0)
@@ -221,9 +277,12 @@ namespace PackItPro.ViewModels.CommandHandlers
             }
             else
             {
-                var skippedNote = skippedCount > 0 ? $" ({skippedCount} skipped)" : "";
+                var notes = new List<string>();
+                if (trustedFpCount > 0) notes.Add($"{trustedFpCount} trusted FP");
+                var suffix = notes.Count > 0 ? $" ({string.Join(", ", notes)})" : "";
+
                 MessageBox.Show(
-                    $"All {totalFiles} file(s) scanned clean!{skippedNote}",
+                    $"All {scannableItems.Count} file(s) scanned clean!{suffix}",
                     "Scan Complete",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
@@ -235,6 +294,75 @@ namespace PackItPro.ViewModels.CommandHandlers
                 ? $"Scan completed — {failedCount} error(s). Check log."
                 : "Scan completed successfully.";
         }
+
+        // ── Trust actions ─────────────────────────────────────────────────────
+
+        private async Task ExecuteMarkAsTrustedAsync(object? parameter)
+        {
+            if (parameter is not FileItemViewModel item) return;
+            if (item.FlaggedByTrustedEngine)
+            {
+                MessageBox.Show(
+                    $"'{item.FileName}' was flagged by {item.TrustedEngineName}, " +
+                    "a trusted security engine.\n\nThis detection cannot be overridden.",
+                    "Cannot Trust",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
+            var confirm = MessageBox.Show(
+                $"Mark '{item.FileName}' as a trusted false positive?\n\n" +
+                $"It was flagged by {item.Positives}/{item.TotalScans} engine(s).\n\n" +
+                "It will be included in the package and this choice will be remembered.",
+                "Mark as Trusted",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (confirm != MessageBoxResult.Yes) return;
+
+            try
+            {
+                string hash = FileHasher.ComputeFileHashString(item.FilePath);
+                await _trustStore.TrustAsync(hash, item.FileName);
+
+                item.IsTrustedFalsePositive = true;
+                item.Status = FileStatusEnum.Clean;
+
+                _logService.Info($"[Trust] '{item.FileName}' ({hash[..8]}...) marked as trusted FP by user.");
+            }
+            catch (Exception ex)
+            {
+                _logService.Error($"Failed to trust '{item.FileName}'", ex);
+                _error.ShowError($"Could not save trust entry: {ex.Message}");
+            }
+
+            RaiseCanExecuteChanged();
+        }
+
+        private async Task ExecuteRemoveTrustAsync(object? parameter)
+        {
+            if (parameter is not FileItemViewModel item) return;
+
+            try
+            {
+                string hash = FileHasher.ComputeFileHashString(item.FilePath);
+                await _trustStore.UntrustAsync(hash);
+
+                item.IsTrustedFalsePositive = false;
+                item.Status = FileStatusEnum.Infected;
+
+                _logService.Info($"[Trust] '{item.FileName}' trust removed.");
+            }
+            catch (Exception ex)
+            {
+                _logService.Error($"Failed to remove trust for '{item.FileName}'", ex);
+            }
+
+            RaiseCanExecuteChanged();
+        }
+
+        // ── Helpers ───────────────────────────────────────────────────────────
 
         private void UpdateProgress(int processed, int total)
         {

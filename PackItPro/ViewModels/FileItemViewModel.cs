@@ -10,17 +10,13 @@ namespace PackItPro.ViewModels
 {
     public class FileItemViewModel : INotifyPropertyChanged
     {
-        // Static lookup table: one entry per extension group.
-        // Brushes are frozen once at class init — zero allocations during rendering.
-        // Adding a new file type: add one entry here, nothing else changes.
-
         private static readonly SolidColorBrush FallbackBrush =
             Frozen(new SolidColorBrush(Color.FromRgb(0x64, 0x74, 0x8B)));
 
         private sealed record FileTypeInfo(string Icon, SolidColorBrush Badge);
-
         private static SolidColorBrush Frozen(SolidColorBrush b) { b.Freeze(); return b; }
 
+        // Static lookup: one entry per extension. Brushes frozen at class init — zero allocations during rendering.
         private static readonly Dictionary<string, FileTypeInfo> ExtensionMap =
             new(System.StringComparer.OrdinalIgnoreCase)
             {
@@ -40,12 +36,19 @@ namespace PackItPro.ViewModels
                 [".appx"] = new("📦", Frozen(new SolidColorBrush(Color.FromRgb(0x06, 0xB6, 0xD4)))),
             };
 
+        // ── Backing fields ────────────────────────────────────────────────────
+
         private string _fileName = "";
         private string _filePath = "";
         private string _size = "";
         private FileStatusEnum _status = FileStatusEnum.Pending;
         private int _positives;
         private int _totalScans;
+        private bool _isTrustedFalsePositive;
+        private bool _flaggedByTrustedEngine;
+        private string? _trustedEngineName;
+
+        // ── Core properties ───────────────────────────────────────────────────
 
         public string FileName
         {
@@ -60,7 +63,7 @@ namespace PackItPro.ViewModels
             {
                 _filePath = value;
                 OnPropertyChanged();
-                // Both computed properties depend on FilePath
+                OnPropertyChanged(nameof(FileIcon));
                 OnPropertyChanged(nameof(FileTypeIcon));
                 OnPropertyChanged(nameof(FileTypeBadgeColor));
             }
@@ -75,7 +78,12 @@ namespace PackItPro.ViewModels
         public FileStatusEnum Status
         {
             get => _status;
-            set { _status = value; OnPropertyChanged(); }
+            set
+            {
+                _status = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(StatusDisplay));
+            }
         }
 
         public int Positives
@@ -90,9 +98,79 @@ namespace PackItPro.ViewModels
             set { _totalScans = value; OnPropertyChanged(); }
         }
 
-        public ICommand? RemoveCommand { get; set; }
+        // ── Trust / false-positive properties ────────────────────────────────
 
-        /// <summary>Emoji icon for the file type. Resolved from static table.</summary>
+        /// <summary>
+        /// True when the user has manually marked this file as a trusted false positive.
+        /// Status is set to Clean when this is true; this flag lets the UI distinguish
+        /// "scanned clean" from "user-trusted FP".
+        /// Persisted via TrustStore by file hash.
+        /// </summary>
+        public bool IsTrustedFalsePositive
+        {
+            get => _isTrustedFalsePositive;
+            set
+            {
+                _isTrustedFalsePositive = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(StatusDisplay));
+                OnPropertyChanged(nameof(TrustTooltip));
+            }
+        }
+
+        /// <summary>
+        /// True when at least one trusted engine (Microsoft, Google, Kaspersky, etc.)
+        /// flagged this file. MinimumDetectionsToFlag is bypassed — always treated as
+        /// real malware and cannot be overridden by the user.
+        /// </summary>
+        public bool FlaggedByTrustedEngine
+        {
+            get => _flaggedByTrustedEngine;
+            set { _flaggedByTrustedEngine = value; OnPropertyChanged(); }
+        }
+
+        /// <summary>Name of the trusted engine that flagged this file, for display in UI.</summary>
+        public string? TrustedEngineName
+        {
+            get => _trustedEngineName;
+            set { _trustedEngineName = value; OnPropertyChanged(); OnPropertyChanged(nameof(TrustTooltip)); }
+        }
+
+        // ── Computed display properties ───────────────────────────────────────
+
+        /// <summary>
+        /// Status label shown in the Status column. Reflects trust overrides:
+        /// - Trusted FP → "✓ Trusted (FP)" (Status is Clean when this flag is set)
+        /// - Trusted engine detection → "⚠ MALWARE (EngineName)"
+        /// </summary>
+        public string StatusDisplay
+        {
+            get
+            {
+                if (FlaggedByTrustedEngine)
+                    return $"⚠ MALWARE ({TrustedEngineName})";
+                if (IsTrustedFalsePositive)
+                    return "✓ Trusted (FP)";
+                return Status.ToString();
+            }
+        }
+
+        /// <summary>Tooltip shown on the trust badge.</summary>
+        public string TrustTooltip
+        {
+            get
+            {
+                if (FlaggedByTrustedEngine)
+                    return $"Flagged by {TrustedEngineName} — considered real malware. Cannot be overridden.";
+                if (IsTrustedFalsePositive)
+                    return "Marked as trusted false positive. Will be included in package.";
+                return "";
+            }
+        }
+
+        // Alias so existing XAML binding {Binding FileIcon} continues to work.
+        public string FileIcon => FileTypeIcon;
+
         public string FileTypeIcon
         {
             get
@@ -103,9 +181,6 @@ namespace PackItPro.ViewModels
             }
         }
 
-        /// <summary>
-        /// Frozen brush for the file-type badge. Static lookup — zero allocations per call.
-        /// </summary>
         public Brush FileTypeBadgeColor
         {
             get
@@ -115,6 +190,8 @@ namespace PackItPro.ViewModels
                 return ExtensionMap.TryGetValue(ext, out var info) ? info.Badge : FallbackBrush;
             }
         }
+
+        public ICommand? RemoveCommand { get; set; }
 
         public event PropertyChangedEventHandler? PropertyChanged;
 

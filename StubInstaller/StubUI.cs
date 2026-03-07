@@ -1,22 +1,12 @@
-﻿// StubInstaller/StubUI.cs - v1.1
-// Changes vs v1.0:
-//   - ShowError and ShowCompletion now check SilentMode.IsEnabled.
-//     In silent mode all dialogs are suppressed; output goes to log only.
-//     AMSI malware detection bypasses silent mode (always shown — see AmsiStep).
-using System.IO;
+﻿using System.IO;
 using System.Windows.Forms;
 
 namespace StubInstaller
 {
     internal static class StubUI
     {
-        /// <summary>
-        /// Shows an error dialog and copies the log to the Desktop.
-        /// Suppressed in silent mode — error is logged only.
-        /// </summary>
         internal static void ShowError(string message, string title)
         {
-            // Always log regardless of silent mode
             StubLogger.Log($"[UI ERROR] {title}: {message}");
 
             if (SilentMode.IsEnabled)
@@ -46,10 +36,6 @@ namespace StubInstaller
                 MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
 
-        /// <summary>
-        /// Shows the completion dialog.
-        /// Suppressed in silent mode — result is in the log and exit code.
-        /// </summary>
         internal static void ShowCompletion(string message, bool success)
         {
             StubLogger.Log($"[UI COMPLETION] Success={success}: {message}");
@@ -72,10 +58,7 @@ namespace StubInstaller
                 success ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
         }
 
-        /// <summary>
-        /// Shows a malware detection warning.
-        /// NOT suppressed by silent mode — malware detection is always reported.
-        /// </summary>
+        // Always show — even in silent mode malware detection gets a dialog
         internal static void ShowMalwareDetected(string fileName)
         {
             string message =
@@ -87,7 +70,6 @@ namespace StubInstaller
 
             StubLogger.Log($"[UI MALWARE] {message}");
 
-            // Always show — even in silent mode malware detection gets a dialog
             MessageBox.Show(message, "PackItPro — Malware Detected",
                 MessageBoxButtons.OK, MessageBoxIcon.Stop);
         }

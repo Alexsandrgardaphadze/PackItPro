@@ -18,6 +18,7 @@ namespace PackItPro.ViewModels
         private readonly string _appDataDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PackItPro");
         private readonly string _cacheFilePath;
+        private readonly string _trustStorePath;
         private readonly HashSet<string> _executableExtensions = new(StringComparer.OrdinalIgnoreCase)
         {
             ".exe", ".dll", ".bat", ".cmd", ".ps1", ".vbs", ".js", ".jar", ".msi", ".com",
@@ -25,6 +26,7 @@ namespace PackItPro.ViewModels
             ".vb", ".vbe", ".jse", ".ws", ".wsf", ".wsc", ".wsh", ".lnk", ".inf", ".scf"
         };
         private VirusTotalClient? _virusTotalClient;
+        private TrustStore? _trustStore;
         private readonly ILogService _logService;
         private bool _isInitialized;
         private bool _disposed;
@@ -61,6 +63,8 @@ namespace PackItPro.ViewModels
         public ICommand ViewCacheCommand => _settingsHandler?.ViewCacheCommand ?? NullCommand;
         public ICommand ScanFilesCommand => _virusTotalHandler?.ScanFilesCommand ?? NullCommand;
         public ICommand CancelScanCommand => _virusTotalHandler?.CancelScanCommand ?? NullCommand;
+        public ICommand MarkAsTrustedCommand => _virusTotalHandler?.MarkAsTrustedCommand ?? NullCommand;
+        public ICommand RemoveTrustCommand => _virusTotalHandler?.RemoveTrustCommand ?? NullCommand;
         public ICommand DocumentationCommand => _helpHandler?.DocumentationCommand ?? NullCommand;
         public ICommand GitHubCommand => _helpHandler?.GitHubCommand ?? NullCommand;
         public ICommand ReportIssueCommand => _helpHandler?.ReportIssueCommand ?? NullCommand;
@@ -74,6 +78,7 @@ namespace PackItPro.ViewModels
         public MainViewModel()
         {
             _cacheFilePath = Path.Combine(_appDataDir, "virusscancache.json");
+            _trustStorePath = Path.Combine(_appDataDir, "trusted_hashes.json");
             EnsureAppDataDirectoryExists();
 
             var logPath = Path.Combine(_appDataDir, "packitpro.log");
@@ -109,6 +114,10 @@ namespace PackItPro.ViewModels
                 await _virusTotalClient.LoadCacheAsync(_logService);
                 _logService.Info("VirusTotal initialized");
 
+                _trustStore = new TrustStore(_trustStorePath);
+                await _trustStore.LoadAsync(_logService);
+                _logService.Info("TrustStore initialized");
+
                 InitializeHandlers();
 
                 // Notify all command properties so WPF updates their enabled state
@@ -129,7 +138,9 @@ namespace PackItPro.ViewModels
         private void InitializeHandlers()
         {
             _packagingHandler = new PackagingCommandHandler(FileList, Settings, Status, Error, _logService);
-            _virusTotalHandler = new VirusTotalCommandHandler(FileList, Settings, Status, Error, _virusTotalClient!, _logService, _executableExtensions);
+            _virusTotalHandler = new VirusTotalCommandHandler(
+                FileList, Settings, Status, Error, _virusTotalClient!, _logService, 
+                _executableExtensions, _trustStore!);
             _fileOperationsHandler = new FileOperationsHandler(FileList, Settings, ScanFilesCommand);
             _settingsHandler = new SettingsHandler(Settings, Status, Error, _virusTotalClient, _cacheFilePath, _appDataDir, _logService);
             _helpHandler = new HelpHandler();
@@ -152,6 +163,8 @@ namespace PackItPro.ViewModels
             OnPropertyChanged(nameof(ViewCacheCommand));
             OnPropertyChanged(nameof(ScanFilesCommand));
             OnPropertyChanged(nameof(CancelScanCommand));
+            OnPropertyChanged(nameof(MarkAsTrustedCommand));
+            OnPropertyChanged(nameof(RemoveTrustCommand));
             OnPropertyChanged(nameof(DocumentationCommand));
             OnPropertyChanged(nameof(GitHubCommand));
             OnPropertyChanged(nameof(ReportIssueCommand));

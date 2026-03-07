@@ -14,16 +14,13 @@ namespace PackItPro
         {
             base.OnStartup(e);
 
-            // Initialize directories
             var appDataDir = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "PackItPro");
-            Directory.CreateDirectory(Path.Combine(appDataDir, "Cache"));
-            Directory.CreateDirectory(Path.Combine(appDataDir, "Logs"));
+            Directory.CreateDirectory(appDataDir);
 
-            _logPath = Path.Combine(appDataDir, "Logs", "crash.log");
+            _logPath = Path.Combine(appDataDir, "crash.log");
 
-            // Global exception handlers
             AppDomain.CurrentDomain.UnhandledException += (s, ex) =>
                 HandleFatalException("AppDomain", (Exception)ex.ExceptionObject);
 
@@ -39,6 +36,12 @@ namespace PackItPro
                 LogError($"Unobserved task exception: {ex.Exception}");
                 ex.SetObserved();
             };
+        }
+
+        protected override void OnExit(ExitEventArgs e)
+        {
+            // MainWindow.Window_Closing handles ViewModel save + dispose before we reach here.
+            base.OnExit(e);
         }
 
         private void HandleFatalException(string source, Exception ex)
@@ -69,18 +72,9 @@ namespace PackItPro
             try
             {
                 if (!string.IsNullOrEmpty(_logPath))
-                {
-                    File.AppendAllText(_logPath,
-                        $"[{DateTime.UtcNow:dd-MM-yyyy HH:mm:ss}] {message}\n\n");
-                }
+                    File.AppendAllText(_logPath, $"[{DateTime.UtcNow:dd-MM-yyyy HH:mm:ss}] {message}\n\n");
             }
-            catch { /* Can't log - fail silently */ }
-        }
-
-        protected override void OnExit(ExitEventArgs e)
-        {
-            // TODO: Add cleanup (dispose API clients, save settings)
-            base.OnExit(e);
+            catch { }
         }
     }
 }

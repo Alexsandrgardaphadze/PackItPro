@@ -1,5 +1,4 @@
-﻿// ViewModels/CommandHandlers/HelpHandler.cs - v2.2 FIXED
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Input;
@@ -98,7 +97,7 @@ namespace PackItPro.ViewModels.CommandHandlers
         private void ExecuteAbout(object? parameter)
         {
             MessageBox.Show(
-                "PackItPro v0.6.2\n\n" +
+                "PackItPro v0.6.5\n\n" +
                 "A secure package builder for bundling multiple applications.\n\n" +
                 "Still in development, but already close to finishing.\n\n" +
                 "© 2026 Maybe all rights reserved.\n\n" +

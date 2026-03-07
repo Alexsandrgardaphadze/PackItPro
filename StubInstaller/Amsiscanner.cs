@@ -1,32 +1,6 @@
-﻿// StubInstaller/AmsiScanner.cs - v1.0
-// Raw P/Invoke AMSI integration — no external dependencies.
-// AMSI (Antimalware Scan Interface) lets us ask whatever AV engine is installed
-// on the machine (Defender, ESET, Kaspersky, BitDefender, etc.) to scan bytes
-// before we execute them, without going to the internet.
-//
-// How it works:
-//   1. AmsiInitialize()  — open a handle to the AMSI subsystem
-//   2. AmsiOpenSession() — group related scans together (one session per installer)
-//   3. AmsiScanBuffer()  — ask the AV engine to evaluate a byte array
-//   4. AmsiCloseSession / AmsiUninitialize — always clean up
-//
-// Result codes:
-//   AMSI_RESULT_CLEAN          (0)     — safe
-//   AMSI_RESULT_NOT_DETECTED   (1)     — safe
-//   AMSI_RESULT_BLOCKED_BY_ADMIN_START (16384) — blocked by policy
-//   AMSI_RESULT_DETECTED       (32768) — detected as malware
-//   Any value ≥ 32768 is considered malicious by AmsiResultIsMalware().
-//
-// Failure modes that are safe to ignore:
-//   - amsi.dll not present (Windows 8.1 or earlier) → skip
-//   - Access denied (process not elevated enough) → skip with warning
-//   - AV engine not registered → skip with warning
-//   All of the above are non-fatal: we log and continue installation.
-//   Only a positive DETECTED result blocks installation.
-
+﻿#nullable enable
 using System;
 using System.Runtime.InteropServices;
-using System.Text;
 
 namespace StubInstaller
 {
@@ -100,6 +74,13 @@ namespace StubInstaller
             string contentName,
             IntPtr session,
             out int result);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern IntPtr LoadLibrary(string lpFileName);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool FreeLibrary(IntPtr hModule);
 
         // AMSI_RESULT_DETECTED = 32768. Anything ≥ this is malicious.
         private const int AMSI_RESULT_DETECTED = 32768;
@@ -231,13 +212,13 @@ namespace StubInstaller
                 try
                 {
                     // Probe by trying to load the DLL
-                    IntPtr handle = NativeLoadLibrary("amsi.dll");
+                    IntPtr handle = LoadLibrary("amsi.dll");
                     if (handle == IntPtr.Zero)
                     {
                         _amsiAvailable = false;
                         return false;
                     }
-                    NativeFreeLibrary(handle);
+                    FreeLibrary(handle);
                     _amsiAvailable = true;
                     return true;
                 }
@@ -248,15 +229,5 @@ namespace StubInstaller
                 }
             }
         }
-
-        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-        private static extern IntPtr LoadLibrary(string lpFileName);
-
-        [DllImport("kernel32.dll", SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool FreeLibrary(IntPtr hModule);
-
-        private static IntPtr NativeLoadLibrary(string name) => LoadLibrary(name);
-        private static void NativeFreeLibrary(IntPtr h) => FreeLibrary(h);
     }
 }
