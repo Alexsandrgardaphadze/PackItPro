@@ -41,6 +41,12 @@ namespace PackItPro
             };
         }
 
+        protected override void OnExit(ExitEventArgs e)
+        {
+            // MainWindow.Window_Closing handles ViewModel save + dispose before we reach here.
+            base.OnExit(e);
+        }
+
         private void HandleFatalException(string source, Exception ex)
         {
             try
@@ -69,18 +75,9 @@ namespace PackItPro
             try
             {
                 if (!string.IsNullOrEmpty(_logPath))
-                {
-                    File.AppendAllText(_logPath,
-                        $"[{DateTime.UtcNow:dd-MM-yyyy HH:mm:ss}] {message}\n\n");
-                }
+                    File.AppendAllText(_logPath, $"[{DateTime.UtcNow:dd-MM-yyyy HH:mm:ss}] {message}\n\n");
             }
-            catch { /* Can't log - fail silently */ }
-        }
-
-        protected override void OnExit(ExitEventArgs e)
-        {
-            // TODO: Add cleanup (dispose API clients, save settings)
-            base.OnExit(e);
+            catch { }
         }
     }
 }

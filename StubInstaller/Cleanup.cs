@@ -26,6 +26,7 @@ namespace StubInstaller
 
             logInfo($"[CLEANUP] Attempting to delete temporary directory: {tempDirectoryPath}");
 
+            // Exponential backoff: 1s, 2s, 4s, 8s
             int[] delays = { 1000, 2000, 4000, 8000 };
             bool success = false;
 

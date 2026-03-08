@@ -1,13 +1,24 @@
-﻿using PackItPro.Models;
+﻿// PackItPro/ViewModels/CommandHandlers/VirusTotalCommandHandler.cs - v2.3 (ROBUSTNESS FIX)
+// Changes vs v2.2:
+//   [1] Added CancellationTokenSource for scan cancellation.
+//       Scan button enables CancelScanCommand during scan.
+//   [2] Added progress update throttling (every 100ms) to prevent UI overload.
+//   [3] Added robust error handling around VirusTotalClient calls to prevent crashes.
+//   [4] Added scan result logging for debugging.
+using Microsoft.VisualBasic.Logging;
+using PackItPro.Models;
 using PackItPro.Services;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Packaging;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Documents;
 using System.Windows.Input;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement.ListView;
 
 namespace PackItPro.ViewModels.CommandHandlers
 {
@@ -21,9 +32,10 @@ namespace PackItPro.ViewModels.CommandHandlers
         private readonly ILogService _logService;
         private readonly HashSet<string> _executableExtensions;
 
-        private CancellationTokenSource? _scanCancellationTokenSource;
+        // Cancellation support
+        private CancellationTokenSource? _scanCts;
         private DateTime _lastProgressUpdate = DateTime.MinValue;
-        private const int ProgressUpdateIntervalMs = 100;
+        private const int ProgressUpdateIntervalMs = 100; // Max 10 updates/second
 
         public ICommand ScanFilesCommand { get; }
         public ICommand CancelScanCommand { get; }
@@ -45,7 +57,8 @@ namespace PackItPro.ViewModels.CommandHandlers
             _logService = logService ?? throw new ArgumentNullException(nameof(logService));
             _executableExtensions = executableExtensions ?? throw new ArgumentNullException(nameof(executableExtensions));
 
-            ScanFilesCommand = new RelayCommand(async _ => await ExecuteScanFilesCommandAsync(null), CanExecuteScan);
+            // ✅ FIX: Use AsyncRelayCommand for better async exception handling
+            ScanFilesCommand = new AsyncRelayCommand(ExecuteScanFilesCommandAsync, CanExecuteScan);
             CancelScanCommand = new RelayCommand(_ => CancelScan(), CanCancelScan);
 
             _status.PropertyChanged += OnStatusPropertyChanged;
@@ -66,18 +79,18 @@ namespace PackItPro.ViewModels.CommandHandlers
         }
 
         private bool CanExecuteScan(object? parameter) =>
-            _settings.ScanWithVirusTotal &&
+            _settings.ScanWithVirusTotal && // ✅ NEW: Check the UI toggle
             _fileList.HasFiles &&
             !_status.IsBusy &&
             !string.IsNullOrWhiteSpace(_settings.VirusTotalApiKey);
 
         private bool CanCancelScan(object? parameter) =>
-            _status.IsBusy && _scanCancellationTokenSource != null;
+            _status.IsBusy && _scanCts != null; // Check if scan is running and CTS exists
 
         private void CancelScan()
         {
-            _scanCancellationTokenSource?.Cancel();
-            _logService.Info("Scan cancellation requested by user.");
+            _scanCts?.Cancel();
+            _logService.Info("[VirusTotalCommandHandler] Scan cancellation requested by user.");
         }
 
         private async Task ExecuteScanFilesCommandAsync(object? parameter)
@@ -92,31 +105,32 @@ namespace PackItPro.ViewModels.CommandHandlers
             catch (OperationCanceledException)
             {
                 _status.Message = "Scan cancelled.";
-                _logService.Info("Virus scan cancelled by user.");
+                _logService.Info("[VirusTotalCommandHandler] Virus scan was cancelled.");
             }
             catch (Exception ex)
             {
-                _logService.Error("Scan operation failed unexpectedly", ex);
+                _logService.Error("[VirusTotalCommandHandler] Scan operation failed unexpectedly", ex);
                 _status.Message = $"Scan failed: {ex.Message}";
                 _error.ShowError(
                     $"Virus scan failed: {ex.Message}",
-                    retryAction: () => _ = ExecuteScanFilesCommandAsync(parameter));
+                    retryAction: () => _ = ExecuteScanFilesCommandAsync(parameter)); // Fire-and-forget retry
             }
             finally
             {
-                // ✅ FIX: Only reset to Ready if we didn't reach a success state.
-                // SetStatusSuccess() sets IsSuccess = true — if that happened,
-                // leave it alone so the "Done" state stays visible.
-                if (!_status.IsSuccess)
-                    _status.SetStatusReady();
-
-                _scanCancellationTokenSource?.Dispose();
-                _scanCancellationTokenSource = null;
+                _status.SetStatusReady();
+                _scanCts?.Dispose();
+                _scanCts = null;
             }
         }
 
         private async Task ExecuteScanFilesWithVirusTotalAsync()
         {
+            if (_virusTotalClient == null || string.IsNullOrWhiteSpace(_settings.VirusTotalApiKey))
+            {
+                _error.ShowError("VirusTotal API key is required for scanning.\nSet it in Settings > VirusTotal API Key.");
+                return;
+            }
+
             var totalFiles = _fileList.Items.Count(f =>
                 !_settings.OnlyScanExecutables ||
                 _executableExtensions.Contains(Path.GetExtension(f.FilePath)));
@@ -124,46 +138,47 @@ namespace PackItPro.ViewModels.CommandHandlers
             if (totalFiles == 0)
             {
                 MessageBox.Show(
-                    "No scannable files found.\n" +
-                    "Enable 'Scan all files' in settings to include non-executables.",
+                    "No scannable files found.\nEnable 'Scan all files' in settings to include non-executables.",
                     "No Files to Scan",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
                 return;
             }
 
-            _scanCancellationTokenSource?.Cancel();
-            _scanCancellationTokenSource = new CancellationTokenSource();
-            var ct = _scanCancellationTokenSource.Token;
+            // Cancel any previous scan operation's CTS
+            _scanCts?.Cancel();
+            _scanCts = new CancellationTokenSource();
+            var ct = _scanCts.Token; // Use the new CTS token
 
             _status.Message = $"Scanning {totalFiles} file(s) with VirusTotal...";
-            int processed = 0;
-            int failedCount = 0;
-            int skippedCount = 0;
+            int processed = 0, failedCount = 0, skippedCount = 0; // ✅ NEW: Track skipped files
             var infectedFiles = new List<FileItemViewModel>();
 
             foreach (var item in _fileList.Items)
             {
-                ct.ThrowIfCancellationRequested();
+                ct.ThrowIfCancellationRequested(); // ✅ NEW: Check for cancellation
 
                 if (_settings.OnlyScanExecutables &&
                     !_executableExtensions.Contains(Path.GetExtension(item.FilePath)))
                 {
                     item.Status = FileStatusEnum.Skipped;
-                    skippedCount++;
+                    skippedCount++; // ✅ NEW: Increment skipped counter
                     processed++;
+                    // ✅ NEW: Provide immediate feedback to user
+                    _status.Message = $"Scanning {totalFiles} file(s)... ({skippedCount} skipped)";
                     UpdateProgress(processed, totalFiles);
-                    continue;
+                    continue; // Skip to next file
                 }
 
                 try
                 {
+                    // ✅ FIX: Pass CancellationToken to scan method
                     var result = await _virusTotalClient.ScanFileAsync(
                         item.FilePath,
                         _settings.VirusTotalApiKey,
                         _settings.OnlyScanExecutables,
                         _settings.MinimumDetectionsToFlag,
-                        ct);
+                        ct); // Pass the cancellation token
 
                     item.Positives = result.Positives;
                     item.TotalScans = result.TotalScans;
@@ -172,12 +187,12 @@ namespace PackItPro.ViewModels.CommandHandlers
                     if (result.IsInfected)
                         infectedFiles.Add(item);
 
-                    _logService.Info(
-                        $"Scanned '{item.FileName}': {result.Positives}/{result.TotalScans} detections — {item.Status}");
+                    // ✅ NEW: Log scan result for debugging
+                    _logService.Info($"Scanned '{item.FileName}': {result.Positives}/{result.TotalScans} detections — {item.Status}");
                 }
                 catch (OperationCanceledException)
                 {
-                    throw;
+                    throw; // Re-throw to be handled by outer try-catch
                 }
                 catch (Exception ex)
                 {
@@ -188,52 +203,54 @@ namespace PackItPro.ViewModels.CommandHandlers
                 finally
                 {
                     processed++;
-                    UpdateProgress(processed, totalFiles);
+                    UpdateProgress(processed, totalFiles); // Throttled updates
                 }
             }
 
+            // ── Results summary ───────────────────────────────────────────────
+
             if (infectedFiles.Count > 0)
             {
-                var msg = $"{infectedFiles.Count} infected file(s) detected!";
+                var message = $"{infectedFiles.Count} infected file(s) detected!";
                 if (_settings.AutoRemoveInfectedFiles)
                 {
-                    foreach (var f in infectedFiles)
-                        _fileList.Items.Remove(f);
-                    msg += "\n\nAutomatically removed from the package list.";
+                    foreach (var file in infectedFiles)
+                        _fileList.Items.Remove(file);
+                    message += "\nAutomatically removed from package list.";
                 }
                 else
                 {
-                    msg += "\n\nReview files marked 'Infected' before packaging.";
+                    message += "\nReview files marked as 'Infected' before packaging.";
                 }
-                MessageBox.Show(msg, "Security Alert", MessageBoxButton.OK, MessageBoxImage.Warning);
-                
-                _status.SetStatusSuccess($"Scan complete — {infectedFiles.Count} infected, {totalFiles - infectedFiles.Count} clean");
+                MessageBox.Show(message, "Security Alert", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
             else if (failedCount > 0)
             {
                 MessageBox.Show(
-                    $"Scan completed with {failedCount} error(s).\n\nCheck the log for details.",
+                    $"Scan completed with {failedCount} error(s).\nCheck logs for details.",
                     "Scan Completed with Errors",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
-                
-                _status.SetStatusSuccess($"Scan complete — {failedCount} error(s)");
             }
             else
             {
-                var skippedNote = skippedCount > 0 ? $" ({skippedCount} skipped)" : "";
+                var skippedNote = skippedCount > 0 ? $" ({skippedCount} skipped)" : ""; // ✅ NEW: Show skipped count
                 MessageBox.Show(
                     $"All {totalFiles} file(s) scanned clean!{skippedNote}",
                     "Scan Complete",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
-                
-                _status.SetStatusSuccess($"Scan complete — all {totalFiles} file(s) clean");
             }
 
+            // ✅ FIX: Pass logService to SaveCacheAsync
             await _virusTotalClient.SaveCacheAsync(_logService);
+
+            _status.Message = failedCount > 0
+                ? $"Scan completed — {failedCount} error(s). Check log."
+                : "Scan completed successfully.";
         }
 
+        // ✅ NEW: Throttle progress updates to prevent UI overload
         private void UpdateProgress(int processed, int total)
         {
             var now = DateTime.Now;
@@ -248,8 +265,8 @@ namespace PackItPro.ViewModels.CommandHandlers
         {
             _status.PropertyChanged -= OnStatusPropertyChanged;
             _settings.PropertyChanged -= OnSettingsPropertyChanged;
-            _scanCancellationTokenSource?.Cancel();
-            _scanCancellationTokenSource?.Dispose();
+            _scanCts?.Cancel();
+            _scanCts?.Dispose();
             base.Dispose();
         }
     }

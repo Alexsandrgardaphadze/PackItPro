@@ -11,6 +11,9 @@ using System.Windows.Input;
 
 namespace PackItPro.ViewModels
 {
+    /// <summary>
+    /// Main ViewModel — orchestrates all CommandHandlers and sub-ViewModels.
+    /// </summary>
     public class MainViewModel : INotifyPropertyChanged, IDisposable
     {
         #region Fields
@@ -18,6 +21,7 @@ namespace PackItPro.ViewModels
         private readonly string _appDataDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PackItPro");
         private readonly string _cacheFilePath;
+        private readonly string _trustStorePath;
         private readonly HashSet<string> _executableExtensions = new(StringComparer.OrdinalIgnoreCase)
         {
             ".exe", ".dll", ".bat", ".cmd", ".ps1", ".vbs", ".js", ".jar", ".msi", ".com",
@@ -26,8 +30,9 @@ namespace PackItPro.ViewModels
         };
 
         private VirusTotalClient? _virusTotalClient;
+        private TrustStore? _trustStore;
         private readonly ILogService _logService;
-        private readonly HttpClient _httpClient;
+        private readonly HttpClient _httpClient;       // long-lived — one instance per application
         private readonly UpdateService _updateService;
         private bool _isInitialized;
         private bool _disposed;
@@ -59,24 +64,35 @@ namespace PackItPro.ViewModels
 
         private static readonly ICommand NullCommand = new RelayCommand(_ => { });
 
+        // Packaging
         public ICommand PackCommand => _packagingHandler?.PackCommand ?? NullCommand;
         public ICommand TestPackageCommand => _packagingHandler?.TestPackageCommand ?? NullCommand;
+
+        // File operations
         public ICommand BrowseFilesCommand => _fileOperationsHandler?.BrowseFilesCommand ?? NullCommand;
         public ICommand ClearAllFilesCommand => _fileOperationsHandler?.ClearAllFilesCommand ?? NullCommand;
         public ICommand ExportListCommand => _fileOperationsHandler?.ExportListCommand ?? NullCommand;
+
+        // Settings
         public ICommand SetOutputLocationCommand => _settingsHandler?.SetOutputLocationCommand ?? NullCommand;
         public ICommand SetVirusApiKeyCommand => _settingsHandler?.SetVirusApiKeyCommand ?? NullCommand;
         public ICommand ClearCacheCommand => _settingsHandler?.ClearCacheCommand ?? NullCommand;
         public ICommand ExportLogsCommand => _settingsHandler?.ExportLogsCommand ?? NullCommand;
         public ICommand PackItProSettingsCommand => _settingsHandler?.PackItProSettingsCommand ?? NullCommand;
         public ICommand ViewCacheCommand => _settingsHandler?.ViewCacheCommand ?? NullCommand;
+
+        // VirusTotal
         public ICommand ScanFilesCommand => _virusTotalHandler?.ScanFilesCommand ?? NullCommand;
         public ICommand CancelScanCommand => _virusTotalHandler?.CancelScanCommand ?? NullCommand;
+
+        // Help
         public ICommand DocumentationCommand => _helpHandler?.DocumentationCommand ?? NullCommand;
         public ICommand GitHubCommand => _helpHandler?.GitHubCommand ?? NullCommand;
         public ICommand ReportIssueCommand => _helpHandler?.ReportIssueCommand ?? NullCommand;
         public ICommand CheckUpdatesCommand => _helpHandler?.CheckUpdatesCommand ?? NullCommand;
         public ICommand AboutCommand => _helpHandler?.AboutCommand ?? NullCommand;
+
+        // Application
         public ICommand ExitCommand => _applicationHandler?.ExitCommand ?? NullCommand;
 
         #endregion
@@ -84,12 +100,12 @@ namespace PackItPro.ViewModels
         public MainViewModel()
         {
             _cacheFilePath = Path.Combine(_appDataDir, "virusscancache.json");
+            _trustStorePath = Path.Combine(_appDataDir, "trusted_hashes.json");
             EnsureAppDataDirectoryExists();
 
             var logPath = Path.Combine(_appDataDir, "packitpro.log");
             _logService = new FileLogService(logPath);
 
-            // HttpClient is long-lived — one instance per application
             _httpClient = new HttpClient();
             _updateService = new UpdateService(_httpClient);
 
@@ -124,6 +140,10 @@ namespace PackItPro.ViewModels
                 await _virusTotalClient.LoadCacheAsync(_logService);
                 _logService.Info("VirusTotal initialized");
 
+                _trustStore = new TrustStore(_trustStorePath);
+                await _trustStore.LoadAsync(_logService);
+                _logService.Info("TrustStore initialized");
+
                 InitializeHandlers();
                 NotifyAllCommandsAvailable();
 
@@ -142,7 +162,8 @@ namespace PackItPro.ViewModels
         private void InitializeHandlers()
         {
             _packagingHandler = new PackagingCommandHandler(FileList, Settings, Status, Error, _logService);
-            _virusTotalHandler = new VirusTotalCommandHandler(FileList, Settings, Status, Error, _virusTotalClient!, _logService, _executableExtensions);
+            _virusTotalHandler = new VirusTotalCommandHandler(
+                FileList, Settings, Status, Error, _virusTotalClient!, _logService, _executableExtensions);
             _fileOperationsHandler = new FileOperationsHandler(FileList, Settings, ScanFilesCommand);
             _settingsHandler = new SettingsHandler(Settings, Status, Error, _virusTotalClient, _cacheFilePath, _appDataDir, _logService);
             _helpHandler = new HelpHandler(_updateService, Status, _logService);

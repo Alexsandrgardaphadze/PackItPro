@@ -1,15 +1,4 @@
-﻿// ViewModels/FileItemViewModel.cs - v3.1 SMALL ISSUES FIX
-// Changes vs v3.0:
-//   - FileTypeBadgeColor: was allocating a new SolidColorBrush on every property get.
-//     WPF calls this on every render pass for every visible list row. Under scrolling
-//     this produced continuous allocations and GC pressure.
-//     Fix: static frozen brush dictionary — allocated once at startup, zero allocations
-//     during scrolling.
-//   - FileTypeIcon + FileTypeBadgeColor: both had duplicate extension switch statements.
-//     Unified into a single static lookup table (FileTypeInfo) so extension metadata
-//     lives in one place.
-//   - Brushes are Frozen() for thread-safety and WPF rendering performance.
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
 using System.Runtime.CompilerServices;
@@ -21,37 +10,33 @@ namespace PackItPro.ViewModels
 {
     public class FileItemViewModel : INotifyPropertyChanged
     {
-        // ── Static lookup table ────────────────────────────────────────
-        // One entry per extension group. Brush frozen once at class init.
-        // Adding a new file type: add one entry here, nothing else changes.
-
         private static readonly SolidColorBrush FallbackBrush =
-            Frozen(new SolidColorBrush(Color.FromRgb(0x64, 0x74, 0x8B))); // slate-500
+            Frozen(new SolidColorBrush(Color.FromRgb(0x64, 0x74, 0x8B)));
 
         private sealed record FileTypeInfo(string Icon, SolidColorBrush Badge);
-
         private static SolidColorBrush Frozen(SolidColorBrush b) { b.Freeze(); return b; }
 
+        // Static lookup: one entry per extension. Brushes frozen at class init — zero allocations during rendering.
         private static readonly Dictionary<string, FileTypeInfo> ExtensionMap =
             new(System.StringComparer.OrdinalIgnoreCase)
             {
-                [".exe"] = new("⚙️", Frozen(new SolidColorBrush(Color.FromRgb(0x63, 0x66, 0xF1)))), // indigo
-                [".msi"] = new("📦", Frozen(new SolidColorBrush(Color.FromRgb(0x10, 0xB9, 0x81)))), // emerald
-                [".msp"] = new("🩹", Frozen(new SolidColorBrush(Color.FromRgb(0x10, 0xB9, 0x81)))), // emerald
-                [".dll"] = new("🔧", Frozen(new SolidColorBrush(Color.FromRgb(0xF5, 0x9E, 0x0B)))), // amber
-                [".bat"] = new("📜", Frozen(new SolidColorBrush(Color.FromRgb(0x8B, 0x5C, 0xF6)))), // violet
-                [".cmd"] = new("📜", Frozen(new SolidColorBrush(Color.FromRgb(0x8B, 0x5C, 0xF6)))), // violet
-                [".ps1"] = new("💻", Frozen(new SolidColorBrush(Color.FromRgb(0x3B, 0x82, 0xF6)))), // blue
-                [".vbs"] = new("📝", Frozen(new SolidColorBrush(Color.FromRgb(0x3B, 0x82, 0xF6)))), // blue
-                [".jar"] = new("☕", Frozen(new SolidColorBrush(Color.FromRgb(0xFB, 0x92, 0x3C)))), // orange
-                [".zip"] = new("🗜️", Frozen(new SolidColorBrush(Color.FromRgb(0xEC, 0x48, 0x99)))), // pink
-                [".7z"] = new("🗜️", Frozen(new SolidColorBrush(Color.FromRgb(0xEC, 0x48, 0x99)))), // pink
-                [".rar"] = new("🗜️", Frozen(new SolidColorBrush(Color.FromRgb(0xEC, 0x48, 0x99)))), // pink
-                [".msix"] = new("📦", Frozen(new SolidColorBrush(Color.FromRgb(0x06, 0xB6, 0xD4)))), // cyan
-                [".appx"] = new("📦", Frozen(new SolidColorBrush(Color.FromRgb(0x06, 0xB6, 0xD4)))), // cyan
+                [".exe"] = new("⚙️", Frozen(new SolidColorBrush(Color.FromRgb(0x63, 0x66, 0xF1)))),
+                [".msi"] = new("📦", Frozen(new SolidColorBrush(Color.FromRgb(0x10, 0xB9, 0x81)))),
+                [".msp"] = new("🩹", Frozen(new SolidColorBrush(Color.FromRgb(0x10, 0xB9, 0x81)))),
+                [".dll"] = new("🔧", Frozen(new SolidColorBrush(Color.FromRgb(0xF5, 0x9E, 0x0B)))),
+                [".bat"] = new("📜", Frozen(new SolidColorBrush(Color.FromRgb(0x8B, 0x5C, 0xF6)))),
+                [".cmd"] = new("📜", Frozen(new SolidColorBrush(Color.FromRgb(0x8B, 0x5C, 0xF6)))),
+                [".ps1"] = new("💻", Frozen(new SolidColorBrush(Color.FromRgb(0x3B, 0x82, 0xF6)))),
+                [".vbs"] = new("📝", Frozen(new SolidColorBrush(Color.FromRgb(0x3B, 0x82, 0xF6)))),
+                [".jar"] = new("☕", Frozen(new SolidColorBrush(Color.FromRgb(0xFB, 0x92, 0x3C)))),
+                [".zip"] = new("🗜️", Frozen(new SolidColorBrush(Color.FromRgb(0xEC, 0x48, 0x99)))),
+                [".7z"] = new("🗜️", Frozen(new SolidColorBrush(Color.FromRgb(0xEC, 0x48, 0x99)))),
+                [".rar"] = new("🗜️", Frozen(new SolidColorBrush(Color.FromRgb(0xEC, 0x48, 0x99)))),
+                [".msix"] = new("📦", Frozen(new SolidColorBrush(Color.FromRgb(0x06, 0xB6, 0xD4)))),
+                [".appx"] = new("📦", Frozen(new SolidColorBrush(Color.FromRgb(0x06, 0xB6, 0xD4)))),
             };
 
-        // ── Backing fields ─────────────────────────────────────────────
+        // ── Backing fields ────────────────────────────────────────────────────
 
         private string _fileName = "";
         private string _filePath = "";
@@ -60,8 +45,11 @@ namespace PackItPro.ViewModels
         private int _positives;
         private int _totalScans;
         private int _installOrder;
+        private bool _isTrustedFalsePositive;
+        private bool _flaggedByTrustedEngine;
+        private string? _trustedEngineName;
 
-        // ── Properties ─────────────────────────────────────────────────
+        // ── Core properties ───────────────────────────────────────────────────
 
         public string FileName
         {
@@ -76,7 +64,7 @@ namespace PackItPro.ViewModels
             {
                 _filePath = value;
                 OnPropertyChanged();
-                // Both computed properties depend on FilePath
+                OnPropertyChanged(nameof(FileIcon));
                 OnPropertyChanged(nameof(FileTypeIcon));
                 OnPropertyChanged(nameof(FileTypeBadgeColor));
             }
@@ -91,7 +79,12 @@ namespace PackItPro.ViewModels
         public FileStatusEnum Status
         {
             get => _status;
-            set { _status = value; OnPropertyChanged(); }
+            set
+            {
+                _status = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(StatusDisplay));
+            }
         }
 
         public int Positives
@@ -107,9 +100,8 @@ namespace PackItPro.ViewModels
         }
 
         /// <summary>
-        /// Install order for packaging. Set to match list position during drag-to-reorder.
-        /// Default 0 is ignored by packager (uses list order instead), so this is purely
-        /// a visual aid to show users the install sequence.
+        /// Install order for drag-to-reorder. Kept in sync with list position by
+        /// FileListPanel.xaml.cs after every drop.
         /// </summary>
         public int InstallOrder
         {
@@ -117,11 +109,80 @@ namespace PackItPro.ViewModels
             set { _installOrder = value; OnPropertyChanged(); }
         }
 
-        public ICommand? RemoveCommand { get; set; }
+        // ── Trust / false-positive properties ────────────────────────────────
 
-        // ── Computed — zero allocations on every call ─────────────────
+        /// <summary>
+        /// True when the user has manually marked this file as a trusted false positive.
+        /// Status is set to Clean when this flag is true; this property lets the UI
+        /// distinguish "scanned clean" from "user-trusted FP".
+        /// Persisted via TrustStore by file hash.
+        /// </summary>
+        public bool IsTrustedFalsePositive
+        {
+            get => _isTrustedFalsePositive;
+            set
+            {
+                _isTrustedFalsePositive = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(StatusDisplay));
+                OnPropertyChanged(nameof(TrustTooltip));
+            }
+        }
 
-        /// <summary>Emoji icon for the file type. Resolved from static table.</summary>
+        /// <summary>
+        /// True when at least one trusted engine (Microsoft, Google, Kaspersky, etc.)
+        /// flagged this file. MinimumDetectionsToFlag is bypassed — always treated as
+        /// real malware and cannot be overridden by the user.
+        /// </summary>
+        public bool FlaggedByTrustedEngine
+        {
+            get => _flaggedByTrustedEngine;
+            set { _flaggedByTrustedEngine = value; OnPropertyChanged(); }
+        }
+
+        /// <summary>Name of the trusted engine that flagged this file, for display in UI.</summary>
+        public string? TrustedEngineName
+        {
+            get => _trustedEngineName;
+            set { _trustedEngineName = value; OnPropertyChanged(); OnPropertyChanged(nameof(TrustTooltip)); }
+        }
+
+        // ── Computed display properties ───────────────────────────────────────
+
+        /// <summary>
+        /// Status label shown in the Status column. Reflects trust overrides:
+        /// - Trusted engine detection → "⚠ MALWARE (EngineName)"
+        /// - User-trusted FP → "✓ Trusted (FP)"
+        /// - Otherwise → Status.ToString()
+        /// </summary>
+        public string StatusDisplay
+        {
+            get
+            {
+                if (FlaggedByTrustedEngine)
+                    return $"⚠ MALWARE ({TrustedEngineName})";
+                if (IsTrustedFalsePositive)
+                    return "✓ Trusted (FP)";
+                return Status.ToString();
+            }
+        }
+
+        /// <summary>Tooltip shown on the trust badge in the file list.</summary>
+        public string TrustTooltip
+        {
+            get
+            {
+                if (FlaggedByTrustedEngine)
+                    return $"Flagged by {TrustedEngineName} — considered real malware. Cannot be overridden.";
+                if (IsTrustedFalsePositive)
+                    return "Marked as trusted false positive. Will be included in package.";
+                return "";
+            }
+        }
+
+        // Alias so existing XAML bindings using {Binding FileIcon} continue to work.
+        public string FileIcon => FileTypeIcon;
+
         public string FileTypeIcon
         {
             get
@@ -132,9 +193,6 @@ namespace PackItPro.ViewModels
             }
         }
 
-        /// <summary>
-        /// Frozen brush for the file-type badge. Static — zero allocations per call.
-        /// </summary>
         public Brush FileTypeBadgeColor
         {
             get
@@ -145,7 +203,7 @@ namespace PackItPro.ViewModels
             }
         }
 
-        // ── INotifyPropertyChanged ─────────────────────────────────────
+        public ICommand? RemoveCommand { get; set; }
 
         public event PropertyChangedEventHandler? PropertyChanged;
 

@@ -37,7 +37,7 @@ namespace PackItPro.ViewModels
                             if (File.Exists(item.FilePath))
                                 _cachedTotalSize += new FileInfo(item.FilePath).Length;
                         }
-                        catch { }
+                        catch { /* File deleted between add and render — skip */ }
                     }
                 }
                 return _cachedTotalSize;
@@ -124,7 +124,9 @@ namespace PackItPro.ViewModels
                     }
                     return true;
                 })
-                // ✅ Validate file type — only accepted installer/script types
+                // Validate file type — only accepted installer/script types allowed in a package.
+                // NOTE: OnlyScanExecutables affects SCANNING, not adding. All valid installer
+                // types can always be added to the list.
                 .Where(fi =>
                 {
                     string ext = Path.GetExtension(fi!.Name).ToLowerInvariant();
@@ -149,10 +151,10 @@ namespace PackItPro.ViewModels
                     Status = FileStatusEnum.Pending,
                     Positives = 0,
                     TotalScans = 0,
-                    InstallOrder = 0  // ✅ Initialize to prevent null reference on removal
+                    InstallOrder = 0  // Initialize to prevent issues on removal/reorder
                 };
                 fileItem.RemoveCommand = new RelayCommand(_ => ExecuteRemoveFile(fileItem));
-                _items.Add(fileItem); // Add AFTER all properties are set
+                _items.Add(fileItem);
             }
 
             result.SuccessCount = validFiles.Count;
@@ -174,14 +176,12 @@ namespace PackItPro.ViewModels
             try
             {
                 if (parameter is FileItemViewModel item && item != null && _items.Contains(item))
-                {
                     _items.Remove(item);
-                }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[FileListViewModel] Remove file failed: {ex.Message}");
-                // Silent fail — prevents app crash
+                // Silent fail — prevents app crash on race condition
             }
         }
 

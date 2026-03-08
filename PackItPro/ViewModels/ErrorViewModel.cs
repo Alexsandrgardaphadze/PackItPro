@@ -1,23 +1,23 @@
-﻿// ViewModels/ErrorViewModel.cs - v2.3
+﻿// PackItPro/ViewModels/ErrorViewModel.cs - v2.2 (ASYNC RETRY SUPPORT)
+// Changes vs v2.1:
+//   [1] Added _retryActionAsync field and property for async retry actions.
+//   [2] Added ShowErrorAsync method to accept Func<Task> retryActionAsync.
+//   [3] ExecuteRetry now handles both sync and async actions.
+//   [4] RelayCommand for RetryCommand now uses async execution.
 using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
-using System.Windows;
 using System.Windows.Input;
 
 namespace PackItPro.ViewModels
 {
-    /// <summary>
-    /// ViewModel for error display and handling with support for both sync and async retry actions.
-    /// FIX: Since ErrorPanel is removed from UI, errors fallback to MessageBox to ensure visibility.
-    /// </summary>
     public class ErrorViewModel : INotifyPropertyChanged
     {
         private bool _isErrorVisible;
         private string _errorMessage = string.Empty;
         private bool _canRetry;
-
+        // ✅ NEW: Support for async retry actions
         private Func<Task>? _retryActionAsync;
         private Action? _retryActionSync;
 
@@ -40,7 +40,9 @@ namespace PackItPro.ViewModels
             {
                 _canRetry = value;
                 OnPropertyChanged();
-                ((RelayCommand)RetryCommand).RaiseCanExecuteChanged();
+                // Notify the command that its CanExecute state has changed
+                if (RetryCommand is RelayCommand relayCommand)
+                    relayCommand.RaiseCanExecuteChanged();
             }
         }
 
@@ -51,6 +53,7 @@ namespace PackItPro.ViewModels
 
         public ErrorViewModel()
         {
+            // ✅ FIX: Use async wrapper for retry command
             RetryCommand = new RelayCommand(async _ => await ExecuteRetryAsync(), CanExecuteRetry);
             DismissErrorCommand = new RelayCommand(ExecuteDismiss);
         }
@@ -73,10 +76,12 @@ namespace PackItPro.ViewModels
             }
             catch (Exception ex)
             {
+                // If retry fails, show the new error
                 ShowError($"Retry failed: {ex.Message}");
                 return;
             }
 
+            // Hide error after successful retry
             IsErrorVisible = false;
         }
 
@@ -89,55 +94,29 @@ namespace PackItPro.ViewModels
         }
 
         /// <summary>
-        /// Shows an error with a synchronous retry action.
-        /// FIX: Falls back to MessageBox since ErrorPanel is not displayed.
+        /// Shows an error with a synchronous retry action
         /// </summary>
         public void ShowError(string message, Action? retryAction = null)
         {
             ErrorMessage = message;
             _retryActionSync = retryAction;
-            _retryActionAsync = null;
+            _retryActionAsync = null; // Clear async action
             CanRetry = retryAction != null;
             IsErrorVisible = true;
             ErrorShown?.Invoke(this, EventArgs.Empty);
-
-            // FIX: Fallback to MessageBox for visibility
-            var result = MessageBox.Show(
-                message + (retryAction != null ? "\n\nTry again?" : ""),
-                "Error",
-                retryAction != null ? MessageBoxButton.YesNo : MessageBoxButton.OK,
-                MessageBoxImage.Error);
-
-            if (result == MessageBoxResult.Yes && retryAction != null)
-            {
-                retryAction();
-            }
         }
 
         /// <summary>
-        /// Shows an error with an asynchronous retry action.
-        /// FIX: Falls back to MessageBox since ErrorPanel is not displayed.
+        /// Shows an error with an asynchronous retry action
         /// </summary>
         public void ShowErrorAsync(string message, Func<Task>? retryActionAsync = null)
         {
             ErrorMessage = message;
             _retryActionAsync = retryActionAsync;
-            _retryActionSync = null;
+            _retryActionSync = null; // Clear sync action
             CanRetry = retryActionAsync != null;
             IsErrorVisible = true;
             ErrorShown?.Invoke(this, EventArgs.Empty);
-
-            // FIX: Fallback to MessageBox for visibility
-            var result = MessageBox.Show(
-                message + (retryActionAsync != null ? "\n\nTry again?" : ""),
-                "Error",
-                retryActionAsync != null ? MessageBoxButton.YesNo : MessageBoxButton.OK,
-                MessageBoxImage.Error);
-
-            if (result == MessageBoxResult.Yes && retryActionAsync != null)
-            {
-                _ = retryActionAsync();
-            }
         }
 
         /// <summary>
