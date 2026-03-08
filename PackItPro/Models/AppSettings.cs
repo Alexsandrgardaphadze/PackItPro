@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 
 namespace PackItPro.Models
 {
@@ -6,15 +7,19 @@ namespace PackItPro.Models
     {
         public string OutputLocation { get; set; } = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
         public string OutputFileName { get; set; } = "MyPackage";
-        public string VirusTotalApiKey { get; set; } = "";
         public bool OnlyScanExecutables { get; set; } = true;
         public bool AutoRemoveInfectedFiles { get; set; } = true;
-        public int MinimumDetectionsToFlag { get; set; } = 1;
+
+        // Raised from 1 → 3. A single obscure engine (Zillya, etc.) flagging
+        // a well-known NSIS installer is noise, not a threat. Three independent
+        // engines agreeing is a much stronger signal.
+        public int MinimumDetectionsToFlag { get; set; } = 3;
+
         public bool IncludeWingetUpdateScript { get; set; } = false;
 
         public CompressionMethodEnum CompressionMethod { get; set; } = CompressionMethodEnum.Fast;
 
-        // Backward compatibility: maps old int value to new enum
+        // Kept for backward compatibility — maps old int value to new enum.
         public int CompressionLevel
         {
             get => CompressionMethod switch
@@ -40,11 +45,32 @@ namespace PackItPro.Models
         public bool ScanWithVirusTotal { get; set; } = true;
         public int MaxFilesInList { get; set; } = 20;
 
-        // Backward compatibility
+        // Kept for backward compatibility
         public bool UseLZMACompression
         {
             get => CompressionMethod == CompressionMethodEnum.Maximum;
             set => CompressionMethod = value ? CompressionMethodEnum.Maximum : CompressionMethodEnum.Fast;
         }
+
+        // Engines considered authoritative — a single detection from any of these
+        // overrides MinimumDetectionsToFlag and flags the file as infected regardless.
+        // User-editable so they can add or remove engines via settings UI.
+        public List<string> TrustedEngines { get; set; } = new()
+        {
+            "Microsoft",
+            "Google",
+            "Kaspersky",
+            "DrWeb",
+            "BitDefender",
+            "ESET-NOD32",
+            "Sophos",
+            "Symantec",
+            "CrowdStrike Falcon",
+            "Malwarebytes",
+            "Avast",
+            "AVG",
+            "F-Secure",
+            "Trend Micro",
+        };
     }
 }

@@ -1,4 +1,5 @@
 ﻿using PackItPro.Models;
+using PackItPro.Services;
 using System;
 using System.ComponentModel;
 using System.IO;
@@ -14,7 +15,20 @@ namespace PackItPro.ViewModels
 
         private readonly string _settingsFilePath;
         private CancellationTokenSource? _saveCts;
+        private string? _virusTotalApiKey;
         private bool _disposed;
+
+        // API key is stored via DPAPI (CredentialStore), never in settings.json as plaintext.
+        public string VirusTotalApiKey
+        {
+            get => _virusTotalApiKey ?? "";
+            set
+            {
+                _virusTotalApiKey = value;
+                CredentialStore.SaveVirusTotalKey(value);
+                OnPropertyChanged();
+            }
+        }
 
         public string OutputLocation
         {
@@ -26,12 +40,6 @@ namespace PackItPro.ViewModels
         {
             get => SettingsModel.OutputFileName;
             set { SettingsModel.OutputFileName = value; OnPropertyChanged(); }
-        }
-
-        public string VirusTotalApiKey
-        {
-            get => SettingsModel.VirusTotalApiKey;
-            set { SettingsModel.VirusTotalApiKey = value; OnPropertyChanged(); }
         }
 
         public bool OnlyScanExecutables
@@ -92,9 +100,9 @@ namespace PackItPro.ViewModels
         {
             SettingsModel = new AppSettings();
             _settingsFilePath = settingsFilePath ?? throw new ArgumentNullException(nameof(settingsFilePath));
+            _virusTotalApiKey = CredentialStore.LoadVirusTotalKey();
         }
 
-        // FIX: Add CancellationToken support for async operations
         public async Task LoadSettingsAsync(CancellationToken cancellationToken = default)
         {
             try
@@ -106,8 +114,7 @@ namespace PackItPro.ViewModels
                     if (loadedSettings != null)
                     {
                         SettingsModel.OutputLocation = loadedSettings.OutputLocation;
-                        SettingsModel.OutputFileName = loadedSettings.OutputFileName;
-                        SettingsModel.VirusTotalApiKey = loadedSettings.VirusTotalApiKey;
+                        // OutputFileName is per-package, not a persistent preference — do NOT restore it.
                         SettingsModel.OnlyScanExecutables = loadedSettings.OnlyScanExecutables;
                         SettingsModel.AutoRemoveInfectedFiles = loadedSettings.AutoRemoveInfectedFiles;
                         SettingsModel.MinimumDetectionsToFlag = loadedSettings.MinimumDetectionsToFlag;
@@ -117,12 +124,18 @@ namespace PackItPro.ViewModels
                         SettingsModel.VerifyIntegrity = loadedSettings.VerifyIntegrity;
                         SettingsModel.ScanWithVirusTotal = loadedSettings.ScanWithVirusTotal;
                         SettingsModel.CompressionLevel = loadedSettings.CompressionLevel;
+
+                        // Preserve user's trusted-engine customisations if present in JSON.
+                        // If absent (first run / old settings file), the default list in AppSettings applies.
+                        if (loadedSettings.TrustedEngines?.Count > 0)
+                            SettingsModel.TrustedEngines = loadedSettings.TrustedEngines;
+
+                        await MigrateLegacyApiKeyIfNeededAsync(json, cancellationToken);
                     }
                 }
             }
             catch (OperationCanceledException)
             {
-                // Silent cancellation — caller handles it
                 throw;
             }
             catch (Exception ex)
@@ -131,10 +144,45 @@ namespace PackItPro.ViewModels
             }
         }
 
-        // FIX: Add CancellationToken support and cancel previous save if in progress
+        /// <summary>
+        /// One-time migration: if DPAPI storage is empty and the JSON file still contains
+        /// a plaintext VirusTotalApiKey field, move it to DPAPI and remove it from JSON.
+        /// </summary>
+        private async Task MigrateLegacyApiKeyIfNeededAsync(string jsonContent, CancellationToken ct)
+        {
+            try
+            {
+                if (CredentialStore.HasStoredKey())
+                    return;
+
+                using var doc = JsonDocument.Parse(jsonContent);
+                if (!doc.RootElement.TryGetProperty("virusTotalApiKey", out var keyElement))
+                    return;
+
+                string? legacyKey = keyElement.GetString();
+                if (string.IsNullOrWhiteSpace(legacyKey))
+                    return;
+
+                CredentialStore.SaveVirusTotalKey(legacyKey);
+                _virusTotalApiKey = legacyKey;
+
+                var migratedJson = JsonSerializer.Serialize(
+                    SettingsModel,
+                    new JsonSerializerOptions { WriteIndented = true });
+                await File.WriteAllTextAsync(_settingsFilePath, migratedJson, ct);
+
+                System.Diagnostics.Debug.WriteLine(
+                    "[SettingsViewModel] Migrated legacy plaintext API key to DPAPI storage.");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"[SettingsViewModel] Legacy API key migration failed (non-fatal): {ex.Message}");
+            }
+        }
+
         public async Task SaveSettingsAsync(CancellationToken cancellationToken = default)
         {
-            // Cancel any previous save operation
             _saveCts?.Cancel();
             _saveCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
@@ -149,10 +197,7 @@ namespace PackItPro.ViewModels
                 var json = JsonSerializer.Serialize(SettingsModel, new JsonSerializerOptions { WriteIndented = true });
                 await File.WriteAllTextAsync(_settingsFilePath, json, _saveCts.Token);
             }
-            catch (OperationCanceledException)
-            {
-                // Silent — save was cancelled (normal during rapid property changes)
-            }
+            catch (OperationCanceledException) { /* save superseded by a newer call */ }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[SettingsViewModel] Save failed: {ex.Message}");
@@ -164,6 +209,11 @@ namespace PackItPro.ViewModels
             }
         }
 
+        /// <summary>
+        /// Validates that the output location is set and exists.
+        /// Does NOT write a test file — write-permission check is the responsibility of
+        /// SettingsHandler when the user explicitly changes the output location.
+        /// </summary>
         public bool ValidateSettings(out string errorMessage)
         {
             errorMessage = "";
@@ -180,22 +230,9 @@ namespace PackItPro.ViewModels
                 return false;
             }
 
-            try
-            {
-                var testFile = Path.Combine(OutputLocation, $".test_{Guid.NewGuid()}");
-                File.WriteAllText(testFile, "test");
-                File.Delete(testFile);
-            }
-            catch (Exception ex)
-            {
-                errorMessage = $"No write permission in output location: {ex.Message}";
-                return false;
-            }
-
             return true;
         }
 
-        // FIX: Proper disposal
         protected virtual void Dispose(bool disposing)
         {
             if (_disposed) return;
@@ -217,7 +254,8 @@ namespace PackItPro.ViewModels
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
-        protected virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string? propertyName = null) =>
+        protected virtual void OnPropertyChanged(
+            [System.Runtime.CompilerServices.CallerMemberName] string? propertyName = null) =>
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 }

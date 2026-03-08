@@ -16,15 +16,17 @@ namespace PackItPro.Services
 
         /// <summary>
         /// Maps the UI ComboBox index to a SharpZipLib compression level:
-        ///   0 = None     → store only (level 0)
-        ///   1 = Fast     → deflate default (level 6)
-        ///   2 = Maximum  → maximum deflate (level 9)
+        ///   0 = None   → store only (level 0)
+        ///   1 = Fast   → deflate default (level 6)
+        ///   2 = Normal → deflate (level 7)
+        ///   3 = Maximum → maximum deflate (level 9)
         /// </summary>
         private static int MapCompressionLevel(int uiIndex) => uiIndex switch
         {
             0 => 0,
             1 => 6,
-            2 => 9,
+            2 => 7,
+            3 => 9,
             _ => 6,
         };
 
@@ -52,7 +54,9 @@ namespace PackItPro.Services
                 log.Info("========== PACKAGE CREATION START ==========");
                 log.Info($"Package: '{packageName}' | Files: {filePaths.Count} | Admin: {requiresAdmin} | Compression: {compressionLevel} | Winget: {includeWingetUpdateScript}");
 
-                // STEP 1: Copy source files to temp directory
+                // ============================================================
+                // STEP 1: COPY FILES TO TEMP
+                // ============================================================
                 Report(progress, 8, "Step 1 of 6 — Copying files...");
                 log.Info($"STEP 1: Copying {filePaths.Count} file(s)...");
 
@@ -65,6 +69,7 @@ namespace PackItPro.Services
 
                     try
                     {
+                        // Verify accessible before committing to copy
                         using (File.Open(src, FileMode.Open, FileAccess.Read, FileShare.Read)) { }
                         File.Copy(src, dest, overwrite: true);
                         log.Info($"  [{i + 1}/{filePaths.Count}] {Path.GetFileName(src)} ({FormatBytes(new FileInfo(src).Length)})");
@@ -94,7 +99,9 @@ namespace PackItPro.Services
                     log.Info("  Winget updater script added: update_all.bat");
                 }
 
-                // STEP 2: Generate manifest
+                // ============================================================
+                // STEP 2: GENERATE MANIFEST (no checksum yet)
+                // ============================================================
                 Report(progress, 20, "Step 2 of 6 — Generating manifest...");
                 log.Info("STEP 2: Generating manifest...");
 
@@ -108,7 +115,10 @@ namespace PackItPro.Services
                 await File.WriteAllTextAsync(manifestPath, manifestJson, ct);
                 log.Info("  Manifest written (checksum pending).");
 
-                // STEP 3: Hash all files and embed the checksum in the manifest
+                // ============================================================
+                // STEP 3: HASH INSTALLER FILES ONLY
+                // SHA256 over hundreds of MB is CPU-bound — run on thread pool.
+                // ============================================================
                 Report(progress, 25, "Step 3 of 6 — Computing integrity hash...");
                 log.Info("STEP 3: Hashing installer files...");
 
@@ -123,7 +133,12 @@ namespace PackItPro.Services
                 await File.WriteAllTextAsync(manifestPath, manifestJson, ct);
                 log.Info("  Manifest updated with checksum.");
 
-                // STEP 4: Create ZIP archive
+                // ============================================================
+                // STEP 4: CREATE ZIP ARCHIVE
+                // SharpZipLib is synchronous — mixing async reads with sync ZIP
+                // writes creates fake async that blocks the thread pool.
+                // We push the ENTIRE compression work onto a background thread.
+                // ============================================================
                 Report(progress, 30, "Step 4 of 6 — Compressing payload (will take a moment)...");
                 log.Info("STEP 4: Compressing payload...");
 
@@ -136,7 +151,8 @@ namespace PackItPro.Services
                 {
                     0 => "Store (no compression)",
                     1 => "Fast (level 6)",
-                    2 => "Maximum (level 9)",
+                    2 => "Normal (level 7)",
+                    3 => "Maximum (level 9)",
                     _ => "Default"
                 };
 
@@ -182,7 +198,9 @@ namespace PackItPro.Services
 
                 log.Info($"  ZIP: {FormatBytes(zipInfo.Length)} ({zipInfo.Length * 100.0 / Math.Max(totalBytes, 1):F1}% of original)");
 
-                // STEP 5: Inject payload into the stub executable
+                // ============================================================
+                // STEP 5: INJECT PAYLOAD INTO STUB
+                // ============================================================
                 Report(progress, 68, "Step 5 of 6 — Injecting payload into stub...");
                 log.Info("STEP 5: Injecting payload...");
 
@@ -198,7 +216,9 @@ namespace PackItPro.Services
 
                 log.Info("  Injection verified ✓");
 
-                // STEP 6: Move to final output path
+                // ============================================================
+                // STEP 6: MOVE TO FINAL LOCATION
+                // ============================================================
                 Report(progress, 92, "Step 6 of 6 — Finalizing...");
                 log.Info("STEP 6: Writing output...");
 
@@ -215,7 +235,7 @@ namespace PackItPro.Services
                 }
 
                 File.Move(finalTemp, outputPath, overwrite: true);
-                finalTemp = null;
+                finalTemp = null; // consumed — don't delete in finally
 
                 log.Info($"  Output: {outputPath} ({FormatBytes(new FileInfo(outputPath).Length)})");
                 Report(progress, 100, "✅ Package created successfully!");
@@ -267,6 +287,7 @@ namespace PackItPro.Services
             pause
             """;
 
+        // Sync ZIP helper — must be called from inside Task.Run
         private static void AddFileToZipSync(
             ZipOutputStream zip, string filePath, string entryName, DateTime timestamp)
         {

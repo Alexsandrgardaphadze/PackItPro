@@ -12,6 +12,7 @@ namespace StubInstaller
 {
     public static class InstallerRunner
     {
+        // Must stay in sync with ManifestGenerator.cs and InstallerDetector.cs
         public const string TypeMsi = "msi";
         public const string TypeMsp = "msp";
         public const string TypeInno = "inno";
@@ -36,7 +37,6 @@ namespace StubInstaller
             bool allSuccess = true;
             foreach (var file in files.OrderBy(f => f.InstallOrder))
             {
-                // [3] Validate path before anything else
                 if (!TryResolveSafePath(tempDir, file.Name, out string filePath, out string? pathError))
                 {
                     logError($"SECURITY: {pathError} — skipping {file.Name}");
@@ -179,7 +179,7 @@ namespace StubInstaller
             var argParts = new List<string> { $"/i \"{filePath}\"" };
             argParts.AddRange(silentArgs);
 
-            // [2] MSI verbose log: /L*v captures property tables, action sequences,
+            // MSI verbose log: /L*v captures property tables, action sequences,
             // and full error text — far more useful than exit codes alone.
             string msiLogPath = string.Empty;
             if (!string.IsNullOrEmpty(tempDir))
@@ -208,8 +208,7 @@ namespace StubInstaller
                 WorkingDirectory = workingDir,
             };
 
-            int exitCode = await RunProcessWithoutCaptureAsync(
-                psi, timeoutMs, logInfo, logError);
+            int exitCode = await RunProcessWithoutCaptureAsync(psi, timeoutMs, logInfo, logError);
 
             if (!string.IsNullOrEmpty(msiLogPath) && File.Exists(msiLogPath))
                 logInfo($"  MSI log: {FormatBytes(new FileInfo(msiLogPath).Length)} written to {msiLogPath}");
@@ -226,14 +225,13 @@ namespace StubInstaller
         {
             string arguments = string.Join(" ", silentArgs);
             string workingDir = Path.GetDirectoryName(filePath) ?? Directory.GetCurrentDirectory();
-            // Short name used as prefix on every captured output line
             string installerName = Path.GetFileName(filePath);
 
             logInfo("  Command line:");
             logInfo($"    \"{filePath}\" {arguments}");
             logInfo($"  Working dir: {workingDir}");
 
-            // [1] Redirect stdout/stderr — many installers explain failures here only.
+            // Redirect stdout/stderr — many installers explain failures here only.
             var psi = new ProcessStartInfo
             {
                 FileName = filePath,
@@ -245,8 +243,7 @@ namespace StubInstaller
                 RedirectStandardError = true,
             };
 
-            return await RunProcessWithOutputCaptureAsync(
-                psi, installerName, timeoutMs, logInfo, logError);
+            return await RunProcessWithOutputCaptureAsync(psi, installerName, timeoutMs, logInfo, logError);
         }
 
         // ── Process runners ───────────────────────────────────────────────────
@@ -281,22 +278,18 @@ namespace StubInstaller
 
         /// <summary>
         /// Runs a process with stdout/stderr captured into a memory buffer.
-        /// On SUCCESS (ExitCodeClassifier.IsSuccess) the buffer is silently discarded —
-        /// clean installs produce no [OUT]/[ERR] noise.
-        /// On FAILURE the full buffer is flushed to the log so every output line is
-        /// available for diagnosis.
-        /// Every buffered line is prefixed with the installer filename so multi-installer
-        /// logs remain readable without scrolling back to find the installer header.
+        /// On SUCCESS the buffer is silently discarded — clean installs produce no [OUT]/[ERR] noise.
+        /// On FAILURE the full buffer is flushed to the log so every output line is available for diagnosis.
+        /// Every buffered line is prefixed with the installer filename for multi-installer log readability.
         /// </summary>
         private static async Task<int> RunProcessWithOutputCaptureAsync(
             ProcessStartInfo psi,
-            string installerName,    // short name for prefix, e.g. "setup.exe"
+            string installerName,
             int timeoutMs,
             Action<string> logInfo,
             Action<string> logError)
         {
-            // Buffer for captured output. DataReceived fires on thread pool threads,
-            // so all access is protected by _outputLock.
+            // DataReceived fires on thread pool threads — all access to outputBuffer is locked.
             var outputBuffer = new List<string>();
             var bufferLock = new object();
 
@@ -305,8 +298,7 @@ namespace StubInstaller
             var tcs = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
             process.Exited += (s, e) => tcs.TrySetResult(process.ExitCode);
 
-            // [1] Subscribe before Start(). Lines get the installer name baked in
-            // at capture time so they're ready to write whether buffered or immediate.
+            // Subscribe before Start() — .NET requirement for BeginOutputReadLine
             process.OutputDataReceived += (s, e) =>
             {
                 if (!string.IsNullOrEmpty(e.Data))
@@ -325,7 +317,6 @@ namespace StubInstaller
             });
 
             process.Start();
-            // [BeginXxx must be called after Start() — .NET requirement]
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
             logInfo($"  PID: {process.Id}");
@@ -333,7 +324,6 @@ namespace StubInstaller
             int exitCode = await tcs.Task; // throws OperationCanceledException on timeout
             logInfo($"  Exited with code: {exitCode}");
 
-            // [2] Flush or discard based on outcome
             List<string> captured;
             lock (bufferLock) { captured = new List<string>(outputBuffer); }
 

@@ -13,7 +13,7 @@ namespace PackItPro.ViewModels
         private bool _disposed;
 
         // Cached stub size so we're not hitting disk on every property change.
-        // Lazily loaded on first access, null means not yet measured.
+        // Lazily loaded on first access; null means not yet measured.
         private long? _cachedStubBytes;
 
         public SummaryViewModel(FileListViewModel fileListViewModel, SettingsViewModel settingsViewModel)
@@ -87,10 +87,8 @@ namespace PackItPro.ViewModels
         /// <summary>
         /// Shows an honest output size estimate: real payload bytes + real stub bytes.
         /// Does NOT apply fake compression ratio multipliers — compression gain on
-        /// .exe/.msi/.mp4 files (the primary use case) is near zero, so false estimates
+        /// .exe/.msi files (the primary use case) is near zero, so false estimates
         /// actively mislead users.
-        ///
-        /// What we DO show: a compression note that sets expectations correctly.
         /// </summary>
         public string EstimatedPackageSize
         {
@@ -107,6 +105,7 @@ namespace PackItPro.ViewModels
                     0 => " (no compression)",
                     1 => " (may compress text/source files)",
                     2 => " (may compress text/source files further)",
+                    3 => " (maximum — may compress text/source files further)",
                     _ => ""
                 };
 
@@ -117,7 +116,7 @@ namespace PackItPro.ViewModels
                            compressionNote;
                 }
 
-                // Stub not found — just show payload
+                // Stub not found — show payload-only estimate
                 return $"~{FormatBytes(payloadBytes)} payload{compressionNote}";
             }
         }
@@ -130,18 +129,19 @@ namespace PackItPro.ViewModels
             {
                 if (TotalSize == 0) return "—";
 
-                // Rough estimate: compression at ~100 MB/s for Fast, ~40 MB/s for Max
-                // plus ~200 MB/s for stub injection (IO bound)
+                // Rough estimate: compression at ~120 MB/s for Fast, ~50 MB/s for Max
+                // plus ~3s for manifest/hash/inject overhead
                 double mbPerSecond = _settingsViewModel.CompressionLevel switch
                 {
                     0 => 500.0,  // Store-only: just IO
                     1 => 120.0,  // Deflate 6
-                    2 => 50.0,   // Deflate 9
+                    2 => 70.0,   // Deflate 7
+                    3 => 50.0,   // Deflate 9
                     _ => 120.0
                 };
 
                 double mb = TotalSize / (1024.0 * 1024.0);
-                long estimatedSeconds = Math.Max(2, (long)(mb / mbPerSecond) + 3); // +3s for manifest/hash/inject
+                long estimatedSeconds = Math.Max(2, (long)(mb / mbPerSecond) + 3);
 
                 if (estimatedSeconds < 60)
                     return $"~{estimatedSeconds} sec";

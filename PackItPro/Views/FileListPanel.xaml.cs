@@ -1,5 +1,4 @@
-﻿// Views/FileListPanel.xaml.cs - v3.0
-
+﻿// Views/FileListPanel.xaml.cs
 using PackItPro.ViewModels;
 using System;
 using System.Linq;
@@ -24,8 +23,7 @@ namespace PackItPro.Views
         private bool _suppressDrag;         // mouse-down was on a Button — never drag
 
         // ── Static frozen brushes ─────────────────────────────────────────────
-        // Allocated once at class init. Pattern matches FileItemViewModel v3.1
-        // and StatusToBackgroundConverter v2.3.
+        // Allocated once at class init. Pattern matches FileItemViewModel and StatusToBackgroundConverter.
 
         private static readonly SolidColorBrush DragHoverBorderBrush =
             Frozen(new SolidColorBrush(Color.FromRgb(0x60, 0xA5, 0xFA)));      // blue-400

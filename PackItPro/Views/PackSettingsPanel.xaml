@@ -1,4 +1,5 @@
-﻿<UserControl x:Class="PackItPro.Views.PackSettingsPanel"
+﻿<!-- Views/PackSettingsPanel.xaml -->
+<UserControl x:Class="PackItPro.Views.PackSettingsPanel"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -188,6 +189,12 @@
                        FontWeight="Medium"
                        FontFamily="Segoe UI"
                        Margin="0,0,0,6"/>
+
+            <!--
+                4 items matching CompressionLevel values (0=None, 1=Fast, 2=Normal, 3=Maximum).
+                SummaryViewModel.EstimatedPackageSize uses levels 0–3 for compression notes.
+                ToolTip from master kept — helps users choose.
+            -->
             <ComboBox SelectedIndex="{Binding CompressionLevel, Mode=TwoWay}" 
                       Margin="0,0,0,12" 
                       Height="36"
@@ -199,9 +206,7 @@
                       BorderBrush="{StaticResource AppBorderColor}"
                       ToolTip="Choose compression method for the final .exe package">
 
-                <!-- ✅ FIX: Override system colors AND ComboBox dropdown style -->
                 <ComboBox.Resources>
-                    <!-- System color overrides for dropdown -->
                     <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="#1a1a2e" />
                     <SolidColorBrush x:Key="{x:Static SystemColors.WindowTextBrushKey}" Color="#f1f5f9" />
                     <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#4f46e5" />
@@ -210,7 +215,6 @@
                     <SolidColorBrush x:Key="{x:Static SystemColors.ControlTextBrushKey}" Color="#f1f5f9" />
                 </ComboBox.Resources>
 
-                <!-- ✅ Item container style with proper colors -->
                 <ComboBox.ItemContainerStyle>
                     <Style TargetType="ComboBoxItem">
                         <Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
@@ -219,11 +223,9 @@
                         <Setter Property="FontFamily" Value="Segoe UI"/>
                         <Setter Property="FontSize" Value="13"/>
                         <Style.Triggers>
-                            <!-- Hover state -->
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter Property="Background" Value="#1f1f33"/>
                             </Trigger>
-                            <!-- Selected state -->
                             <Trigger Property="IsSelected" Value="True">
                                 <Setter Property="Background" Value="#4f46e5"/>
                                 <Setter Property="Foreground" Value="#f1f5f9"/>
@@ -232,15 +234,18 @@
                     </Style>
                 </ComboBox.ItemContainerStyle>
 
-                <ComboBoxItem ToolTip="No compression. Fastest packing, largest output. Use when packaging already-compressed files (video, installers).">
-                    None (Fastest)
-                </ComboBoxItem>
-                <ComboBoxItem ToolTip="Standard DEFLATE compression (level 6). Good balance between packing speed and output size. Recommended for most packages.">
-                    Fast (Recommended)
-                </ComboBoxItem>
-                <ComboBoxItem ToolTip="Maximum DEFLATE compression (level 9). Slowest packing but best compression, especially for text/source files.">
-                    Maximum (Smallest)
-                </ComboBoxItem>
+                <!-- Index 0 -->
+                <ComboBoxItem Content="None (Fastest)"
+                              ToolTip="No compression. Fastest packing, largest output. Use when packaging already-compressed files (video, installers)."/>
+                <!-- Index 1 -->
+                <ComboBoxItem Content="Fast (Recommended)"
+                              ToolTip="Standard DEFLATE compression (level 6). Good balance between speed and output size. Recommended for most packages."/>
+                <!-- Index 2 -->
+                <ComboBoxItem Content="Normal"
+                              ToolTip="DEFLATE compression (level 7). Slightly slower than Fast, somewhat smaller output."/>
+                <!-- Index 3 -->
+                <ComboBoxItem Content="Maximum (Smallest)"
+                              ToolTip="Maximum DEFLATE compression (level 9). Slowest packing but best compression, especially for text/source files."/>
             </ComboBox>
 
             <!-- Require Admin -->

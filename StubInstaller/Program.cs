@@ -338,9 +338,6 @@ namespace StubInstaller
             }
         }
 
-        // FIX [1]: Removed the unreachable `await Task.CompletedTask` that was after
-        // the final `return true`. The method is still async because the MessageBox
-        // call path could benefit from it, and removing async would be a larger change.
         private static async Task<bool> VerifyIntegrityAsync(PackageManifest manifest, string tempDir)
         {
             if (string.IsNullOrEmpty(manifest.SHA256Checksum))
@@ -388,11 +385,6 @@ namespace StubInstaller
             }
         }
 
-        // FIX [2]: Script now runs without UseShellExecute=true so it inherits
-        // the current process's elevation token. Previously, UseShellExecute=true
-        // on an already-elevated process could spawn a new unelevated cmd.exe on
-        // some Windows configurations, causing winget to silently fail on protected
-        // system paths. Now the bat file runs directly in the same security context.
         private static async Task RunPostInstallScriptAsync(PackageManifest manifest, string tempDir)
         {
             if (string.IsNullOrEmpty(manifest.AutoUpdateScript)) return;
@@ -412,7 +404,7 @@ namespace StubInstaller
 
             try
             {
-                // FIX [2]: UseShellExecute=false inherits elevation from current process.
+                // UseShellExecute=false inherits elevation from current process.
                 // CreateNoWindow=false lets the bat window appear so users can see progress.
                 // cmd.exe /c is used so the bat runs in a proper cmd context with ERRORLEVEL etc.
                 var psi = new ProcessStartInfo
