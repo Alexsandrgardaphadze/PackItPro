@@ -22,6 +22,7 @@ namespace PackItPro.ViewModels.CommandHandlers
 
         public ICommand SetOutputLocationCommand { get; }
         public ICommand SetVirusApiKeyCommand { get; }
+        public ICommand DeleteVirusApiKeyCommand { get; }
         public ICommand ClearCacheCommand { get; }
         public ICommand ExportLogsCommand { get; }
         public ICommand PackItProSettingsCommand { get; }
@@ -46,6 +47,7 @@ namespace PackItPro.ViewModels.CommandHandlers
 
             SetOutputLocationCommand = new RelayCommand(async _ => await ExecuteSetOutputLocationAsync());
             SetVirusApiKeyCommand = new RelayCommand(ExecuteSetVirusApiKey);
+            DeleteVirusApiKeyCommand = new RelayCommand(ExecuteDeleteVirusApiKey);
             ClearCacheCommand = new RelayCommand(ExecuteClearCache);
             ExportLogsCommand = new RelayCommand(ExecuteExportLogs);
             PackItProSettingsCommand = new RelayCommand(ExecutePackItProSettings);
@@ -97,14 +99,12 @@ namespace PackItPro.ViewModels.CommandHandlers
 
         private void ExecuteSetVirusApiKey(object? parameter)
         {
-            var dialog = new InputDialog(
-                "VirusTotal API Key",
-                "Enter your 64-character VirusTotal API key:",
-                _settings.VirusTotalApiKey);
+            var dialog = new VirusApiKeyWindow(_settings.VirusTotalApiKey);
 
-            if (dialog.ShowDialog() != true) return;
+            if (dialog.ShowDialog() != true)
+                return;
 
-            var key = dialog.Answer?.Trim() ?? "";
+            var key = dialog.ApiKey?.Trim() ?? "";
             if (string.IsNullOrWhiteSpace(key))
             {
                 _error.ShowError("API key cannot be empty.");
@@ -131,6 +131,42 @@ namespace PackItPro.ViewModels.CommandHandlers
                 MessageBoxImage.Information);
 
             _log.Info("VirusTotal API key updated.");
+        }
+
+        // ── Delete VirusTotal API Key ─────────────────────────────────────────
+
+        private void ExecuteDeleteVirusApiKey(object? parameter)
+        {
+            if (!CredentialStore.HasStoredKey())
+            {
+                MessageBox.Show(
+                    "No VirusTotal API key is currently stored.",
+                    "No Key Found",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            var result = MessageBox.Show(
+                "Are you sure you want to delete the stored VirusTotal API key?\n\n" +
+                "VirusTotal scanning will be disabled until a new key is entered.",
+                "Delete API Key",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            if (result != MessageBoxResult.Yes) return;
+
+            CredentialStore.SaveVirusTotalKey("");
+            _settings.VirusTotalApiKey = "";
+            _virusTotalClient?.SetApiKey("");
+            _ = _settings.SaveSettingsAsync();
+
+            _log.Info("VirusTotal API key deleted.");
+            MessageBox.Show(
+                "API key deleted successfully.",
+                "Key Deleted",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
         }
 
         // ── Clear Cache ───────────────────────────────────────────────────────

@@ -44,16 +44,15 @@
                        FontWeight="Medium"
                        FontFamily="Segoe UI"
                        Margin="0,0,0,6"/>
-            <TextBox Text="{Binding OutputFileName, Mode=TwoWay}" 
+            <!-- StyledTextBoxStyle is the global implicit TextBox style from Controls.xaml
+                 (rounded dark look matching the ComboBox). No explicit Style= needed. -->
+            <TextBox Text="{Binding OutputFileName, Mode=TwoWay}"
                      Margin="0,0,0,16"
                      Height="36"
+                     Padding="10,4"
                      VerticalContentAlignment="Center"
                      FontFamily="Segoe UI"
-                     FontSize="13"
-                     Background="{StaticResource AppCardColor}"
-                     Foreground="{StaticResource AppTextColor}"
-                     BorderBrush="{StaticResource AppBorderColor}"
-                     Padding="10,8"/>
+                     FontSize="13"/>
 
             <!-- Divider -->
             <Border Height="1" 
@@ -194,26 +193,16 @@
                 4 items matching CompressionLevel values (0=None, 1=Fast, 2=Normal, 3=Maximum).
                 SummaryViewModel.EstimatedPackageSize uses levels 0–3 for compression notes.
                 ToolTip from master kept — helps users choose.
+                FIX: Apply ComprehensiveComboBoxStyle for consistent dropdown styling
             -->
             <ComboBox SelectedIndex="{Binding CompressionLevel, Mode=TwoWay}" 
+                      Style="{StaticResource ComprehensiveComboBoxStyle}"
                       Margin="0,0,0,12" 
                       Height="36"
                       VerticalContentAlignment="Center"
                       FontFamily="Segoe UI"
                       FontSize="13"
-                      Background="{StaticResource AppCardColor}"
-                      Foreground="{StaticResource AppTextColor}"
-                      BorderBrush="{StaticResource AppBorderColor}"
                       ToolTip="Choose compression method for the final .exe package">
-
-                <ComboBox.Resources>
-                    <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="#1a1a2e" />
-                    <SolidColorBrush x:Key="{x:Static SystemColors.WindowTextBrushKey}" Color="#f1f5f9" />
-                    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#4f46e5" />
-                    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#f1f5f9" />
-                    <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}" Color="#1a1a2e" />
-                    <SolidColorBrush x:Key="{x:Static SystemColors.ControlTextBrushKey}" Color="#f1f5f9" />
-                </ComboBox.Resources>
 
                 <ComboBox.ItemContainerStyle>
                     <Style TargetType="ComboBoxItem">
@@ -224,10 +213,12 @@
                         <Setter Property="FontSize" Value="13"/>
                         <Style.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#1f1f33"/>
+                                <Setter Property="Background" Value="{StaticResource AppPrimaryColor}"/>
+                                <Setter Property="Background" Value="#2d2d44"/>
+                                <Setter Property="Opacity" Value="0.7"/>
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter Property="Background" Value="#4f46e5"/>
+                                <Setter Property="Background" Value="{StaticResource AppPrimaryColor}"/>
                                 <Setter Property="Foreground" Value="#f1f5f9"/>
                             </Trigger>
                         </Style.Triggers>

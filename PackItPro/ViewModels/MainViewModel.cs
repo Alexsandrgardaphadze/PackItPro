@@ -8,6 +8,7 @@ using System.IO;
 using System.Net.Http;
 using System.Threading.Tasks;
 using System.Windows.Input;
+using System.Reflection;
 
 namespace PackItPro.ViewModels
 {
@@ -16,6 +17,15 @@ namespace PackItPro.ViewModels
     /// </summary>
     public class MainViewModel : INotifyPropertyChanged, IDisposable
     {
+        public string AppVersion
+        {
+            get
+            {
+                var version = Assembly.GetExecutingAssembly().GetName().Version;
+                return $"v{version!.Major}.{version.Minor}.{version.Build}";
+            }
+        }
+
         #region Fields
 
         private readonly string _appDataDir = Path.Combine(
@@ -57,6 +67,7 @@ namespace PackItPro.ViewModels
         private VirusTotalCommandHandler? _virusTotalHandler;
         private HelpHandler? _helpHandler;
         private ApplicationHandler? _applicationHandler;
+        private MarkTrustCommandHandler? _markTrustHandler;
 
         #endregion
 
@@ -84,6 +95,11 @@ namespace PackItPro.ViewModels
         // VirusTotal
         public ICommand ScanFilesCommand => _virusTotalHandler?.ScanFilesCommand ?? NullCommand;
         public ICommand CancelScanCommand => _virusTotalHandler?.CancelScanCommand ?? NullCommand;
+        public ICommand DeleteVirusApiKeyCommand => _settingsHandler?.DeleteVirusApiKeyCommand ?? NullCommand;
+
+        // Trust — exposed here so FileListPanel ContextMenu can reach them via Tag binding
+        public ICommand MarkAsTrustedCommand => _markTrustHandler?.MarkAsTrustedCommand ?? NullCommand;
+        public ICommand RemoveTrustCommand => _markTrustHandler?.RemoveTrustCommand ?? NullCommand;
 
         // Help
         public ICommand DocumentationCommand => _helpHandler?.DocumentationCommand ?? NullCommand;
@@ -131,6 +147,7 @@ namespace PackItPro.ViewModels
 
             try
             {
+                _logService.Info($"PackItPro {AppVersion} started");
                 _logService.Info("========== INITIALIZATION START ==========");
 
                 await Settings.LoadSettingsAsync();
@@ -168,6 +185,7 @@ namespace PackItPro.ViewModels
             _settingsHandler = new SettingsHandler(Settings, Status, Error, _virusTotalClient, _cacheFilePath, _appDataDir, _logService);
             _helpHandler = new HelpHandler(_updateService, Status, _logService);
             _applicationHandler = new ApplicationHandler(Settings);
+            _markTrustHandler = new MarkTrustCommandHandler(_trustStore!, _logService);
             _logService.Info("All handlers initialized");
         }
 
@@ -180,12 +198,15 @@ namespace PackItPro.ViewModels
             OnPropertyChanged(nameof(ExportListCommand));
             OnPropertyChanged(nameof(SetOutputLocationCommand));
             OnPropertyChanged(nameof(SetVirusApiKeyCommand));
+            OnPropertyChanged(nameof(DeleteVirusApiKeyCommand));
             OnPropertyChanged(nameof(ClearCacheCommand));
             OnPropertyChanged(nameof(ExportLogsCommand));
             OnPropertyChanged(nameof(PackItProSettingsCommand));
             OnPropertyChanged(nameof(ViewCacheCommand));
             OnPropertyChanged(nameof(ScanFilesCommand));
             OnPropertyChanged(nameof(CancelScanCommand));
+            OnPropertyChanged(nameof(MarkAsTrustedCommand));
+            OnPropertyChanged(nameof(RemoveTrustCommand));
             OnPropertyChanged(nameof(DocumentationCommand));
             OnPropertyChanged(nameof(GitHubCommand));
             OnPropertyChanged(nameof(ReportIssueCommand));
@@ -207,6 +228,7 @@ namespace PackItPro.ViewModels
                 _settingsHandler?.Dispose();
                 _helpHandler?.Dispose();
                 _applicationHandler?.Dispose();
+                _markTrustHandler?.Dispose();
                 FileList?.Dispose();
                 Summary?.Dispose();
                 Settings?.Dispose();

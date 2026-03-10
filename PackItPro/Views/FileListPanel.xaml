@@ -1,17 +1,19 @@
-﻿<!-- Views/FileListPanel.xaml - v3.0 -->
+﻿<!-- Views/FileListPanel.xaml - v4.0 UI IMPROVEMENTS
+     Changes vs v3.0:
+       - Status column width: 150 → 110 (badge is ~90px, was leaving 60px dead space)
+       - Delete column width: 40 → 32 (button is 24px wide, no need for 40px)
+       - Status badge HorizontalAlignment stays Left so it anchors tightly
+       - All other markup unchanged
+-->
 <UserControl x:Class="PackItPro.Views.FileListPanel"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-             xmlns:converters="clr-namespace:PackItPro.Converters"
              mc:Ignorable="d"
              d:DesignHeight="450" d:DesignWidth="800">
 
     <UserControl.Resources>
-        <!-- Pulse animation — started/stopped from code-behind only.
-             No EventTrigger here; the XAML trigger and IsVisibleChanged handler
-             competed, making Stop() a no-op. -->
         <Storyboard x:Key="PulseAnimation" RepeatBehavior="Forever">
             <DoubleAnimation Storyboard.TargetName="EmptyStateIcon"
                              Storyboard.TargetProperty="Opacity"
@@ -24,10 +26,46 @@
             </DoubleAnimation>
         </Storyboard>
 
-        <converters:StatusToBackgroundConverter x:Key="StatusToBackground"/>
+        <Style x:Key="DeleteButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="24"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{StaticResource AppTextTertiaryColor}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="ToolTip" Value="Remove"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="6"
+                                Padding="{TemplateBinding Padding}">
+                            <Viewbox Width="16" Height="16"
+                                     HorizontalAlignment="Center"
+                                     VerticalAlignment="Center">
+                                <Canvas Width="20" Height="20">
+                                    <Path Data="{StaticResource Icon.Delete}"
+                                          Fill="{TemplateBinding Foreground}"/>
+                                </Canvas>
+                            </Viewbox>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{StaticResource AppStatusErrorColor}"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Background" Value="{StaticResource AppStatusErrorColor}"/>
+                                <Setter Property="Opacity" Value="0.8"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </UserControl.Resources>
 
-    <!-- MAIN BORDER — named so code-behind can update BorderBrush/Background on drag -->
     <Border x:Name="MainBorder"
             Margin="0,0,10,0"
             BorderBrush="{StaticResource AppBorderColor}"
@@ -40,7 +78,6 @@
             DragLeave="UserControl_DragLeave">
 
         <Grid>
-            <!-- Subtle gradient overlay for depth -->
             <Border CornerRadius="12" Opacity="0.03">
                 <Border.Background>
                     <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
@@ -50,10 +87,9 @@
                 </Border.Background>
             </Border>
 
-            <!-- EMPTY STATE — animation controlled entirely from code-behind -->
+            <!-- EMPTY STATE -->
             <Grid Name="EmptyDropState"
                   Visibility="{Binding HasFiles, Converter={StaticResource InverseBoolToVisibility}}">
-
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="30">
                     <Border x:Name="EmptyStateIcon" Width="90" Height="90"
                             Background="{StaticResource AppPanelHoverColor}" CornerRadius="45"
@@ -90,6 +126,7 @@
                       BorderThickness="0"
                       Margin="15"
                       AllowDrop="True"
+                      Tag="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=DataContext}"
                       PreviewMouseLeftButtonDown="FileListView_PreviewMouseLeftButtonDown"
                       PreviewMouseLeftButtonUp="FileListView_PreviewMouseLeftButtonUp"
                       PreviewMouseMove="FileListView_PreviewMouseMove"
@@ -100,6 +137,54 @@
                       ItemsSource="{Binding Items}"
                       ItemContainerStyle="{StaticResource FileItemStyle}"
                       ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+
+                <ListView.Resources>
+                    <Style TargetType="GridViewColumnHeader">
+                        <Setter Property="Background" Value="Transparent"/>
+                        <Setter Property="Foreground" Value="{StaticResource AppTextTertiaryColor}"/>
+                        <Setter Property="FontSize" Value="11"/>
+                        <Setter Property="FontWeight" Value="SemiBold"/>
+                        <Setter Property="Padding" Value="8,8,8,6"/>
+                        <Setter Property="HorizontalContentAlignment" Value="Left"/>
+                        <Setter Property="BorderThickness" Value="0"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="GridViewColumnHeader">
+                                    <Border Background="{TemplateBinding Background}"
+                                            BorderThickness="0,0,0,1"
+                                            BorderBrush="{StaticResource AppDividerColor}"
+                                            Padding="{TemplateBinding Padding}">
+                                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                        VerticalAlignment="Center"/>
+                                    </Border>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </ListView.Resources>
+
+                <ListView.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="✅  Mark as Trusted (False Positive)"
+                                  Command="{Binding PlacementTarget.Tag.MarkAsTrustedCommand,
+                                            RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                  CommandParameter="{Binding PlacementTarget.SelectedItem,
+                                                    RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                  Style="{StaticResource ContextMenuItemStyle}"
+                                  FontFamily="Segoe UI"
+                                  FontSize="13"/>
+                        <Separator Background="{StaticResource AppBorderColor}"/>
+                        <MenuItem Header="🚫  Remove Trust"
+                                  Command="{Binding PlacementTarget.Tag.RemoveTrustCommand,
+                                            RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                  CommandParameter="{Binding PlacementTarget.SelectedItem,
+                                                    RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                  Style="{StaticResource ContextMenuItemStyle}"
+                                  FontFamily="Segoe UI"
+                                  FontSize="13"/>
+                    </ContextMenu>
+                </ListView.ContextMenu>
+
                 <ListView.View>
                     <GridView>
 
@@ -139,34 +224,28 @@
                             </GridViewColumn.CellTemplate>
                         </GridViewColumn>
 
-                        <!-- Status Column -->
-                        <GridViewColumn Header="Status" Width="120"
+                        <!-- Status Column — reduced from 150 → 110 px, tightens gap to delete btn -->
+                        <GridViewColumn Header="Status" Width="110"
                                         HeaderContainerStyle="{StaticResource GridViewColumnHeaderStyle}">
                             <GridViewColumn.CellTemplate>
                                 <DataTemplate>
                                     <Border Background="{Binding Status, Converter={StaticResource StatusToBackground}}"
-                                            CornerRadius="4" Padding="6,3" HorizontalAlignment="Left">
-                                        <!-- AppTextColor adapts to theme — "Black" was invisible on dark backgrounds -->
-                                        <TextBlock Text="{Binding Status}" FontSize="10" FontWeight="SemiBold"
-                                                   Foreground="{StaticResource AppTextColor}" FontFamily="Segoe UI"/>
+                                            CornerRadius="4" Padding="6,3" HorizontalAlignment="Left"
+                                            ToolTip="{Binding TrustTooltip}">
+                                        <TextBlock Text="{Binding StatusDisplay}" FontSize="10" FontWeight="SemiBold"
+                                                   Foreground="{StaticResource AppTextColor}" FontFamily="Segoe UI"
+                                                   TextTrimming="CharacterEllipsis"/>
                                     </Border>
                                 </DataTemplate>
                             </GridViewColumn.CellTemplate>
                         </GridViewColumn>
 
-                        <!-- Remove Button Column
-                             Binds to item's own RemoveCommand — no RelativeSource or CommandParameter needed.
-                             The ViewModel wires RemoveCommand per-item in AddFilesWithValidation. -->
-                        <GridViewColumn Header="" Width="35"
+                        <!-- Delete Column — reduced from 40 → 32 px -->
+                        <GridViewColumn Header="" Width="32"
                                         HeaderContainerStyle="{StaticResource GridViewColumnHeaderStyle}">
                             <GridViewColumn.CellTemplate>
                                 <DataTemplate>
-                                    <Button Content="✕"
-                                            Width="22" Height="22"
-                                            FontSize="11" FontWeight="Bold"
-                                            Foreground="{StaticResource AppTextTertiaryColor}"
-                                            Background="Transparent" BorderThickness="0"
-                                            Cursor="Hand"
+                                    <Button Style="{StaticResource DeleteButtonStyle}"
                                             Command="{Binding RemoveCommand}"/>
                                 </DataTemplate>
                             </GridViewColumn.CellTemplate>

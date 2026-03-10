@@ -26,12 +26,6 @@
         </Storyboard>
     </UserControl.Resources>
 
-    <UserControl.Triggers>
-        <EventTrigger RoutedEvent="Loaded">
-            <BeginStoryboard Storyboard="{StaticResource SlideInAnimation}"/>
-        </EventTrigger>
-    </UserControl.Triggers>
-
     <Border x:Name="ErrorBorder"
             Background="{StaticResource AppStatusErrorColor}"
             CornerRadius="10"

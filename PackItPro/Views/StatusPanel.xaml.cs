@@ -1,25 +1,73 @@
-﻿using System.Windows.Controls;
+﻿// Views/StatusPanel.xaml.cs - v3.0 SPINNER ANIMATION
+// Drives the Fluent spinner arc by listening to StatusViewModel.IsBusy.
+// The XAML DataTriggers handle show/hide; this file only manages Begin/Stop.
+using PackItPro.ViewModels;
+using System.ComponentModel;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media.Animation;
 
 namespace PackItPro.Views
 {
-    /// <summary>
-    /// Interaction logic for StatusPanel.xaml
-    /// Pure MVVM implementation - all actions handled via Command bindings
-    /// </summary>
     public partial class StatusPanel : UserControl
     {
+        private Storyboard? _spinAnimation;
+        private bool _isSpinning;
+
         public StatusPanel()
         {
             InitializeComponent();
+            DataContextChanged += OnDataContextChanged;
+            Loaded += OnLoaded;
         }
 
-        // ✅ No event handlers needed - StatusPanel uses Command binding
-        // The XAML uses:
-        // - Command="{Binding PackCommand}" for the Pack button
-        // - All status display is data-bound to StatusViewModel properties
-        
-        // Note: The original Retry_Click and DismissError_Click handlers were for ErrorPanel,
-        // not StatusPanel. Those are now properly implemented in ErrorPanel.xaml with
-        // ErrorViewModel commands (RetryCommand and DismissErrorCommand).
+        private void OnLoaded(object sender, RoutedEventArgs e)
+        {
+            _spinAnimation = (Storyboard)Resources["SpinAnimation"];
+            // Sync state in case IsBusy was already true when we loaded
+            if (DataContext is StatusViewModel vm)
+                ApplySpinnerState(vm.IsBusy);
+        }
+
+        private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
+        {
+            if (e.OldValue is StatusViewModel oldVm)
+                oldVm.PropertyChanged -= OnStatusPropertyChanged;
+
+            if (e.NewValue is StatusViewModel newVm)
+            {
+                newVm.PropertyChanged += OnStatusPropertyChanged;
+                // Sync immediately (DataContext can be set before or after Loaded)
+                if (_spinAnimation != null)
+                    ApplySpinnerState(newVm.IsBusy);
+            }
+        }
+
+        private void OnStatusPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName != nameof(StatusViewModel.IsBusy)) return;
+            if (sender is StatusViewModel vm)
+            {
+                // PropertyChanged can fire from a background thread (e.g. scan task)
+                Dispatcher.InvokeAsync(() => ApplySpinnerState(vm.IsBusy));
+            }
+        }
+
+        private void ApplySpinnerState(bool isBusy)
+        {
+            // _spinAnimation may be null if called before Loaded fires
+            if (_spinAnimation == null) return;
+
+            if (isBusy && !_isSpinning)
+            {
+                _spinAnimation.Begin();
+                _isSpinning = true;
+            }
+            else if (!isBusy && _isSpinning)
+            {
+                _spinAnimation.Stop();
+                _isSpinning = false;
+            }
+        }
     }
 }

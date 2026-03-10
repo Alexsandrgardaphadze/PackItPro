@@ -1,4 +1,5 @@
 ﻿// App.xaml.cs
+using PackItPro.Services;
 using System;
 using System.IO;
 using System.Threading.Tasks;
@@ -22,6 +23,10 @@ namespace PackItPro
             Directory.CreateDirectory(Path.Combine(appDataDir, "Logs"));
 
             _logPath = Path.Combine(appDataDir, "Logs", "crash.log");
+
+            // Initialize Windows Toast notification infrastructure.
+            // Must run before any ToastService.Notify*() calls.
+            ToastService.Initialize();
 
             // Global exception handlers
             AppDomain.CurrentDomain.UnhandledException += (s, ex) =>

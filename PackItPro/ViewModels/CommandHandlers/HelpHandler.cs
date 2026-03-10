@@ -100,8 +100,8 @@ namespace PackItPro.ViewModels.CommandHandlers
                 {
                     MessageBox.Show(
                         $"You're up to date!\n" +
-                        $"Current version:  {result.CurrentVersion}\n" +
-                        $"Latest release:   {result.LatestVersion}",
+                        $"Current version:  {result.CurrentVersion ?? UpdateService.CurrentVersion}\n" +
+                        $"Latest release:   {result.LatestVersion ?? "unknown"}",
                         "PackItPro — Up to Date",
                         MessageBoxButton.OK,
                         MessageBoxImage.Information);
@@ -116,10 +116,14 @@ namespace PackItPro.ViewModels.CommandHandlers
                     ? $"\nWhat's new:\n{Truncate(result.ReleaseNotes, 300)}"
                     : "";
 
+                // Toast fires immediately; dialog appears on top
+                if (!string.IsNullOrEmpty(result.ReleaseUrl))
+                    ToastService.NotifyUpdateAvailable(result.CurrentVersion, result.LatestVersion, result.ReleaseUrl);
+
                 var response = MessageBox.Show(
                     $"A new version of PackItPro is available!\n" +
-                    $"Current version:  {result.CurrentVersion}\n" +
-                    $"Latest version:   {result.LatestVersion}{publishedWhen}\n" +
+                    $"Current version:  {result.CurrentVersion ?? UpdateService.CurrentVersion}\n" +
+                    $"Latest version:   {result.LatestVersion ?? "unknown"}{publishedWhen}\n" +
                     $"{notes}\n" +
                     "Open the release page to download?",
                     "PackItPro — Update Available",

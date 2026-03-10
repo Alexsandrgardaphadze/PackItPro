@@ -1,4 +1,14 @@
-﻿<Window x:Class="PackItPro.MainWindow"
+﻿<!-- MainWindow.xaml - v4.0 UI IMPROVEMENTS
+     Changes vs v3.0:
+       - Menu bar: converted inner layout to DockPanel so menu items sit LEFT
+         and a status strip sits RIGHT (file counter, VirusTotal shield badge,
+         version label). This fills the empty right space naturally.
+       - MenuItemStyle: top-level items now have a subtle left accent bar on hover
+         and a slightly brighter foreground, making them clearly clickable.
+         (See updated Styles.xaml MenuItemStyle)
+       - All functional bindings unchanged.
+-->
+<Window x:Class="PackItPro.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -6,7 +16,7 @@
         xmlns:views="clr-namespace:PackItPro.Views"
         xmlns:vm="clr-namespace:PackItPro.ViewModels"
         mc:Ignorable="d"
-        Title="PackItPro - Secure Package Builder" 
+        Title="PackItPro - Secure Package Builder"
         Height="650" Width="1050"
         Background="{StaticResource AppBackgroundColor}"
         WindowStartupLocation="CenterScreen"
@@ -26,71 +36,182 @@
             <!-- Main Content -->
             <RowDefinition Height="Auto"/>
             <!-- Status Panel -->
-            <RowDefinition Height="Auto"/>
-            <!-- Bottom Progress Bar -->
         </Grid.RowDefinitions>
 
-        <!-- MENU BAR -->
-        <Menu Grid.Row="0" Background="{StaticResource AppBackgroundColor}" Padding="0,6" Margin="0,0,0,12">
-            <!-- File Menu -->
-            <MenuItem Header="File" Foreground="{StaticResource AppTextColor}" Style="{StaticResource MenuItemStyle}">
-                <MenuItem Header="Add Files..." Command="{Binding BrowseFilesCommand}" Style="{StaticResource SubMenuItemStyle}"/>
-                <MenuItem Header="Clear All Files" Command="{Binding ClearAllFilesCommand}" Style="{StaticResource SubMenuItemStyle}"/>
-                <Separator Background="{StaticResource AppBorderColor}"/>
-                <MenuItem Header="Export Logs..." Command="{Binding ExportLogsCommand}" Style="{StaticResource SubMenuItemStyle}"/>
-                <Separator Background="{StaticResource AppBorderColor}"/>
-                <MenuItem Header="Exit" Command="{Binding ExitCommand}" Style="{StaticResource SubMenuItemStyle}"/>
-            </MenuItem>
+        <!-- ══ MENU BAR ════════════════════════════════════════════════════════
+             DockPanel:
+               LEFT  — the four Menu items (File / Settings / Tools / Help)
+               RIGHT — a compact status strip (file count · VT badge · version)
+             The strip is purely informational and doesn't need commands.
+        -->
+        <Border Grid.Row="0"
+                Background="{StaticResource AppPanelColor}"
+                CornerRadius="8"
+                Margin="0,0,0,12"
+                Padding="4,0"
+                BorderBrush="{StaticResource AppBorderColor}"
+                BorderThickness="1">
 
-            <!-- Settings Menu -->
-            <MenuItem Header="Settings" Foreground="{StaticResource AppTextColor}" Style="{StaticResource MenuItemStyle}">
-                <MenuItem Header="Output Location..." Command="{Binding SetOutputLocationCommand}" Style="{StaticResource SubMenuItemStyle}"/>
-                <MenuItem Header="VirusTotal API Key..." Command="{Binding SetVirusApiKeyCommand}" Style="{StaticResource SubMenuItemStyle}"/>
-                <MenuItem Header="PackItPro Settings..." Command="{Binding PackItProSettingsCommand}" Style="{StaticResource SubMenuItemStyle}"/>
-            </MenuItem>
+            <DockPanel LastChildFill="False">
 
-            <!-- Tools Menu -->
-            <MenuItem Header="Tools" Foreground="{StaticResource AppTextColor}" Style="{StaticResource MenuItemStyle}">
-                <MenuItem Header="Test Package..." Command="{Binding TestPackageCommand}" Style="{StaticResource SubMenuItemStyle}"/>
-                <MenuItem Header="View Cache..." Command="{Binding ViewCacheCommand}" Style="{StaticResource SubMenuItemStyle}"/>
-                <MenuItem Header="Clear Cache" Command="{Binding ClearCacheCommand}" Style="{StaticResource SubMenuItemStyle}"/>
-                <Separator Background="{StaticResource AppBorderColor}"/>
-                <MenuItem Header="Export List..." Command="{Binding ExportListCommand}" Style="{StaticResource SubMenuItemStyle}"/>
-            </MenuItem>
+                <!-- ── Left: navigation menu ────────────────────────────── -->
+                <Menu DockPanel.Dock="Left"
+                      Background="Transparent"
+                      Padding="0,4,0,4"
+                      VerticalAlignment="Center">
 
-            <!-- Help Menu -->
-            <MenuItem Header="Help" Foreground="{StaticResource AppTextColor}" Style="{StaticResource MenuItemStyle}">
-                <MenuItem Header="Documentation" Command="{Binding DocumentationCommand}" Style="{StaticResource SubMenuItemStyle}"/>
-                <MenuItem Header="GitHub Repository" Command="{Binding GitHubCommand}" Style="{StaticResource SubMenuItemStyle}"/>
-                <MenuItem Header="Report Issue" Command="{Binding ReportIssueCommand}" Style="{StaticResource SubMenuItemStyle}"/>
-                <Separator Background="{StaticResource AppBorderColor}"/>
-                <MenuItem Header="Check for Updates" Command="{Binding CheckUpdatesCommand}" Style="{StaticResource SubMenuItemStyle}"/>
-                <Separator Background="{StaticResource AppBorderColor}"/>
-                <MenuItem Header="About PackItPro" Command="{Binding AboutCommand}" Style="{StaticResource SubMenuItemStyle}"/>
-            </MenuItem>
-        </Menu>
+                    <MenuItem Header="File" Style="{StaticResource MenuItemStyle}">
+                        <MenuItem Header="Add Files..."           Command="{Binding BrowseFilesCommand}"         Style="{StaticResource SubMenuItemStyle}"/>
+                        <MenuItem Header="Clear All Files"        Command="{Binding ClearAllFilesCommand}"       Style="{StaticResource SubMenuItemStyle}"/>
+                        <Separator Background="{StaticResource AppBorderColor}"/>
+                        <MenuItem Header="Export Logs..."         Command="{Binding ExportLogsCommand}"          Style="{StaticResource SubMenuItemStyle}"/>
+                        <Separator Background="{StaticResource AppBorderColor}"/>
+                        <MenuItem Header="Exit"                   Command="{Binding ExitCommand}"                Style="{StaticResource SubMenuItemStyle}"/>
+                    </MenuItem>
+
+                    <MenuItem Header="Settings" Style="{StaticResource MenuItemStyle}">
+                        <MenuItem Header="Output Location..."         Command="{Binding SetOutputLocationCommand}"   Style="{StaticResource SubMenuItemStyle}"/>
+                        <MenuItem Header="VirusTotal API Key..."      Command="{Binding SetVirusApiKeyCommand}"      Style="{StaticResource SubMenuItemStyle}"/>
+                        <MenuItem Header="Delete VirusTotal API Key"  Command="{Binding DeleteVirusApiKeyCommand}"   Style="{StaticResource SubMenuItemStyle}"/>
+                        <MenuItem Header="PackItPro Settings..."      Command="{Binding PackItProSettingsCommand}"   Style="{StaticResource SubMenuItemStyle}"/>
+                    </MenuItem>
+
+                    <MenuItem Header="Tools" Style="{StaticResource MenuItemStyle}">
+                        <MenuItem Header="Test Package..."   Command="{Binding TestPackageCommand}"   Style="{StaticResource SubMenuItemStyle}"/>
+                        <MenuItem Header="View Cache..."     Command="{Binding ViewCacheCommand}"     Style="{StaticResource SubMenuItemStyle}"/>
+                        <MenuItem Header="Clear Cache"       Command="{Binding ClearCacheCommand}"    Style="{StaticResource SubMenuItemStyle}"/>
+                        <Separator Background="{StaticResource AppBorderColor}"/>
+                        <MenuItem Header="Export List..."    Command="{Binding ExportListCommand}"    Style="{StaticResource SubMenuItemStyle}"/>
+                    </MenuItem>
+
+                    <MenuItem Header="Help" Style="{StaticResource MenuItemStyle}">
+                        <MenuItem Header="Documentation"      Command="{Binding DocumentationCommand}"  Style="{StaticResource SubMenuItemStyle}"/>
+                        <MenuItem Header="GitHub Repository"  Command="{Binding GitHubCommand}"         Style="{StaticResource SubMenuItemStyle}"/>
+                        <MenuItem Header="Report Issue"       Command="{Binding ReportIssueCommand}"    Style="{StaticResource SubMenuItemStyle}"/>
+                        <Separator Background="{StaticResource AppBorderColor}"/>
+                        <MenuItem Header="Check for Updates"  Command="{Binding CheckUpdatesCommand}"   Style="{StaticResource SubMenuItemStyle}"/>
+                        <Separator Background="{StaticResource AppBorderColor}"/>
+                        <MenuItem Header="About PackItPro"    Command="{Binding AboutCommand}"          Style="{StaticResource SubMenuItemStyle}"/>
+                    </MenuItem>
+                </Menu>
+
+                <!-- ── Right: status strip ──────────────────────────────── -->
+                <StackPanel DockPanel.Dock="Right"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center"
+                            Margin="0,0,8,0">
+
+                    <!-- File counter pill -->
+                    <Border Background="{StaticResource AppPanelHoverColor}"
+                            CornerRadius="12"
+                            Padding="10,4"
+                            Margin="0,0,8,0"
+                            VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal">
+                            <!-- File icon -->
+                            <Viewbox Width="13" Height="13" Margin="0,0,5,0" VerticalAlignment="Center">
+                                <Canvas Width="20" Height="20">
+                                    <Path Data="{StaticResource Icon.Document}"
+                                          Fill="{StaticResource AppTextTertiaryColor}"/>
+                                </Canvas>
+                            </Viewbox>
+                            <TextBlock VerticalAlignment="Center"
+                                       FontFamily="Segoe UI" FontSize="12"
+                                       Foreground="{StaticResource AppTextSecondaryColor}">
+                                <Run Text="{Binding FileList.Items.Count, Mode=OneWay}"/>
+                                <Run Text=" / 20 files"/>
+                            </TextBlock>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- VirusTotal shield badge — green when API key is set -->
+                    <Border x:Name="VtBadge"
+                            CornerRadius="12"
+                            Padding="10,4"
+                            Margin="0,0,8,0"
+                            VerticalAlignment="Center"
+                            ToolTip="VirusTotal scanning status">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <!-- Default: no key → dim red tint -->
+                                <Setter Property="Background" Value="#2a1a1a"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Settings.ScanWithVirusTotal}" Value="True">
+                                        <Setter Property="Background" Value="#1a2a1a"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <StackPanel Orientation="Horizontal">
+                            <Viewbox Width="13" Height="13" Margin="0,0,5,0" VerticalAlignment="Center">
+                                <Canvas Width="20" Height="20">
+                                    <Path>
+                                        <Path.Style>
+                                            <Style TargetType="Path">
+                                                <Setter Property="Data" Value="{StaticResource Icon.ShieldErrorFilled}"/>
+                                                <Setter Property="Fill" Value="{StaticResource AppStatusErrorColor}"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Settings.ScanWithVirusTotal}" Value="True">
+                                                        <Setter Property="Data" Value="{StaticResource Icon.ShieldCheckFilled}"/>
+                                                        <Setter Property="Fill" Value="{StaticResource AppStatusCleanColor}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Path.Style>
+                                    </Path>
+                                </Canvas>
+                            </Viewbox>
+                            <TextBlock VerticalAlignment="Center"
+                                       FontFamily="Segoe UI" FontSize="12">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Text" Value="VT Off"/>
+                                        <Setter Property="Foreground" Value="{StaticResource AppStatusErrorColor}"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Settings.ScanWithVirusTotal}" Value="True">
+                                                <Setter Property="Text" Value="VT Active"/>
+                                                <Setter Property="Foreground" Value="{StaticResource AppStatusCleanColor}"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Thin divider -->
+                    <Border Width="1" Background="{StaticResource AppDividerColor}"
+                            Margin="0,6,8,6" VerticalAlignment="Stretch"/>
+
+                    <!-- Version label -->
+                    <TextBlock Text="{Binding AppVersion}"
+                               FontFamily="Consolas" FontSize="11"
+                               Foreground="{StaticResource AppTextTertiaryColor}"
+                               VerticalAlignment="Center"
+                               Margin="0,0,4,0"/>
+                </StackPanel>
+
+            </DockPanel>
+        </Border>
 
         <!-- MAIN CONTENT AREA -->
-        <Grid Grid.Row="1" Margin="0,10">
+        <Grid Grid.Row="1" Margin="0,0,0,10">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="3*"/>
-
                 <ColumnDefinition Width="2*"/>
-
             </Grid.ColumnDefinitions>
 
-            <views:FileListPanel Grid.Column="0" Margin="0,0,10,0" DataContext="{Binding FileList}" />
-
+            <views:FileListPanel Grid.Column="0" DataContext="{Binding FileList}"/>
 
             <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                 <StackPanel>
                     <views:PackSettingsPanel DataContext="{Binding Settings}" Margin="0,0,0,10"/>
-                    <views:SummaryPanel DataContext="{Binding Summary}" />
+                    <views:SummaryPanel DataContext="{Binding Summary}"/>
                 </StackPanel>
             </ScrollViewer>
         </Grid>
 
         <!-- STATUS PANEL -->
-        <views:StatusPanel Grid.Row="2" Margin="0,0,0,8" DataContext="{Binding Status}" />
+        <views:StatusPanel Grid.Row="2" Margin="0,0,0,8" DataContext="{Binding Status}"/>
     </Grid>
 </Window>

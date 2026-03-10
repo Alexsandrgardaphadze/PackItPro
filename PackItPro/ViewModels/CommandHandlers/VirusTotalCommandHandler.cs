@@ -223,6 +223,7 @@ namespace PackItPro.ViewModels.CommandHandlers
                     message += "\nReview files marked as 'Infected' before packaging.";
                 }
                 MessageBox.Show(message, "Security Alert", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ToastService.NotifyScanThreatsFound(infectedFiles.Count, totalFiles);
             }
             else if (failedCount > 0)
             {
@@ -240,6 +241,7 @@ namespace PackItPro.ViewModels.CommandHandlers
                     "Scan Complete",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
+                ToastService.NotifyScanClean(totalFiles - skippedCount);
             }
 
             // ✅ FIX: Pass logService to SaveCacheAsync

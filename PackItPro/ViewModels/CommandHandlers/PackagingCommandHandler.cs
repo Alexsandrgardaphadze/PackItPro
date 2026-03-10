@@ -116,6 +116,9 @@ namespace PackItPro.ViewModels.CommandHandlers
                 _status.SetStatusSuccess($"Package created — {Path.GetFileName(outputPath)}");
                 RaiseCanExecuteChanged(); // enable TestPackageCommand
 
+                // Windows toast — fires immediately; MessageBox appears after
+                ToastService.NotifyPackageCreated(Path.GetFileName(outputPath), outputPath);
+
                 var response = MessageBox.Show(
                     $"Package created successfully!\n\nSaved to:\n{outputPath}\n\n" +
                     "Open the containing folder?",

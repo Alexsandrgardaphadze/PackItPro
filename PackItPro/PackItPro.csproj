@@ -2,7 +2,7 @@
 	<!-- PackItPro/PackItPro.csproj -->
 	<PropertyGroup>
 		<OutputType>WinExe</OutputType>
-		<TargetFramework>net8.0-windows</TargetFramework>
+		<TargetFramework>net8.0-windows10.0.17763.0</TargetFramework>
 		<UseWPF>true</UseWPF>
 		<UseWindowsForms>true</UseWindowsForms>
 		<ApplicationIcon>PackItPro.ico</ApplicationIcon>
@@ -11,11 +11,11 @@
 
 		<!-- Version — update this for every release.
          Must match your GitHub release tag (without the "v" prefix).
-         GitHub tag: v0.6.6  →  <Version>0.6.6</Version>
+         GitHub tag: v0.7.0  →  <Version>0.7.0</Version>
          UpdateService.cs reads this from the assembly automatically. -->
-		<Version>0.6.6</Version>
-		<AssemblyVersion>0.6.6.0</AssemblyVersion>
-		<FileVersion>0.6.6.0</FileVersion>
+		<Version>0.7.0</Version>
+		<AssemblyVersion>0.7.0.0</AssemblyVersion>
+		<FileVersion>0.7.0.0</FileVersion>
 		<InformationalVersion>$(Version)</InformationalVersion>
 
 		<Company>Alexsandrgardaphadze</Company>
@@ -42,11 +42,12 @@
 
 	<ItemGroup>
 		<PackageReference Include="Microsoft-WindowsAPICodePack-Shell" Version="1.1.5" />
+		<PackageReference Include="Microsoft.Toolkit.Uwp.Notifications" Version="7.1.3" />
+		<PackageReference Include="PeNet" Version="5.1.0" />
 		<PackageReference Include="SharpZipLib" Version="1.4.2" />
 		<PackageReference Include="System.IO.Compression.ZipFile" Version="4.3.0" />
 		<PackageReference Include="System.Net.Http.Json" Version="8.0.1" />
 		<PackageReference Include="System.Text.Json" Version="8.0.5" />
-		<PackageReference Include="PeNet" Version="5.1.0" />
 	</ItemGroup>
 
 	<ItemGroup>

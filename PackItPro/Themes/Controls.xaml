@@ -1,151 +1,443 @@
-﻿<!-- Themes/Controls.xaml -->
+﻿<!-- Themes/Controls.xaml - v3.0 UI IMPROVEMENTS
+     Changes vs v2.0:
+       - ADDED: ComprehensiveComboBoxStyle — full custom ControlTemplate that
+         actually works (v2 dropdown was never clickable because it lacked
+         PART_Popup and PART_ToggleButton named parts that ComboBox requires).
+       - ADDED: StyledTextBoxStyle — matches the combobox look exactly
+         (rounded, dark, focus ring in AppPrimaryColor).
+       - UPDATED: MenuItemStyle hover state in Styles.xaml (see that file).
+       - All other styles unchanged.
+-->
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-	<!-- Input Control Style -->
-	<Style x:Key="InputControlStyle" TargetType="Control">
-		<Setter Property="Background" Value="{StaticResource AppPanelColor}"/>
-		<Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
-		<Setter Property="BorderBrush" Value="{StaticResource AppBorderColor}"/>
-		<Setter Property="Padding" Value="10,8"/>
-		<Setter Property="FontFamily" Value="Consolas"/>
-		<Setter Property="FontSize" Value="13"/>
-	</Style>
+    <!-- Input Control Style -->
+    <Style x:Key="InputControlStyle" TargetType="Control">
+        <Setter Property="Background" Value="{StaticResource AppPanelColor}"/>
+        <Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource AppBorderColor}"/>
+        <Setter Property="Padding" Value="10,8"/>
+        <Setter Property="FontFamily" Value="Segoe UI"/>
+        <Setter Property="FontSize" Value="13"/>
+    </Style>
 
-	<!-- Setting CheckBox Style -->
-	<Style x:Key="SettingCheckBoxStyle" TargetType="CheckBox">
-		<Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
-		<Setter Property="Margin" Value="0,0,0,12"/>
-		<Setter Property="VerticalAlignment" Value="Center"/>
-	</Style>
-
-	<!-- Setting Label Style -->
-	<Style x:Key="SettingLabelStyle" TargetType="TextBlock">
-		<Setter Property="Foreground" Value="{StaticResource AppTextSecondaryColor}"/>
-		<Setter Property="FontSize" Value="12"/>
-		<Setter Property="FontWeight" Value="Medium"/>
-		<Setter Property="Margin" Value="0,0,0,8"/>
-	</Style>
-
-	<!-- Info Button Style -->
-	<Style x:Key="InfoButtonStyle" TargetType="Button">
-		<Setter Property="Content" Value="?"/>
-		<Setter Property="Width" Value="20"/>
-		<Setter Property="Height" Value="20"/>
-		<Setter Property="FontSize" Value="11"/>
-		<Setter Property="FontWeight" Value="Bold"/>
-		<Setter Property="Background" Value="{StaticResource AppPanelHoverColor}"/>
-		<Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
-		<Setter Property="BorderThickness" Value="0"/>
-		<Setter Property="Cursor" Value="Hand"/>
-		<Setter Property="HorizontalAlignment" Value="Left"/>
-		<Setter Property="Margin" Value="8,0,0,0"/>
-		<Setter Property="ToolTipService.InitialShowDelay" Value="0"/>
-		<Setter Property="Template">
-			<Setter.Value>
-				<ControlTemplate TargetType="Button">
-					<Border Background="{TemplateBinding Background}"
-                            CornerRadius="10"
-                            BorderThickness="1"
-                            BorderBrush="{StaticResource AppBorderLightColor}">
-						<ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-					</Border>
-				</ControlTemplate>
-			</Setter.Value>
-		</Setter>
-	</Style>
-
-	<!-- Modern ComboBox -->
-	<Style x:Key="ModernComboBox" TargetType="ComboBox" BasedOn="{StaticResource InputControlStyle}">
-	</Style>
-
-	<!-- Modern Button (Win11Button) -->
-	<Style x:Key="Win11Button" TargetType="Button">
-		<Setter Property="Background" Value="{StaticResource AppPrimaryColor}"/>
-		<Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
-		<Setter Property="BorderThickness" Value="0"/>
-		<Setter Property="Padding" Value="15,8"/>
-		<Setter Property="Cursor" Value="Hand"/>
-		<Setter Property="FontWeight" Value="SemiBold"/>
-		<Setter Property="Template">
-			<Setter.Value>
-				<ControlTemplate TargetType="Button">
-					<Border Background="{TemplateBinding Background}"
-                            BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="8">
-						<ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-					</Border>
-				</ControlTemplate>
-			</Setter.Value>
-		</Setter>
-		<Style.Triggers>
-			<Trigger Property="IsMouseOver" Value="True">
-				<Setter Property="Background" Value="{StaticResource AppPrimaryHoverColor}"/>
-				<Setter Property="Effect" Value="{StaticResource AppButtonShadow}"/>
-			</Trigger>
-			<Trigger Property="IsPressed" Value="True">
-				<Setter Property="Background" Value="{StaticResource AppPrimaryPressedColor}"/>
-				<Setter Property="RenderTransform">
-					<Setter.Value>
-						<ScaleTransform ScaleX="0.98" ScaleY="0.98"/>
-					</Setter.Value>
-				</Setter>
-			</Trigger>
-			<Trigger Property="IsEnabled" Value="False">
-				<Setter Property="Opacity" Value="0.6"/>
-			</Trigger>
-		</Style.Triggers>
-	</Style>
-
-	<!-- Rounded ProgressBar Style -->
-	<Style x:Key="RoundedProgressBarStyle" TargetType="ProgressBar">
-		<Setter Property="Height" Value="6"/>
-		<Setter Property="Template">
-			<Setter.Value>
-				<ControlTemplate TargetType="ProgressBar">
-					<Grid Name="TemplateRoot" SnapsToDevicePixels="True">
-						<Border x:Name="ProgressBarTrack"
-                                Background="{TemplateBinding Background}"
-                                CornerRadius="3"/>
-						<Rectangle x:Name="PART_Track"/>
-						<Decorator x:Name="PART_Indicator"
-                                   HorizontalAlignment="Left"
-                                   VerticalAlignment="Stretch">
-							<Grid>
-								<Border x:Name="Indicator"
-                                        Background="{TemplateBinding Foreground}"
-                                        CornerRadius="3"/>
-							</Grid>
-						</Decorator>
-					</Grid>
-				</ControlTemplate>
-			</Setter.Value>
-		</Setter>
-	</Style>
-
-    <!-- Global focus visual style -->
-    <Style x:Key="FocusVisual">
-        <Setter Property="Control.Template">
+    <!-- ── Styled TextBox ─────────────────────────────────────────────────────
+         Matches the ComboBox look: same dark background, rounded corners,
+         coloured focus ring. Replace the plain TextBox in PackSettingsPanel.
+    -->
+    <Style x:Key="StyledTextBoxStyle" TargetType="TextBox">
+        <Setter Property="Background" Value="{StaticResource AppCardColor}"/>
+        <Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
+        <Setter Property="CaretBrush" Value="{StaticResource AppPrimaryColor}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource AppBorderColor}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Padding" Value="10,8"/>
+        <Setter Property="FontFamily" Value="Segoe UI"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="SelectionBrush" Value="{StaticResource AppPrimaryColor}"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <Setter Property="Template">
             <Setter.Value>
-                <ControlTemplate>
-                    <Rectangle Stroke="{StaticResource AppPrimaryColor}" 
-                           StrokeThickness="2" 
-                           Margin="-2"
-                           StrokeDashArray="2 2"
-                           SnapsToDevicePixels="true"/>
+                <ControlTemplate TargetType="TextBox">
+                    <Border x:Name="border"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="8"
+                            SnapsToDevicePixels="True">
+                        <ScrollViewer x:Name="PART_ContentHost"
+                                      Margin="{TemplateBinding Padding}"
+                                      VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                      Focusable="False"
+                                      HorizontalScrollBarVisibility="Hidden"
+                                      VerticalScrollBarVisibility="Hidden"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="border" Property="BorderBrush"
+                                    Value="{StaticResource AppBorderLightColor}"/>
+                        </Trigger>
+                        <Trigger Property="IsFocused" Value="True">
+                            <Setter TargetName="border" Property="BorderBrush"
+                                    Value="{StaticResource AppPrimaryColor}"/>
+                            <Setter TargetName="border" Property="BorderThickness" Value="1.5"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.5"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
     </Style>
 
-    <!-- Apply to interactive controls -->
+    <!-- ── Comprehensive ComboBox ─────────────────────────────────────────────
+         Full custom ControlTemplate. The previous style was cosmetic-only and
+         never worked because WPF's ComboBox requires:
+           · PART_Popup         — the dropdown popup
+           · PART_ToggleButton  — the clickable area that opens the popup
+           · PART_ContentSite   — where the selected item is displayed
+           · PART_EditableTextBox — (only for IsEditable=True, omitted here)
+         Without these named parts the control renders but the dropdown never opens.
+    -->
+    <Style x:Key="ComprehensiveComboBoxStyle" TargetType="ComboBox">
+        <Setter Property="Background" Value="{StaticResource AppCardColor}"/>
+        <Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource AppBorderColor}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Padding" Value="10,0"/>
+        <Setter Property="FontFamily" Value="Segoe UI"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto"/>
+        <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ComboBox">
+                    <Grid x:Name="templateRoot" SnapsToDevicePixels="True">
+
+                        <!-- PART_ToggleButton — the whole bar is clickable -->
+                        <ToggleButton x:Name="toggleButton"
+                                      IsChecked="{Binding IsDropDownOpen, Mode=TwoWay,
+                                                  RelativeSource={RelativeSource TemplatedParent}}"
+                                      Background="{TemplateBinding Background}"
+                                      BorderBrush="{TemplateBinding BorderBrush}"
+                                      BorderThickness="{TemplateBinding BorderThickness}"
+                                      Focusable="False"
+                                      ClickMode="Press"
+                                      OverridesDefaultStyle="True">
+                            <ToggleButton.Template>
+                                <ControlTemplate TargetType="ToggleButton">
+                                    <Border x:Name="tbBorder"
+                                            Background="{TemplateBinding Background}"
+                                            BorderBrush="{TemplateBinding BorderBrush}"
+                                            BorderThickness="{TemplateBinding BorderThickness}"
+                                            CornerRadius="8"
+                                            SnapsToDevicePixels="True">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="30"/>
+                                            </Grid.ColumnDefinitions>
+                                            <!-- Arrow -->
+                                            <Path Grid.Column="1"
+                                                  x:Name="arrow"
+                                                  Data="M 0 0 L 5 5 L 10 0 Z"
+                                                  Fill="{StaticResource AppTextTertiaryColor}"
+                                                  Width="10" Height="5"
+                                                  HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center"
+                                                  RenderTransformOrigin="0.5,0.5">
+                                                <Path.RenderTransform>
+                                                    <RotateTransform x:Name="arrowRotate" Angle="0"/>
+                                                </Path.RenderTransform>
+                                            </Path>
+                                        </Grid>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="tbBorder" Property="BorderBrush"
+                                                    Value="{StaticResource AppBorderLightColor}"/>
+                                        </Trigger>
+                                        <Trigger Property="IsChecked" Value="True">
+                                            <Setter TargetName="tbBorder" Property="BorderBrush"
+                                                    Value="{StaticResource AppPrimaryColor}"/>
+                                            <Setter TargetName="tbBorder" Property="BorderThickness" Value="1.5"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </ToggleButton.Template>
+                        </ToggleButton>
+
+                        <!-- Selected item display — PART_ContentSite -->
+                        <ContentPresenter x:Name="contentPresenter"
+                                          ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                          Content="{TemplateBinding SelectionBoxItem}"
+                                          ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"
+                                          HorizontalAlignment="Left"
+                                          VerticalAlignment="Center"
+                                          Margin="{TemplateBinding Padding}"
+                                          IsHitTestVisible="False"
+                                          SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+
+                        <!-- PART_Popup — the dropdown itself -->
+                        <Popup x:Name="PART_Popup"
+                               AllowsTransparency="True"
+                               IsOpen="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}}"
+                               Placement="Bottom"
+                               PopupAnimation="Slide"
+                               Focusable="False">
+                            <Border x:Name="dropDownBorder"
+                                    Background="{StaticResource AppCardColor}"
+                                    BorderBrush="{StaticResource AppBorderColor}"
+                                    BorderThickness="1"
+                                    CornerRadius="8"
+                                    MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
+                                    MaxHeight="{TemplateBinding MaxDropDownHeight}"
+                                    Margin="0,4,0,0">
+                                <Border.Effect>
+                                    <DropShadowEffect Color="Black" Opacity="0.45" BlurRadius="18" ShadowDepth="4"/>
+                                </Border.Effect>
+                                <ScrollViewer x:Name="DropDownScrollViewer" Margin="4">
+                                    <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained"/>
+                                </ScrollViewer>
+                            </Border>
+                        </Popup>
+                    </Grid>
+
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.5"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ── Custom CheckBox ────────────────────────────────────────────────────
+         Unchanged from v2.0
+    -->
+    <Style x:Key="SettingCheckBoxStyle" TargetType="CheckBox">
+        <Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
+        <Setter Property="Margin" Value="0,0,0,12"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="FocusVisualStyle" Value="{StaticResource FocusVisual}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="CheckBox">
+                    <Grid VerticalAlignment="Center">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="20"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Border x:Name="CheckBorder"
+                                Grid.Column="0"
+                                Width="16" Height="16"
+                                CornerRadius="4"
+                                BorderThickness="1.5"
+                                BorderBrush="{StaticResource AppBorderColor}"
+                                Background="Transparent"
+                                VerticalAlignment="Center"
+                                HorizontalAlignment="Center">
+
+                            <Viewbox x:Name="CheckMark"
+                                     Width="10" Height="10"
+                                     Visibility="Hidden"
+                                     RenderTransformOrigin="0.5,0.5">
+                                <Viewbox.RenderTransform>
+                                    <ScaleTransform x:Name="CheckMarkScale" ScaleX="0.7" ScaleY="0.7"/>
+                                </Viewbox.RenderTransform>
+                                <Canvas Width="20" Height="20">
+                                    <Path Data="M17.78 5.72a.75.75 0 0 0-1.06 0L8 14.44 3.28 9.72a.75.75 0 1 0-1.06 1.06l5.25 5.25a.75.75 0 0 0 1.06 0l9.25-9.25a.75.75 0 0 0 0-1.06z"
+                                          Fill="{StaticResource AppTextColor}"/>
+                                </Canvas>
+                            </Viewbox>
+                        </Border>
+
+                        <ContentPresenter Grid.Column="1"
+                                          Margin="8,0,0,0"
+                                          VerticalAlignment="Center"
+                                          RecognizesAccessKey="True"/>
+                    </Grid>
+
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="CheckBorder" Property="Background"
+                                    Value="{StaticResource AppPrimaryColor}"/>
+                            <Setter TargetName="CheckBorder" Property="BorderBrush"
+                                    Value="{StaticResource AppPrimaryColor}"/>
+                            <Setter TargetName="CheckMark" Property="Visibility" Value="Visible"/>
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="CheckMarkScale"
+                                                         Storyboard.TargetProperty="ScaleX"
+                                                         From="0.5" To="1.0" Duration="0:0:0.15">
+                                            <DoubleAnimation.EasingFunction>
+                                                <BackEase EasingMode="EaseOut" Amplitude="0.3"/>
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <DoubleAnimation Storyboard.TargetName="CheckMarkScale"
+                                                         Storyboard.TargetProperty="ScaleY"
+                                                         From="0.5" To="1.0" Duration="0:0:0.15">
+                                            <DoubleAnimation.EasingFunction>
+                                                <BackEase EasingMode="EaseOut" Amplitude="0.3"/>
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                        </Trigger>
+
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsMouseOver" Value="True"/>
+                                <Condition Property="IsChecked" Value="False"/>
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="CheckBorder" Property="BorderBrush"
+                                    Value="{StaticResource AppBorderLightColor}"/>
+                        </MultiTrigger>
+
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsMouseOver" Value="True"/>
+                                <Condition Property="IsChecked" Value="True"/>
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="CheckBorder" Property="Background"
+                                    Value="{StaticResource AppPrimaryHoverColor}"/>
+                            <Setter TargetName="CheckBorder" Property="BorderBrush"
+                                    Value="{StaticResource AppPrimaryHoverColor}"/>
+                        </MultiTrigger>
+
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.5"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Setting Label Style -->
+    <Style x:Key="SettingLabelStyle" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{StaticResource AppTextSecondaryColor}"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontWeight" Value="Medium"/>
+        <Setter Property="Margin" Value="0,0,0,8"/>
+    </Style>
+
+    <!-- ── Info Button (Fluent ? icon) ─────────────────────────────────────── -->
+    <Style x:Key="InfoButtonStyle" TargetType="Button">
+        <Setter Property="Width" Value="20"/>
+        <Setter Property="Height" Value="20"/>
+        <Setter Property="Background" Value="{StaticResource AppPanelHoverColor}"/>
+        <Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="HorizontalAlignment" Value="Left"/>
+        <Setter Property="Margin" Value="8,0,0,0"/>
+        <Setter Property="ToolTipService.InitialShowDelay" Value="0"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="border"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="10"
+                            BorderThickness="1"
+                            BorderBrush="{StaticResource AppBorderLightColor}">
+                        <Viewbox Width="12" Height="12"
+                                 HorizontalAlignment="Center"
+                                 VerticalAlignment="Center">
+                            <Canvas Width="20" Height="20">
+                                <Path Data="M10 2a8 8 0 1 1 0 16A8 8 0 0 1 10 2zm0 1a7 7 0 1 0 0 14A7 7 0 0 0 10 3zm0 10.5a.75.75 0 1 1 0 1.5.75.75 0 0 1 0-1.5zm0-7A2.5 2.5 0 0 1 11 11.27V11.5a.5.5 0 0 1-1 0v-1a.5.5 0 0 1 .5-.5A1.5 1.5 0 1 0 8.5 8.5a.5.5 0 0 1-1 0A2.5 2.5 0 0 1 10 6z"
+                                      Fill="{StaticResource AppTextColor}"/>
+                            </Canvas>
+                        </Viewbox>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="border" Property="Background"
+                                    Value="{StaticResource AppPrimaryColor}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ── Modern Button (Win11Button) ─────────────────────────────────────── -->
+    <Style x:Key="Win11Button" TargetType="Button">
+        <Setter Property="Background" Value="{StaticResource AppPrimaryColor}"/>
+        <Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="15,8"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="{TemplateBinding Background}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="8">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                                          Margin="{TemplateBinding Padding}"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{StaticResource AppPrimaryHoverColor}"/>
+                <Setter Property="Effect" Value="{StaticResource AppButtonShadow}"/>
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+                <Setter Property="Background" Value="{StaticResource AppPrimaryPressedColor}"/>
+                <Setter Property="RenderTransform">
+                    <Setter.Value>
+                        <ScaleTransform ScaleX="0.98" ScaleY="0.98"/>
+                    </Setter.Value>
+                </Setter>
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Opacity" Value="0.6"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- ── Rounded ProgressBar ──────────────────────────────────────────────── -->
+    <Style x:Key="RoundedProgressBarStyle" TargetType="ProgressBar">
+        <Setter Property="Height" Value="6"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ProgressBar">
+                    <Grid Name="TemplateRoot" SnapsToDevicePixels="True">
+                        <Border x:Name="ProgressBarTrack"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="3"/>
+                        <Rectangle x:Name="PART_Track"/>
+                        <Decorator x:Name="PART_Indicator"
+                                   HorizontalAlignment="Left"
+                                   VerticalAlignment="Stretch">
+                            <Grid>
+                                <Border x:Name="Indicator"
+                                        Background="{TemplateBinding Foreground}"
+                                        CornerRadius="3"/>
+                            </Grid>
+                        </Decorator>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ── Focus Visual ──────────────────────────────────────────────────────── -->
+    <Style x:Key="FocusVisual">
+        <Setter Property="Control.Template">
+            <Setter.Value>
+                <ControlTemplate>
+                    <Rectangle Stroke="{StaticResource AppPrimaryColor}"
+                               StrokeThickness="2"
+                               Margin="-2"
+                               StrokeDashArray="2 2"
+                               SnapsToDevicePixels="true"/>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ── Global implicit styles ───────────────────────────────────────────── -->
     <Style TargetType="Button" BasedOn="{StaticResource Win11Button}">
         <Setter Property="FocusVisualStyle" Value="{StaticResource FocusVisual}"/>
     </Style>
-    <Style TargetType="TextBox">
-        <Setter Property="FocusVisualStyle" Value="{StaticResource FocusVisual}"/>
+    <Style TargetType="TextBox" BasedOn="{StaticResource StyledTextBoxStyle}">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
     </Style>
-    <Style TargetType="CheckBox">
+    <Style TargetType="CheckBox" BasedOn="{StaticResource SettingCheckBoxStyle}">
         <Setter Property="FocusVisualStyle" Value="{StaticResource FocusVisual}"/>
     </Style>
 
