@@ -1,6 +1,7 @@
 ﻿// PackItPro/ViewModels/CommandHandlers/MarkTrustCommandHandler.cs
 using PackItPro.Models;
 using PackItPro.Services;
+using PackItPro.Views;
 using System;
 using System.Threading.Tasks;
 using System.Windows;
@@ -43,12 +44,12 @@ namespace PackItPro.ViewModels.CommandHandlers
             // Guard: never allow overriding a trusted-engine detection
             if (item.FlaggedByTrustedEngine)
             {
-                MessageBox.Show(
-                    $"This file was flagged by a trusted security engine ({item.TrustedEngineName}).\n" +
-                    "Trusted-engine detections cannot be overridden as a false positive.",
+                AlertDialog.Show(
+                    Application.Current?.MainWindow,
                     "Cannot Mark as Trusted",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+                    $"This file was flagged by a trusted security engine ({item.TrustedEngineName}).\n\n" +
+                    "Trusted-engine detections cannot be overridden as a false positive.",
+                    kind: AlertDialog.Kind.Warning);
                 return;
             }
 
@@ -59,6 +60,7 @@ namespace PackItPro.ViewModels.CommandHandlers
             item.IsTrustedFalsePositive = true;
             item.Status = FileStatusEnum.Clean;
             _log.Info($"[Trust] '{item.FileName}' marked as trusted FP (hash={hash[..8]}…)");
+            ToastService.NotifyFileTrusted(item.FileName);
         }
 
         private async Task ExecuteRemoveTrustAsync(object? parameter)
@@ -73,6 +75,7 @@ namespace PackItPro.ViewModels.CommandHandlers
             // Revert to Pending — needs a fresh scan to verify
             item.Status = FileStatusEnum.Pending;
             _log.Info($"[Trust] Trust removed for '{item.FileName}' (hash={hash[..8]}…)");
+            ToastService.NotifyTrustRemoved(item.FileName);
         }
     }
 }

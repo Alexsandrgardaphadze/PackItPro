@@ -6,6 +6,7 @@
 //   [3] Added UpdateService reference to constructor.
 //   [4] Added UpdateService to field list.
 using PackItPro.Services;
+using PackItPro.Views;
 using System;
 using System.Diagnostics;
 using System.Runtime.Intrinsics.X86;
@@ -75,22 +76,23 @@ namespace PackItPro.ViewModels.CommandHandlers
                 if (!result.Success)
                 {
                     _log.Warning($"[HelpHandler] Update check failed: {result.ErrorMessage}");
-                    MessageBox.Show(
-                        $"Could not check for updates.\nError: {result.ErrorMessage}",
-                        "PackItPro — Update Check Failed",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Warning);
+                    AlertDialog.Show(
+                        Application.Current?.MainWindow,
+                        "Update Check Failed",
+                        "Could not reach the update server. Check your internet connection.",
+                        detail: result.ErrorMessage,
+                        kind: AlertDialog.Kind.Warning);
                     return;
                 }
 
                 if (result.NoReleasesPublished)
                 {
-                    MessageBox.Show(
+                    AlertDialog.Show(
+                        Application.Current?.MainWindow,
+                        "Up to Date",
                         $"You're running PackItPro {UpdateService.CurrentVersion}.\n" +
                         "No releases have been published yet — you already have the latest build.",
-                        "PackItPro — Up to Date",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Information);
+                        kind: AlertDialog.Kind.Info);
                     return;
                 }
 
@@ -98,49 +100,40 @@ namespace PackItPro.ViewModels.CommandHandlers
 
                 if (!result.UpdateAvailable)
                 {
-                    MessageBox.Show(
-                        $"You're up to date!\n" +
-                        $"Current version:  {result.CurrentVersion ?? UpdateService.CurrentVersion}\n" +
-                        $"Latest release:   {result.LatestVersion ?? "unknown"}",
-                        "PackItPro — Up to Date",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Information);
+                    AlertDialog.Show(
+                        Application.Current?.MainWindow,
+                        "You're Up to Date",
+                        $"PackItPro {result.CurrentVersion ?? UpdateService.CurrentVersion} is the latest version.",
+                        kind: AlertDialog.Kind.Success);
                     return;
                 }
-
-                string publishedWhen = result.PublishedAt.HasValue
-                    ? $"\nPublished: {result.PublishedAt.Value.ToLocalTime():MMM d, yyyy}"
-                    : "";
-
-                string notes = !string.IsNullOrWhiteSpace(result.ReleaseNotes)
-                    ? $"\nWhat's new:\n{Truncate(result.ReleaseNotes, 300)}"
-                    : "";
 
                 // Toast fires immediately; dialog appears on top
                 if (!string.IsNullOrEmpty(result.ReleaseUrl))
                     ToastService.NotifyUpdateAvailable(result.CurrentVersion, result.LatestVersion, result.ReleaseUrl);
 
-                var response = MessageBox.Show(
-                    $"A new version of PackItPro is available!\n" +
-                    $"Current version:  {result.CurrentVersion ?? UpdateService.CurrentVersion}\n" +
-                    $"Latest version:   {result.LatestVersion ?? "unknown"}{publishedWhen}\n" +
-                    $"{notes}\n" +
-                    "Open the release page to download?",
-                    "PackItPro — Update Available",
-                    MessageBoxButton.YesNo,
-                    MessageBoxImage.Information);
+                var updateWindow = new UpdateAvailableWindow(
+                    result.CurrentVersion ?? UpdateService.CurrentVersion,
+                    result.LatestVersion,
+                    result.PublishedAt?.UtcDateTime,
+                    result.ReleaseNotes,
+                    result.ReleaseUrl)
+                {
+                    Owner = Application.Current?.MainWindow
+                };
+                updateWindow.ShowDialog();
 
-                if (response == MessageBoxResult.Yes && !string.IsNullOrEmpty(result.ReleaseUrl))
+                if (updateWindow.ShouldDownload && !string.IsNullOrEmpty(result.ReleaseUrl))
                     OpenUrl(result.ReleaseUrl);
             }
             catch (OperationCanceledException)
             {
                 _log.Warning("[HelpHandler] Update check timed out.");
-                MessageBox.Show(
+                AlertDialog.Show(
+                    Application.Current?.MainWindow,
+                    "Request Timed Out",
                     "Update check timed out after 15 seconds.\nCheck your internet connection and try again.",
-                    "PackItPro — Timeout",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+                    kind: AlertDialog.Kind.Warning);
             }
             finally
             {
@@ -158,11 +151,10 @@ namespace PackItPro.ViewModels.CommandHandlers
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    $"Could not open documentation.\nVisit: https://github.com/Alexsandrgardaphadze/PackItPro/wiki\nError: {ex.Message}",
-                    "Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                AlertDialog.Show(Application.Current?.MainWindow, "Cannot Open Browser",
+                    "Could not open the documentation page.",
+                    detail: "https://github.com/Alexsandrgardaphadze/PackItPro/wiki\n\n" + ex.Message,
+                    kind: AlertDialog.Kind.Error);
             }
         }
 
@@ -174,11 +166,10 @@ namespace PackItPro.ViewModels.CommandHandlers
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    $"Could not open GitHub repository.\nVisit: https://github.com/Alexsandrgardaphadze/PackItPro\nError: {ex.Message}",
-                    "Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                AlertDialog.Show(Application.Current?.MainWindow, "Cannot Open Browser",
+                    "Could not open the GitHub repository.",
+                    detail: "https://github.com/Alexsandrgardaphadze/PackItPro\n\n" + ex.Message,
+                    kind: AlertDialog.Kind.Error);
             }
         }
 
@@ -190,26 +181,16 @@ namespace PackItPro.ViewModels.CommandHandlers
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    $"Could not open issue tracker.\nVisit: https://github.com/Alexsandrgardaphadze/PackItPro/issues\nError: {ex.Message}",
-                    "Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                AlertDialog.Show(Application.Current?.MainWindow, "Cannot Open Browser",
+                    "Could not open the issue tracker.",
+                    detail: "https://github.com/Alexsandrgardaphadze/PackItPro/issues\n\n" + ex.Message,
+                    kind: AlertDialog.Kind.Error);
             }
         }
 
         private void ExecuteAbout(object? parameter)
         {
-            var version = UpdateService.CurrentVersion; // Use UpdateService for version
-            MessageBox.Show(
-                $"PackItPro {version}\n" +
-                "A secure package builder for bundling multiple applications.\n" +
-                "Still in development, but already close to finishing.\n" +
-                "© 2026 Maybe all rights reserved.\n" +
-                "GitHub: https://github.com/Alexsandrgardaphadze/PackItPro",
-                "About PackItPro",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
+            new AboutWindow { Owner = Application.Current?.MainWindow }.ShowDialog();
         }
 
         // ── Helpers ───────────────────────────────────────────────────────────
@@ -222,11 +203,10 @@ namespace PackItPro.ViewModels.CommandHandlers
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    $"Could not open browser.\nVisit manually:\n{url}\nError: {ex.Message}",
-                    "PackItPro",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+                AlertDialog.Show(Application.Current?.MainWindow, "Cannot Open Browser",
+                    "Could not launch the browser. Visit the release page manually:",
+                    detail: url + "\n\n" + ex.Message,
+                    kind: AlertDialog.Kind.Error);
             }
         }
 

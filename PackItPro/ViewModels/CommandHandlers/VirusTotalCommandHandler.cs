@@ -1,24 +1,24 @@
-﻿// PackItPro/ViewModels/CommandHandlers/VirusTotalCommandHandler.cs - v2.3 (ROBUSTNESS FIX)
-// Changes vs v2.2:
-//   [1] Added CancellationTokenSource for scan cancellation.
-//       Scan button enables CancelScanCommand during scan.
-//   [2] Added progress update throttling (every 100ms) to prevent UI overload.
-//   [3] Added robust error handling around VirusTotalClient calls to prevent crashes.
-//   [4] Added scan result logging for debugging.
-using Microsoft.VisualBasic.Logging;
+﻿// PackItPro/ViewModels/CommandHandlers/VirusTotalCommandHandler.cs - v2.4 (TRUST STORE FIX)
+// Changes vs v2.3:
+//   [1] TrustStore injected via constructor — trusted files are now SKIPPED during scanning.
+//       Previously the handler had no reference to TrustStore, so every scan would re-flag
+//       files the user had already marked as false positives. Files whose SHA-256 hash is in
+//       TrustStore are now marked FileStatusEnum.Trusted and counted as "skipped (trusted)".
+//   [2] Hash computation is done inline using SHA256 on the file path, consistent with how
+//       MarkTrustCommandHandler computes hashes before calling TrustStore.TrustAsync.
+//   [3] Trusted-file skip is logged so users can verify the behaviour in packitpro.log.
 using PackItPro.Models;
 using PackItPro.Services;
+using PackItPro.Views;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.IO.Packaging;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Documents;
 using System.Windows.Input;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement.ListView;
 
 namespace PackItPro.ViewModels.CommandHandlers
 {
@@ -29,13 +29,14 @@ namespace PackItPro.ViewModels.CommandHandlers
         private readonly StatusViewModel _status;
         private readonly ErrorViewModel _error;
         private readonly VirusTotalClient _virusTotalClient;
+        private readonly TrustStore _trustStore;                 // NEW — injected
         private readonly ILogService _logService;
         private readonly HashSet<string> _executableExtensions;
 
         // Cancellation support
         private CancellationTokenSource? _scanCts;
         private DateTime _lastProgressUpdate = DateTime.MinValue;
-        private const int ProgressUpdateIntervalMs = 100; // Max 10 updates/second
+        private const int ProgressUpdateIntervalMs = 100;
 
         public ICommand ScanFilesCommand { get; }
         public ICommand CancelScanCommand { get; }
@@ -46,6 +47,7 @@ namespace PackItPro.ViewModels.CommandHandlers
             StatusViewModel status,
             ErrorViewModel error,
             VirusTotalClient virusTotalClient,
+            TrustStore trustStore,                               // NEW parameter
             ILogService logService,
             HashSet<string> executableExtensions)
         {
@@ -54,10 +56,10 @@ namespace PackItPro.ViewModels.CommandHandlers
             _status = status ?? throw new ArgumentNullException(nameof(status));
             _error = error ?? throw new ArgumentNullException(nameof(error));
             _virusTotalClient = virusTotalClient ?? throw new ArgumentNullException(nameof(virusTotalClient));
+            _trustStore = trustStore ?? throw new ArgumentNullException(nameof(trustStore));
             _logService = logService ?? throw new ArgumentNullException(nameof(logService));
             _executableExtensions = executableExtensions ?? throw new ArgumentNullException(nameof(executableExtensions));
 
-            // ✅ FIX: Use AsyncRelayCommand for better async exception handling
             ScanFilesCommand = new AsyncRelayCommand(ExecuteScanFilesCommandAsync, CanExecuteScan);
             CancelScanCommand = new RelayCommand(_ => CancelScan(), CanCancelScan);
 
@@ -79,13 +81,13 @@ namespace PackItPro.ViewModels.CommandHandlers
         }
 
         private bool CanExecuteScan(object? parameter) =>
-            _settings.ScanWithVirusTotal && // ✅ NEW: Check the UI toggle
+            _settings.ScanWithVirusTotal &&
             _fileList.HasFiles &&
             !_status.IsBusy &&
             !string.IsNullOrWhiteSpace(_settings.VirusTotalApiKey);
 
         private bool CanCancelScan(object? parameter) =>
-            _status.IsBusy && _scanCts != null; // Check if scan is running and CTS exists
+            _status.IsBusy && _scanCts != null;
 
         private void CancelScan()
         {
@@ -113,7 +115,7 @@ namespace PackItPro.ViewModels.CommandHandlers
                 _status.Message = $"Scan failed: {ex.Message}";
                 _error.ShowError(
                     $"Virus scan failed: {ex.Message}",
-                    retryAction: () => _ = ExecuteScanFilesCommandAsync(parameter)); // Fire-and-forget retry
+                    retryAction: () => _ = ExecuteScanFilesCommandAsync(parameter));
             }
             finally
             {
@@ -125,7 +127,7 @@ namespace PackItPro.ViewModels.CommandHandlers
 
         private async Task ExecuteScanFilesWithVirusTotalAsync()
         {
-            if (_virusTotalClient == null || string.IsNullOrWhiteSpace(_settings.VirusTotalApiKey))
+            if (string.IsNullOrWhiteSpace(_settings.VirusTotalApiKey))
             {
                 _error.ShowError("VirusTotal API key is required for scanning.\nSet it in Settings > VirusTotal API Key.");
                 return;
@@ -137,48 +139,65 @@ namespace PackItPro.ViewModels.CommandHandlers
 
             if (totalFiles == 0)
             {
-                MessageBox.Show(
-                    "No scannable files found.\nEnable 'Scan all files' in settings to include non-executables.",
+                AlertDialog.Show(
+                    Application.Current?.MainWindow,
                     "No Files to Scan",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
+                    "No scannable files found.\n\nEnable 'Scan all files' in settings to include non-executables.",
+                    kind: AlertDialog.Kind.Info);
                 return;
             }
 
-            // Cancel any previous scan operation's CTS
             _scanCts?.Cancel();
             _scanCts = new CancellationTokenSource();
-            var ct = _scanCts.Token; // Use the new CTS token
+            var ct = _scanCts.Token;
 
+            ToastService.NotifyScanStarted(totalFiles);
             _status.Message = $"Scanning {totalFiles} file(s) with VirusTotal...";
-            int processed = 0, failedCount = 0, skippedCount = 0; // ✅ NEW: Track skipped files
+
+            int processed = 0, failedCount = 0, skippedCount = 0, trustedCount = 0;
             var infectedFiles = new List<FileItemViewModel>();
 
             foreach (var item in _fileList.Items)
             {
-                ct.ThrowIfCancellationRequested(); // ✅ NEW: Check for cancellation
+                ct.ThrowIfCancellationRequested();
 
+                // ── Extension filter ─────────────────────────────────────────
                 if (_settings.OnlyScanExecutables &&
                     !_executableExtensions.Contains(Path.GetExtension(item.FilePath)))
                 {
                     item.Status = FileStatusEnum.Skipped;
-                    skippedCount++; // ✅ NEW: Increment skipped counter
+                    skippedCount++;
                     processed++;
-                    // ✅ NEW: Provide immediate feedback to user
                     _status.Message = $"Scanning {totalFiles} file(s)... ({skippedCount} skipped)";
                     UpdateProgress(processed, totalFiles);
-                    continue; // Skip to next file
+                    continue;
                 }
 
+                // ── Trust Store check ────────────────────────────────────────
+                // Compute the file's SHA-256 and check the store before making
+                // any API call. This is the same hash MarkTrustCommandHandler
+                // stores, so the comparison is always apples-to-apples.
                 try
                 {
-                    // ✅ FIX: Pass CancellationToken to scan method
+                    string hash = await ComputeSha256Async(item.FilePath, ct);
+
+                    if (_trustStore.IsTrusted(hash))
+                    {
+                        item.Status = FileStatusEnum.Trusted;
+                        trustedCount++;
+                        processed++;
+                        _logService.Info($"[TrustStore] Skipping trusted file '{item.FileName}' (hash: {hash[..16]}...)");
+                        UpdateProgress(processed, totalFiles);
+                        continue;
+                    }
+
+                    // ── VirusTotal API call ──────────────────────────────────
                     var result = await _virusTotalClient.ScanFileAsync(
                         item.FilePath,
                         _settings.VirusTotalApiKey,
                         _settings.OnlyScanExecutables,
                         _settings.MinimumDetectionsToFlag,
-                        ct); // Pass the cancellation token
+                        ct);
 
                     item.Positives = result.Positives;
                     item.TotalScans = result.TotalScans;
@@ -187,12 +206,11 @@ namespace PackItPro.ViewModels.CommandHandlers
                     if (result.IsInfected)
                         infectedFiles.Add(item);
 
-                    // ✅ NEW: Log scan result for debugging
                     _logService.Info($"Scanned '{item.FileName}': {result.Positives}/{result.TotalScans} detections — {item.Status}");
                 }
                 catch (OperationCanceledException)
                 {
-                    throw; // Re-throw to be handled by outer try-catch
+                    throw;
                 }
                 catch (Exception ex)
                 {
@@ -203,56 +221,61 @@ namespace PackItPro.ViewModels.CommandHandlers
                 finally
                 {
                     processed++;
-                    UpdateProgress(processed, totalFiles); // Throttled updates
+                    UpdateProgress(processed, totalFiles);
                 }
             }
 
             // ── Results summary ───────────────────────────────────────────────
+            var owner = Application.Current?.MainWindow;
 
             if (infectedFiles.Count > 0)
             {
-                var message = $"{infectedFiles.Count} infected file(s) detected!";
                 if (_settings.AutoRemoveInfectedFiles)
-                {
                     foreach (var file in infectedFiles)
                         _fileList.Items.Remove(file);
-                    message += "\nAutomatically removed from package list.";
-                }
-                else
-                {
-                    message += "\nReview files marked as 'Infected' before packaging.";
-                }
-                MessageBox.Show(message, "Security Alert", MessageBoxButton.OK, MessageBoxImage.Warning);
+
                 ToastService.NotifyScanThreatsFound(infectedFiles.Count, totalFiles);
+                ScanResultsWindow.ShowInfected(owner, infectedFiles.Count, totalFiles, _settings.AutoRemoveInfectedFiles);
             }
             else if (failedCount > 0)
             {
-                MessageBox.Show(
-                    $"Scan completed with {failedCount} error(s).\nCheck logs for details.",
-                    "Scan Completed with Errors",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+                ScanResultsWindow.ShowErrors(owner, failedCount, totalFiles);
             }
             else
             {
-                var skippedNote = skippedCount > 0 ? $" ({skippedCount} skipped)" : ""; // ✅ NEW: Show skipped count
-                MessageBox.Show(
-                    $"All {totalFiles} file(s) scanned clean!{skippedNote}",
-                    "Scan Complete",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-                ToastService.NotifyScanClean(totalFiles - skippedCount);
+                // Exclude both extension-skipped and trust-skipped from the "clean" count
+                ToastService.NotifyScanClean(totalFiles - skippedCount - trustedCount);
+                ScanResultsWindow.ShowClean(owner, totalFiles, skippedCount + trustedCount);
             }
 
-            // ✅ FIX: Pass logService to SaveCacheAsync
             await _virusTotalClient.SaveCacheAsync(_logService);
 
-            _status.Message = failedCount > 0
-                ? $"Scan completed — {failedCount} error(s). Check log."
+            // Build a meaningful completion message
+            var parts = new List<string>();
+            if (failedCount > 0) parts.Add($"{failedCount} error(s)");
+            if (trustedCount > 0) parts.Add($"{trustedCount} trusted (skipped)");
+            if (skippedCount > 0) parts.Add($"{skippedCount} non-exe skipped");
+
+            _status.Message = parts.Count > 0
+                ? $"Scan completed — {string.Join(", ", parts)}. Check log."
                 : "Scan completed successfully.";
         }
 
-        // ✅ NEW: Throttle progress updates to prevent UI overload
+        // ── Helpers ───────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Computes the SHA-256 hash of a file asynchronously on the thread pool.
+        /// Returns a lowercase hex string, consistent with MarkTrustCommandHandler.
+        /// </summary>
+        private static Task<string> ComputeSha256Async(string filePath, CancellationToken ct) =>
+            Task.Run(() =>
+            {
+                using var sha = SHA256.Create();
+                using var stream = File.OpenRead(filePath);
+                var hashBytes = sha.ComputeHash(stream);
+                return Convert.ToHexString(hashBytes).ToLowerInvariant();
+            }, ct);
+
         private void UpdateProgress(int processed, int total)
         {
             var now = DateTime.Now;

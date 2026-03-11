@@ -1,4 +1,9 @@
 ﻿// PackItPro/ViewModels/FileListViewModel.cs
+// v2.1 — Duplicate file detection (#4)
+//   AddFilesWithValidation now checks for existing paths (OrdinalIgnoreCase)
+//   before any other guard. Duplicates are reported as "already in list" in
+//   SkipReasons so FileAddResultWindow surfaces them to the user.
+//   No other logic changed.
 using PackItPro.Models;
 using System;
 using System.Collections.Generic;
@@ -98,6 +103,18 @@ namespace PackItPro.ViewModels
             var validFiles = paths
                 .Where(p =>
                 {
+                    // ── Duplicate check ──────────────────────────────────────
+                    // Must be the FIRST guard: a file already in the list that
+                    // has since been deleted from disk should report "already in
+                    // list", not "file not found".
+                    // OrdinalIgnoreCase because Windows paths are case-insensitive.
+                    if (_items.Any(existing =>
+                            string.Equals(existing.FilePath, p, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        skipReasons.Add($"Already in list: {Path.GetFileName(p)}");
+                        return false;
+                    }
+
                     if (!File.Exists(p))
                     {
                         skipReasons.Add($"File not found: {Path.GetFileName(p)}");
@@ -151,7 +168,7 @@ namespace PackItPro.ViewModels
                     Status = FileStatusEnum.Pending,
                     Positives = 0,
                     TotalScans = 0,
-                    InstallOrder = 0  // Initialize to prevent issues on removal/reorder
+                    InstallOrder = 0
                 };
                 fileItem.RemoveCommand = new RelayCommand(_ => ExecuteRemoveFile(fileItem));
                 _items.Add(fileItem);
@@ -181,7 +198,6 @@ namespace PackItPro.ViewModels
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[FileListViewModel] Remove file failed: {ex.Message}");
-                // Silent fail — prevents app crash on race condition
             }
         }
 

@@ -1,6 +1,7 @@
 ﻿// PackItPro/ViewModels/CommandHandlers/PackagingCommandHandler.cs
 using Microsoft.Win32;
 using PackItPro.Services;
+using PackItPro.Views;
 using System;
 using System.IO;
 using System.Linq;
@@ -113,20 +114,22 @@ namespace PackItPro.ViewModels.CommandHandlers
 
                 _lastPackedFile = outputPath;
                 succeeded = true;
+                _settings.OutputFileName = string.Empty; // Reset for next package
                 _status.SetStatusSuccess($"Package created — {Path.GetFileName(outputPath)}");
                 RaiseCanExecuteChanged(); // enable TestPackageCommand
 
-                // Windows toast — fires immediately; MessageBox appears after
+                // Windows toast — fires immediately; dialog appears after
                 ToastService.NotifyPackageCreated(Path.GetFileName(outputPath), outputPath);
 
-                var response = MessageBox.Show(
-                    $"Package created successfully!\n\nSaved to:\n{outputPath}\n\n" +
-                    "Open the containing folder?",
-                    "PackItPro — Success",
-                    MessageBoxButton.YesNo,
-                    MessageBoxImage.Information);
+                bool openFolder = ConfirmDialog.Show(
+                    Application.Current?.MainWindow,
+                    "Package Created",
+                    $"Package saved successfully.\n\n{outputPath}",
+                    confirmLabel: "Open Folder",
+                    cancelLabel: "Close",
+                    kind: ConfirmDialog.Kind.Info);
 
-                if (response == MessageBoxResult.Yes)
+                if (openFolder)
                     OpenFolderAndSelect(outputPath);
             }
             catch (OperationCanceledException)
@@ -221,11 +224,12 @@ namespace PackItPro.ViewModels.CommandHandlers
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    $"Could not open Explorer.\n\nFile is at:\n{filePath}\n\nError: {ex.Message}",
-                    "PackItPro",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+                AlertDialog.Show(
+                    Application.Current?.MainWindow,
+                    "Cannot Open Explorer",
+                    "Could not open File Explorer.",
+                    detail: filePath + "\n\n" + ex.Message,
+                    kind: AlertDialog.Kind.Error);
             }
         }
 

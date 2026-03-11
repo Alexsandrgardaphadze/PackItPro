@@ -1,4 +1,18 @@
-﻿// Views/FileListPanel.xaml.cs
+﻿// Views/FileListPanel.xaml.cs - v2.2
+// Added: FileListView_SizeChanged — keeps NotesColumn.Width = available space minus
+//        the sum of all fixed columns, so the Notes column always fills the gap between
+//        Status and the Delete button regardless of window width.
+//
+// Fixed columns and their widths (must match XAML exactly):
+//   Icon     35
+//   FileName 200
+//   Size     75
+//   Status   110
+//   Delete   32
+//   ──────────── = 452px + ~18px scrollbar allowance = 470px reserved
+//
+// Notes gets: FileListView.ActualWidth - 470, clamped to a minimum of 60px so the
+// column header stays visible even at the minimum window width (900px).
 using PackItPro.ViewModels;
 using System;
 using System.Linq;
@@ -15,24 +29,27 @@ namespace PackItPro.Views
     {
         private Storyboard? _pulseAnimation;
 
-        // ── Drag-threshold state ──────────────────────────────────────────────
-        // Set in PreviewMouseLeftButtonDown, read in PreviewMouseMove.
+        // Sum of every fixed-width column + scrollbar allowance.
+        // If you ever change a column width in XAML, update this constant too.
+        private const double FixedColumnsWidth = 452 + 18; // 470
 
+        // Minimum width for the Notes column — keeps the header legible.
+        private const double NotesMinWidth = 60;
+
+        // ── Drag-threshold state ──────────────────────────────────────────────
         private Point _dragStartPoint;
-        private bool _isDragStartPending;   // mouse is down, drag not yet started
-        private bool _suppressDrag;         // mouse-down was on a Button — never drag
+        private bool _isDragStartPending;
+        private bool _suppressDrag;
 
         // ── Static frozen brushes ─────────────────────────────────────────────
-        // Allocated once at class init. Pattern matches FileItemViewModel and StatusToBackgroundConverter.
-
         private static readonly SolidColorBrush DragHoverBorderBrush =
-            Frozen(new SolidColorBrush(Color.FromRgb(0x60, 0xA5, 0xFA)));      // blue-400
+            Frozen(new SolidColorBrush(Color.FromRgb(0x60, 0xA5, 0xFA)));
         private static readonly SolidColorBrush DragHoverFillBrush =
-            Frozen(new SolidColorBrush(Color.FromArgb(30, 0x60, 0xA5, 0xFA))); // blue-400 @ ~12%
+            Frozen(new SolidColorBrush(Color.FromArgb(30, 0x60, 0xA5, 0xFA)));
         private static readonly SolidColorBrush FallbackBorderBrush =
-            Frozen(new SolidColorBrush(Color.FromRgb(0x3F, 0x3F, 0x46)));      // zinc-700
+            Frozen(new SolidColorBrush(Color.FromRgb(0x3F, 0x3F, 0x46)));
         private static readonly SolidColorBrush FallbackPanelBrush =
-            Frozen(new SolidColorBrush(Color.FromRgb(0x18, 0x18, 0x1B)));      // zinc-950
+            Frozen(new SolidColorBrush(Color.FromRgb(0x18, 0x18, 0x1B)));
 
         private static SolidColorBrush Frozen(SolidColorBrush b) { b.Freeze(); return b; }
 
@@ -42,6 +59,25 @@ namespace PackItPro.Views
         {
             InitializeComponent();
             EmptyDropState.IsVisibleChanged += EmptyDropState_IsVisibleChanged;
+        }
+
+        // ── Notes column stretching ───────────────────────────────────────────
+
+        /// <summary>
+        /// Recalculates NotesColumn.Width every time the ListView is resized so the
+        /// column absorbs all space between the Status column and the Delete button.
+        /// Throttling is not needed — WPF coalesces layout passes, so this only fires
+        /// once per completed resize frame, not per pixel.
+        /// </summary>
+        private void FileListView_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            if (!e.WidthChanged) return; // height-only resize — nothing to recalculate
+
+            double notesWidth = Math.Max(
+                FileListView.ActualWidth - FixedColumnsWidth,
+                NotesMinWidth);
+
+            NotesColumn.Width = notesWidth;
         }
 
         // ── Empty-state pulse animation ───────────────────────────────────────
@@ -61,26 +97,16 @@ namespace PackItPro.Views
 
         // ── Drag-to-reorder (internal list items) ────────────────────────────
 
-        /// <summary>
-        /// Records where the mouse went down and whether it landed on a Button.
-        /// We use PreviewMouseLeftButtonDown (not MouseLeftButtonDown) because
-        /// the ListView's selection logic marks MouseLeftButtonDown as Handled,
-        /// preventing it from bubbling up to us.
-        /// </summary>
         private void FileListView_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             _dragStartPoint = e.GetPosition(FileListView);
             _isDragStartPending = true;
-
-            // If the click originated inside any ButtonBase (i.e. the ✕ remove button),
-            // suppress drag for the entire duration of this mouse-down/up cycle.
             var clicked = e.OriginalSource as DependencyObject;
             _suppressDrag = WalkUpVisualTree<ButtonBase>(clicked) != null;
         }
 
         private void FileListView_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
-            // Clean up drag state when the mouse is released without a drag starting.
             _isDragStartPending = false;
             _suppressDrag = false;
         }
@@ -88,30 +114,23 @@ namespace PackItPro.Views
         private void FileListView_PreviewMouseMove(object sender, MouseEventArgs e)
         {
             if (e.LeftButton != MouseButtonState.Pressed) return;
-            if (!_isDragStartPending) return;   // no pending mouse-down
-            if (_suppressDrag) return;           // click was on ✕ — leave it alone
+            if (!_isDragStartPending) return;
+            if (_suppressDrag) return;
             if (sender is not ListView lv) return;
 
             var currentPos = e.GetPosition(lv);
             var dx = Math.Abs(currentPos.X - _dragStartPoint.X);
             var dy = Math.Abs(currentPos.Y - _dragStartPoint.Y);
 
-            // Only begin drag after the cursor has moved beyond the system threshold.
-            // This is what distinguishes an intentional drag from a jittery click.
             if (dx < SystemParameters.MinimumHorizontalDragDistance &&
                 dy < SystemParameters.MinimumVerticalDragDistance)
                 return;
 
-            // Resolve the item under the original down-point (not current position,
-            // which may have drifted off the row by now).
             var hit = lv.InputHitTest(_dragStartPoint) as DependencyObject;
             var listViewItem = WalkUpVisualTree<ListViewItem>(hit);
             if (listViewItem?.DataContext is not FileItemViewModel fileItem) return;
 
-            // Clear the pending flag before DoDragDrop so we don't restart a drag
-            // if the mouse keeps moving during the (synchronous) DoDragDrop call.
             _isDragStartPending = false;
-
             DragDrop.DoDragDrop(lv, fileItem, DragDropEffects.Move);
         }
 
@@ -123,10 +142,7 @@ namespace PackItPro.Views
             e.Handled = true;
         }
 
-        private void FileListView_DragLeave(object sender, DragEventArgs e)
-        {
-            e.Handled = true;
-        }
+        private void FileListView_DragLeave(object sender, DragEventArgs e) => e.Handled = true;
 
         private void FileListView_Drop(object sender, DragEventArgs e)
         {
@@ -136,41 +152,30 @@ namespace PackItPro.Views
 
             int fromIndex = lv.Items.IndexOf(fileItem);
             int rawToIndex = GetInsertIndex(lv, e.GetPosition(lv));
-
-            // Clamp: ObservableCollection.Move() only accepts 0..Count-1.
-            // GetInsertIndex returns Count when dropped below all items.
             int toIndex = Math.Clamp(rawToIndex, 0, vm.Items.Count - 1);
 
             if (fromIndex < 0 || fromIndex == toIndex) return;
 
             vm.Items.Move(fromIndex, toIndex);
 
-            // Keep InstallOrder in sync with the new visual order
             for (int i = 0; i < vm.Items.Count; i++)
                 vm.Items[i].InstallOrder = i;
 
             e.Handled = true;
         }
 
-        /// <summary>
-        /// Returns the index at which a dropped item should be inserted.
-        /// Returns <c>lv.Items.Count</c> when dropped below all items (caller must clamp).
-        /// </summary>
         private static int GetInsertIndex(ListView lv, Point point)
         {
             var hit = lv.InputHitTest(point) as DependencyObject;
             var listViewItem = WalkUpVisualTree<ListViewItem>(hit);
 
-            if (listViewItem == null)
-                return lv.Items.Count;
+            if (listViewItem == null) return lv.Items.Count;
 
             int index = lv.Items.IndexOf(listViewItem.DataContext);
             if (index < 0) return lv.Items.Count;
 
             var itemPos = listViewItem.TranslatePoint(new Point(0, 0), lv);
-            return point.Y < itemPos.Y + listViewItem.ActualHeight / 2
-                ? index       // upper half → insert before
-                : index + 1;  // lower half → insert after
+            return point.Y < itemPos.Y + listViewItem.ActualHeight / 2 ? index : index + 1;
         }
 
         // ── Shared visual tree helper ─────────────────────────────────────────
@@ -221,28 +226,30 @@ namespace PackItPro.Views
 
             viewModel.AddFilesWithValidation(files, out var result);
 
+            if (result.SuccessCount > 0 || result.SkippedCount > 0)
+                FileAddResultWindow.Show(
+                    Window.GetWindow(this),
+                    result.SuccessCount,
+                    result.SkippedCount,
+                    result.SkipReasons);
+
+            // Scan-on-add: resolve MainViewModel through the Window's DataContext
+            // so FileListPanel doesn't need a direct ViewModel reference injected.
             if (result.SuccessCount > 0)
-            {
-                string message = $"✓ Added {result.SuccessCount} file(s)";
-                if (result.SkippedCount > 0)
-                {
-                    message += $"\n\n⚠ Skipped {result.SkippedCount}:\n";
-                    message += string.Join("\n", result.SkipReasons.Take(5));
-                    if (result.SkipReasons.Count > 5)
-                        message += $"\n...and {result.SkipReasons.Count - 5} more";
-                }
-                MessageBox.Show(message, "Files Added", MessageBoxButton.OK,
-                    result.SkippedCount > 0 ? MessageBoxImage.Warning : MessageBoxImage.Information);
-            }
-            else if (result.SkippedCount > 0)
-            {
-                var reasons = string.Join("\n", result.SkipReasons.Take(5));
-                var extra = result.SkipReasons.Count > 5
-                    ? $"\n...and {result.SkipReasons.Count - 5} more" : "";
-                MessageBox.Show(
-                    $"⚠ All files were skipped:\n\n{reasons}{extra}",
-                    "No Files Added", MessageBoxButton.OK, MessageBoxImage.Warning);
-            }
+                TriggerScanOnAddIfEnabled();
+        }
+
+        /// <summary>
+        /// Fires ScanFilesCommand if ScanOnAdd is enabled and the command can execute.
+        /// MainViewModel is reached via Window.DataContext — keeps the panel decoupled.
+        /// </summary>
+        private void TriggerScanOnAddIfEnabled()
+        {
+            if (Window.GetWindow(this)?.DataContext is not MainViewModel mainVm) return;
+            if (!mainVm.Settings.ScanOnAdd) return;
+            if (!mainVm.ScanFilesCommand.CanExecute(null)) return;
+
+            mainVm.ScanFilesCommand.Execute(null);
         }
 
         private void RestoreMainBorderDefaults()

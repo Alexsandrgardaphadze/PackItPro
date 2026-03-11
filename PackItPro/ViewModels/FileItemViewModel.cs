@@ -1,4 +1,8 @@
-﻿using System.Collections.Generic;
+﻿// PackItPro/ViewModels/FileItemViewModel.cs - v2.1
+// Added: Notes property — free-text label per file (install order hints, etc.)
+//        Surfaces in the file list Notes column and is written into packitmeta.json
+//        by ManifestGenerator so the stub can display it during installation.
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
 using System.Runtime.CompilerServices;
@@ -16,7 +20,6 @@ namespace PackItPro.ViewModels
         private sealed record FileTypeInfo(string Icon, SolidColorBrush Badge);
         private static SolidColorBrush Frozen(SolidColorBrush b) { b.Freeze(); return b; }
 
-        // Static lookup: one entry per extension. Brushes frozen at class init — zero allocations during rendering.
         private static readonly Dictionary<string, FileTypeInfo> ExtensionMap =
             new(System.StringComparer.OrdinalIgnoreCase)
             {
@@ -48,6 +51,7 @@ namespace PackItPro.ViewModels
         private bool _isTrustedFalsePositive;
         private bool _flaggedByTrustedEngine;
         private string? _trustedEngineName;
+        private string _notes = "";          // NEW
 
         // ── Core properties ───────────────────────────────────────────────────
 
@@ -99,24 +103,25 @@ namespace PackItPro.ViewModels
             set { _totalScans = value; OnPropertyChanged(); }
         }
 
-        /// <summary>
-        /// Install order for drag-to-reorder. Kept in sync with list position by
-        /// FileListPanel.xaml.cs after every drop.
-        /// </summary>
         public int InstallOrder
         {
             get => _installOrder;
             set { _installOrder = value; OnPropertyChanged(); }
         }
 
+        /// <summary>
+        /// Optional free-text label for this file — install order hints, version notes, etc.
+        /// Written into packitmeta.json so the stub can display it during installation.
+        /// Editable inline in the file list Notes column.
+        /// </summary>
+        public string Notes
+        {
+            get => _notes;
+            set { _notes = value ?? ""; OnPropertyChanged(); }
+        }
+
         // ── Trust / false-positive properties ────────────────────────────────
 
-        /// <summary>
-        /// True when the user has manually marked this file as a trusted false positive.
-        /// Status is set to Clean when this flag is true; this property lets the UI
-        /// distinguish "scanned clean" from "user-trusted FP".
-        /// Persisted via TrustStore by file hash.
-        /// </summary>
         public bool IsTrustedFalsePositive
         {
             get => _isTrustedFalsePositive;
@@ -129,18 +134,12 @@ namespace PackItPro.ViewModels
             }
         }
 
-        /// <summary>
-        /// True when at least one trusted engine (Microsoft, Google, Kaspersky, etc.)
-        /// flagged this file. MinimumDetectionsToFlag is bypassed — always treated as
-        /// real malware and cannot be overridden by the user.
-        /// </summary>
         public bool FlaggedByTrustedEngine
         {
             get => _flaggedByTrustedEngine;
             set { _flaggedByTrustedEngine = value; OnPropertyChanged(); }
         }
 
-        /// <summary>Name of the trusted engine that flagged this file, for display in UI.</summary>
         public string? TrustedEngineName
         {
             get => _trustedEngineName;
@@ -149,25 +148,16 @@ namespace PackItPro.ViewModels
 
         // ── Computed display properties ───────────────────────────────────────
 
-        /// <summary>
-        /// Status label shown in the Status column. Reflects trust overrides:
-        /// - Trusted engine detection → "⚠ MALWARE (EngineName)"
-        /// - User-trusted FP → "✓ Trusted (FP)"
-        /// - Otherwise → Status.ToString()
-        /// </summary>
         public string StatusDisplay
         {
             get
             {
-                if (FlaggedByTrustedEngine)
-                    return $"⚠ MALWARE ({TrustedEngineName})";
-                if (IsTrustedFalsePositive)
-                    return "✓ Trusted (FP)";
+                if (FlaggedByTrustedEngine) return $"⚠ MALWARE ({TrustedEngineName})";
+                if (IsTrustedFalsePositive) return "✓ Trusted (FP)";
                 return Status.ToString();
             }
         }
 
-        /// <summary>Tooltip shown on the trust badge in the file list.</summary>
         public string TrustTooltip
         {
             get
@@ -180,7 +170,6 @@ namespace PackItPro.ViewModels
             }
         }
 
-        // Alias so existing XAML bindings using {Binding FileIcon} continue to work.
         public string FileIcon => FileTypeIcon;
 
         public string FileTypeIcon

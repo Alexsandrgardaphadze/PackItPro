@@ -1,8 +1,9 @@
-﻿// PackItPro/Models/Models.cs - v2.3 UPDATED
+﻿// PackItPro/Models/FileStatusEnum.cs - v2.4
+// Added: Trusted — file hash is in TrustStore; scan skipped, treated as safe.
 namespace PackItPro.Models
 {
     /// <summary>
-    /// Status of a file in the package list
+    /// Status of a file in the package list.
     /// </summary>
     public enum FileStatusEnum
     {
@@ -10,22 +11,23 @@ namespace PackItPro.Models
         Clean,        // Scanned, no threats
         Infected,     // Detected threats
         ScanFailed,   // Scan error
-        Skipped       // Skipped (e.g., non-executable when OnlyScanExecutables=true)
+        Skipped,      // Skipped (e.g., non-executable when OnlyScanExecutables=true)
+        Trusted       // Hash is in TrustStore — scan bypassed, treated as false positive
     }
 
     /// <summary>
-    /// Compression method for ZIP archive
+    /// Compression method for ZIP archive.
     /// Maps to SharpZipLib compression levels:
-    /// - None: 0 (store only, no compression)
-    /// - Fast: 6 (good balance)
-    /// - Normal: 7 (better compression)
+    /// - None:    0 (store only, no compression)
+    /// - Fast:    6 (good balance)
+    /// - Normal:  7 (better compression)
     /// - Maximum: 9 (best compression, slowest)
     /// </summary>
     public enum CompressionMethodEnum
     {
-        None = 0,      // No compression
-        Fast = 1,      // Fast compression (level 6)
-        Normal = 2,    // Normal compression (level 7)
-        Maximum = 3    // Maximum compression (level 9)
+        None = 0,
+        Fast = 1,
+        Normal = 2,
+        Maximum = 3
     }
 }

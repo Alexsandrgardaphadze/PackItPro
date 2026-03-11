@@ -1,9 +1,14 @@
-﻿<!-- Views/FileListPanel.xaml - v4.0 UI IMPROVEMENTS
-     Changes vs v3.0:
-       - Status column width: 150 → 110 (badge is ~90px, was leaving 60px dead space)
-       - Delete column width: 40 → 32 (button is 24px wide, no need for 40px)
-       - Status badge HorizontalAlignment stays Left so it anchors tightly
-       - All other markup unchanged
+﻿<!-- Views/FileListPanel.xaml - v5.1
+     Fixes vs v5.0:
+       - Delete (✕) button now always visible — was clipped at default window width
+         because all columns had fixed widths that summed past the panel's 3* share.
+       - Notes column stretches to fill all remaining space instead of a fixed 160px.
+         SizeChanged in code-behind recalculates: NotesWidth = listViewWidth - 470px
+         (470 = 35+200+75+110+32 fixed cols + ~18px scrollbar).
+       - HorizontalScrollBarVisibility changed Disabled → Hidden to avoid the WPF
+         measure loop that fires on every resize when content sits exactly at boundary.
+       - VirtualizingPanel.VirtualizationMode="Recycling" added — reuses row containers
+         instead of creating new ones on scroll, eliminating the resize RAM spike.
 -->
 <UserControl x:Class="PackItPro.Views.FileListPanel"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -39,11 +44,9 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border Background="{TemplateBinding Background}"
-                                CornerRadius="6"
-                                Padding="{TemplateBinding Padding}">
+                                CornerRadius="6" Padding="{TemplateBinding Padding}">
                             <Viewbox Width="16" Height="16"
-                                     HorizontalAlignment="Center"
-                                     VerticalAlignment="Center">
+                                     HorizontalAlignment="Center" VerticalAlignment="Center">
                                 <Canvas Width="20" Height="20">
                                     <Path Data="{StaticResource Icon.Delete}"
                                           Fill="{TemplateBinding Foreground}"/>
@@ -64,13 +67,54 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- Notes TextBox: invisible at rest, subtle border on hover/focus -->
+        <Style x:Key="NotesTextBoxStyle" TargetType="TextBox">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Foreground" Value="{StaticResource AppTextSecondaryColor}"/>
+            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Padding" Value="4,2"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="CaretBrush" Value="{StaticResource AppPrimaryColor}"/>
+            <Setter Property="SelectionBrush" Value="{StaticResource AppPrimaryColor}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="border"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="Transparent"
+                                BorderThickness="1"
+                                CornerRadius="4">
+                            <ScrollViewer x:Name="PART_ContentHost"
+                                          Padding="{TemplateBinding Padding}"
+                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="BorderBrush"
+                                        Value="{StaticResource AppBorderColor}"/>
+                                <Setter TargetName="border" Property="Background"
+                                        Value="{StaticResource AppPanelHoverColor}"/>
+                            </Trigger>
+                            <Trigger Property="IsFocused" Value="True">
+                                <Setter TargetName="border" Property="BorderBrush"
+                                        Value="{StaticResource AppPrimaryColor}"/>
+                                <Setter TargetName="border" Property="Background"
+                                        Value="{StaticResource AppPanelHoverColor}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </UserControl.Resources>
 
     <Border x:Name="MainBorder"
             Margin="0,0,10,0"
             BorderBrush="{StaticResource AppBorderColor}"
-            BorderThickness="1"
-            CornerRadius="12"
+            BorderThickness="1" CornerRadius="12"
             Background="{StaticResource AppPanelColor}"
             AllowDrop="True"
             Drop="UserControl_Drop"
@@ -121,10 +165,8 @@
             </Grid>
 
             <!-- FILE LIST -->
-            <ListView Name="FileListView"
-                      Background="Transparent"
-                      BorderThickness="0"
-                      Margin="15"
+            <ListView x:Name="FileListView"
+                      Background="Transparent" BorderThickness="0" Margin="15"
                       AllowDrop="True"
                       Tag="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=DataContext}"
                       PreviewMouseLeftButtonDown="FileListView_PreviewMouseLeftButtonDown"
@@ -133,10 +175,13 @@
                       DragEnter="FileListView_DragEnter"
                       DragLeave="FileListView_DragLeave"
                       Drop="FileListView_Drop"
+                      SizeChanged="FileListView_SizeChanged"
                       Visibility="{Binding HasFiles, Converter={StaticResource BoolToVisibility}}"
                       ItemsSource="{Binding Items}"
                       ItemContainerStyle="{StaticResource FileItemStyle}"
-                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                      ScrollViewer.HorizontalScrollBarVisibility="Hidden"
+                      VirtualizingPanel.IsVirtualizing="True"
+                      VirtualizingPanel.VirtualizationMode="Recycling">
 
                 <ListView.Resources>
                     <Style TargetType="GridViewColumnHeader">
@@ -155,7 +200,7 @@
                                             BorderBrush="{StaticResource AppDividerColor}"
                                             Padding="{TemplateBinding Padding}">
                                         <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                                        VerticalAlignment="Center"/>
+                                                          VerticalAlignment="Center"/>
                                     </Border>
                                 </ControlTemplate>
                             </Setter.Value>
@@ -171,8 +216,7 @@
                                   CommandParameter="{Binding PlacementTarget.SelectedItem,
                                                     RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                   Style="{StaticResource ContextMenuItemStyle}"
-                                  FontFamily="Segoe UI"
-                                  FontSize="13"/>
+                                  FontFamily="Segoe UI" FontSize="13"/>
                         <Separator Background="{StaticResource AppBorderColor}"/>
                         <MenuItem Header="🚫  Remove Trust"
                                   Command="{Binding PlacementTarget.Tag.RemoveTrustCommand,
@@ -180,15 +224,14 @@
                                   CommandParameter="{Binding PlacementTarget.SelectedItem,
                                                     RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                   Style="{StaticResource ContextMenuItemStyle}"
-                                  FontFamily="Segoe UI"
-                                  FontSize="13"/>
+                                  FontFamily="Segoe UI" FontSize="13"/>
                     </ContextMenu>
                 </ListView.ContextMenu>
 
                 <ListView.View>
                     <GridView>
 
-                        <!-- Icon Column -->
+                        <!-- Icon — fixed 35px -->
                         <GridViewColumn Header="📄" Width="35"
                                         HeaderContainerStyle="{StaticResource GridViewColumnHeaderStyle}">
                             <GridViewColumn.CellTemplate>
@@ -201,20 +244,20 @@
                             </GridViewColumn.CellTemplate>
                         </GridViewColumn>
 
-                        <!-- File Name Column -->
-                        <GridViewColumn Header="File Name" Width="250"
+                        <!-- File Name — fixed 200px -->
+                        <GridViewColumn Header="File Name" Width="200"
                                         HeaderContainerStyle="{StaticResource GridViewColumnHeaderStyle}">
                             <GridViewColumn.CellTemplate>
                                 <DataTemplate>
                                     <TextBlock Text="{Binding FileName}" FontSize="12" FontFamily="Segoe UI"
-                                               TextTrimming="CharacterEllipsis" ToolTip="{Binding FileName}"
+                                               TextTrimming="CharacterEllipsis" ToolTip="{Binding FilePath}"
                                                Foreground="{StaticResource AppTextColor}"/>
                                 </DataTemplate>
                             </GridViewColumn.CellTemplate>
                         </GridViewColumn>
 
-                        <!-- Size Column -->
-                        <GridViewColumn Header="Size" Width="90"
+                        <!-- Size — fixed 75px -->
+                        <GridViewColumn Header="Size" Width="75"
                                         HeaderContainerStyle="{StaticResource GridViewColumnHeaderStyle}">
                             <GridViewColumn.CellTemplate>
                                 <DataTemplate>
@@ -224,7 +267,7 @@
                             </GridViewColumn.CellTemplate>
                         </GridViewColumn>
 
-                        <!-- Status Column — reduced from 150 → 110 px, tightens gap to delete btn -->
+                        <!-- Status — fixed 110px -->
                         <GridViewColumn Header="Status" Width="110"
                                         HeaderContainerStyle="{StaticResource GridViewColumnHeaderStyle}">
                             <GridViewColumn.CellTemplate>
@@ -240,7 +283,40 @@
                             </GridViewColumn.CellTemplate>
                         </GridViewColumn>
 
-                        <!-- Delete Column — reduced from 40 → 32 px -->
+                        <!-- Notes — stretches to fill remaining space; width managed in SizeChanged -->
+                        <GridViewColumn x:Name="NotesColumn" Header="Notes" Width="120"
+                                        HeaderContainerStyle="{StaticResource GridViewColumnHeaderStyle}">
+                            <GridViewColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Grid>
+                                        <!-- Placeholder shown when Notes is empty -->
+                                        <TextBlock Text="Add a note…"
+                                                   FontSize="11" FontFamily="Segoe UI" FontStyle="Italic"
+                                                   Foreground="{StaticResource AppTextTertiaryColor}"
+                                                   VerticalAlignment="Center" Margin="5,0,0,0"
+                                                   IsHitTestVisible="False">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Notes}" Value="">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                        <TextBox Text="{Binding Notes, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                                 Style="{StaticResource NotesTextBoxStyle}"
+                                                 MaxLength="120"
+                                                 ToolTip="{Binding Notes}"
+                                                 SpellCheck.IsEnabled="False"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </GridViewColumn.CellTemplate>
+                        </GridViewColumn>
+
+                        <!-- Delete — fixed 32px, always last so it's never clipped -->
                         <GridViewColumn Header="" Width="32"
                                         HeaderContainerStyle="{StaticResource GridViewColumnHeaderStyle}">
                             <GridViewColumn.CellTemplate>

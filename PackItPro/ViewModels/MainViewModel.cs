@@ -1,4 +1,8 @@
 ﻿// PackItPro/ViewModels/MainViewModel.cs
+// v2.1 — TrustStore now passed to VirusTotalCommandHandler (fixes #2/#3: trusted files
+//         were being re-scanned and re-flagged every time because the handler had no
+//         reference to the store).
+// No other logic changed.
 using PackItPro.Services;
 using PackItPro.ViewModels.CommandHandlers;
 using System;
@@ -42,7 +46,7 @@ namespace PackItPro.ViewModels
         private VirusTotalClient? _virusTotalClient;
         private TrustStore? _trustStore;
         private readonly ILogService _logService;
-        private readonly HttpClient _httpClient;       // long-lived — one instance per application
+        private readonly HttpClient _httpClient;
         private readonly UpdateService _updateService;
         private bool _isInitialized;
         private bool _disposed;
@@ -97,7 +101,7 @@ namespace PackItPro.ViewModels
         public ICommand CancelScanCommand => _virusTotalHandler?.CancelScanCommand ?? NullCommand;
         public ICommand DeleteVirusApiKeyCommand => _settingsHandler?.DeleteVirusApiKeyCommand ?? NullCommand;
 
-        // Trust — exposed here so FileListPanel ContextMenu can reach them via Tag binding
+        // Trust
         public ICommand MarkAsTrustedCommand => _markTrustHandler?.MarkAsTrustedCommand ?? NullCommand;
         public ICommand RemoveTrustCommand => _markTrustHandler?.RemoveTrustCommand ?? NullCommand;
 
@@ -179,10 +183,16 @@ namespace PackItPro.ViewModels
         private void InitializeHandlers()
         {
             _packagingHandler = new PackagingCommandHandler(FileList, Settings, Status, Error, _logService);
+
+            // FIX #2/#3: Pass _trustStore so the handler can skip trusted files
+            //            before making any VirusTotal API call.
             _virusTotalHandler = new VirusTotalCommandHandler(
-                FileList, Settings, Status, Error, _virusTotalClient!, _logService, _executableExtensions);
+                FileList, Settings, Status, Error,
+                _virusTotalClient!, _trustStore!,          // _trustStore added here
+                _logService, _executableExtensions);
+
             _fileOperationsHandler = new FileOperationsHandler(FileList, Settings, ScanFilesCommand);
-            _settingsHandler = new SettingsHandler(Settings, Status, Error, _virusTotalClient, _cacheFilePath, _appDataDir, _logService);
+            _settingsHandler = new SettingsHandler(Settings, Status, Error, _virusTotalClient, _trustStore, _cacheFilePath, _appDataDir, _logService);
             _helpHandler = new HelpHandler(_updateService, Status, _logService);
             _applicationHandler = new ApplicationHandler(Settings);
             _markTrustHandler = new MarkTrustCommandHandler(_trustStore!, _logService);

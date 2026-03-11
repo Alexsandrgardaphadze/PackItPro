@@ -49,6 +49,8 @@ namespace PackItPro
         protected override void OnExit(ExitEventArgs e)
         {
             // MainWindow.Window_Closing handles ViewModel save + dispose before we reach here.
+            // Log a clean shutdown marker so crash.log has a clear boundary.
+            LogError($"[OnExit] Application exited with code {e.ApplicationExitCode}.");
             base.OnExit(e);
         }
 

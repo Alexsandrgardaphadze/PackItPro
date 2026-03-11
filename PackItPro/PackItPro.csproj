@@ -11,14 +11,14 @@
 
 		<!-- Version — update this for every release.
          Must match your GitHub release tag (without the "v" prefix).
-         GitHub tag: v0.7.0  →  <Version>0.7.0</Version>
+         GitHub tag: v0.7.1  →  <Version>0.7.1</Version>
          UpdateService.cs reads this from the assembly automatically. -->
-		<Version>0.7.0</Version>
-		<AssemblyVersion>0.7.0.0</AssemblyVersion>
-		<FileVersion>0.7.0.0</FileVersion>
+		<Version>0.7.1</Version>
+		<AssemblyVersion>0.7.1.0</AssemblyVersion>
+		<FileVersion>0.7.1.0</FileVersion>
 		<InformationalVersion>$(Version)</InformationalVersion>
 
-		<Company>Alexsandrgardaphadze</Company>
+		<Company>ZenQuant</Company>
 		<Product>PackItPro</Product>
 		<Copyright>Copyright © 2026</Copyright>
 		<Authors>PackItPro Team</Authors>

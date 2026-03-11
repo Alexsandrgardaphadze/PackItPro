@@ -1,0 +1,182 @@
+﻿<Window x:Class="PackItPro.Views.UpdateAvailableWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Update Available"
+        Height="Auto" Width="460"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="{StaticResource AppBackgroundColor}"
+        ShowInTaskbar="False">
+
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0"
+                Background="{StaticResource AppPanelColor}"
+                BorderBrush="{StaticResource AppBorderColor}"
+                BorderThickness="1"
+                CornerRadius="10"
+                Padding="24,20">
+            <StackPanel>
+
+                <!-- Header -->
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                    <Border Width="40" Height="40" CornerRadius="20"
+                            Background="#3322c55e"
+                            Margin="0,0,14,0" VerticalAlignment="Center">
+                        <TextBlock Text="🚀" FontSize="20"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"/>
+                    </Border>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Update Available!"
+                                   FontSize="16" FontWeight="SemiBold"
+                                   Foreground="{StaticResource AppTextColor}"
+                                   FontFamily="Segoe UI"/>
+                        <TextBlock Text="A new version of PackItPro is ready"
+                                   FontSize="12"
+                                   Foreground="{StaticResource AppTextTertiaryColor}"
+                                   FontFamily="Segoe UI"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Version comparison card -->
+                <Border Background="{StaticResource AppCardColor}"
+                        CornerRadius="8" Padding="14,12"
+                        BorderBrush="{StaticResource AppBorderColor}"
+                        BorderThickness="1"
+                        Margin="0,0,0,14">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Current -->
+                        <StackPanel Grid.Column="0" HorizontalAlignment="Center">
+                            <TextBlock Text="CURRENT"
+                                       FontSize="9" FontWeight="SemiBold"
+                                       Foreground="{StaticResource AppTextTertiaryColor}"
+                                       FontFamily="Segoe UI"
+                                       HorizontalAlignment="Center"
+                                       Margin="0,0,0,4"/>
+                            <TextBlock x:Name="CurrentVersionText"
+                                       Text="v0.0.0"
+                                       FontSize="18" FontWeight="Bold"
+                                       FontFamily="Consolas"
+                                       Foreground="{StaticResource AppTextTertiaryColor}"
+                                       HorizontalAlignment="Center"/>
+                        </StackPanel>
+
+                        <!-- Arrow -->
+                        <TextBlock Grid.Column="1" Text="→"
+                                   FontSize="20"
+                                   Foreground="{StaticResource AppPrimaryColor}"
+                                   VerticalAlignment="Center"
+                                   Margin="12,0"/>
+
+                        <!-- Latest -->
+                        <StackPanel Grid.Column="2" HorizontalAlignment="Center">
+                            <TextBlock Text="LATEST"
+                                       FontSize="9" FontWeight="SemiBold"
+                                       Foreground="{StaticResource AppTextTertiaryColor}"
+                                       FontFamily="Segoe UI"
+                                       HorizontalAlignment="Center"
+                                       Margin="0,0,0,4"/>
+                            <TextBlock x:Name="LatestVersionText"
+                                       Text="v0.0.0"
+                                       FontSize="18" FontWeight="Bold"
+                                       FontFamily="Consolas"
+                                       Foreground="{StaticResource AppStatusCleanColor}"
+                                       HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Published date -->
+                <TextBlock x:Name="PublishedText"
+                           Text=""
+                           FontSize="11"
+                           Foreground="{StaticResource AppTextTertiaryColor}"
+                           FontFamily="Segoe UI"
+                           HorizontalAlignment="Center"
+                           Margin="0,0,0,12"
+                           Visibility="Collapsed"/>
+
+                <!-- Release notes -->
+                <Border x:Name="NotesBox"
+                        Background="{StaticResource AppCardColor}"
+                        CornerRadius="6" Padding="12"
+                        BorderBrush="{StaticResource AppBorderColor}"
+                        BorderThickness="1"
+                        Margin="0,0,0,4"
+                        Visibility="Collapsed">
+                    <StackPanel>
+                        <TextBlock Text="What's new"
+                                   FontSize="10" FontWeight="SemiBold"
+                                   Foreground="{StaticResource AppTextTertiaryColor}"
+                                   FontFamily="Segoe UI"
+                                   Margin="0,0,0,6"/>
+                        <TextBlock x:Name="NotesText"
+                                   FontSize="12"
+                                   Foreground="{StaticResource AppTextSecondaryColor}"
+                                   FontFamily="Segoe UI"
+                                   TextWrapping="Wrap"
+                                   LineHeight="18"/>
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+        </Border>
+
+        <!-- Buttons -->
+        <StackPanel Grid.Row="1"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    Margin="0,10,0,0">
+            <Button Content="Later"
+                    Width="90" Height="34"
+                    Margin="0,0,10,0"
+                    Click="LaterButton_Click">
+                <Button.Style>
+                    <Style TargetType="Button">
+                        <Setter Property="Background" Value="{StaticResource AppPanelHoverColor}"/>
+                        <Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
+                        <Setter Property="BorderBrush" Value="{StaticResource AppBorderColor}"/>
+                        <Setter Property="BorderThickness" Value="1"/>
+                        <Setter Property="FontFamily" Value="Segoe UI"/>
+                        <Setter Property="FontSize" Value="13"/>
+                        <Setter Property="Cursor" Value="Hand"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="{TemplateBinding Background}"
+                                            BorderBrush="{TemplateBinding BorderBrush}"
+                                            BorderThickness="{TemplateBinding BorderThickness}"
+                                            CornerRadius="7">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                        <Style.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{StaticResource AppBorderColor}"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+            <Button Content="Download"
+                    Width="110" Height="34"
+                    IsDefault="True"
+                    Click="DownloadButton_Click"
+                    Style="{StaticResource Win11Button}"/>
+        </StackPanel>
+    </Grid>
+</Window>

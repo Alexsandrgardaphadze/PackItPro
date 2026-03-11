@@ -1,4 +1,6 @@
-﻿using System;
+﻿// PackItPro/Models/AppSettings.cs - v2.1
+// Added: ScanOnAdd — when true, VirusTotal scan fires automatically after files are added.
+using System;
 using System.Collections.Generic;
 
 namespace PackItPro.Models
@@ -10,9 +12,6 @@ namespace PackItPro.Models
         public bool OnlyScanExecutables { get; set; } = true;
         public bool AutoRemoveInfectedFiles { get; set; } = true;
 
-        // Raised from 1 → 3. A single obscure engine (Zillya, etc.) flagging
-        // a well-known NSIS installer is noise, not a threat. Three independent
-        // engines agreeing is a much stronger signal.
         public int MinimumDetectionsToFlag { get; set; } = 3;
 
         public bool IncludeWingetUpdateScript { get; set; } = false;
@@ -45,6 +44,15 @@ namespace PackItPro.Models
         public bool ScanWithVirusTotal { get; set; } = true;
         public int MaxFilesInList { get; set; } = 20;
 
+        /// <summary>
+        /// When true, a VirusTotal scan is triggered automatically as soon as files
+        /// are added (via browse dialog or drag-and-drop). Requires ScanWithVirusTotal
+        /// to be true and a valid API key to be stored — both are checked at call-time.
+        /// Default false: users who add many files at once shouldn't be surprised by
+        /// an immediate scan eating their API quota.
+        /// </summary>
+        public bool ScanOnAdd { get; set; } = false;
+
         // Kept for backward compatibility
         public bool UseLZMACompression
         {
@@ -52,9 +60,6 @@ namespace PackItPro.Models
             set => CompressionMethod = value ? CompressionMethodEnum.Maximum : CompressionMethodEnum.Fast;
         }
 
-        // Engines considered authoritative — a single detection from any of these
-        // overrides MinimumDetectionsToFlag and flags the file as infected regardless.
-        // User-editable so they can add or remove engines via settings UI.
         public List<string> TrustedEngines { get; set; } = new()
         {
             "Microsoft",

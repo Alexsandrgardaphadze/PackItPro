@@ -1,0 +1,83 @@
+﻿<Window x:Class="PackItPro.Views.AlertDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="PackItPro"
+        Height="Auto" Width="440"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="{StaticResource AppBackgroundColor}"
+        ShowInTaskbar="False">
+
+    <Grid Margin="12">
+        <Border Background="{StaticResource AppPanelColor}"
+                BorderBrush="{StaticResource AppBorderColor}"
+                BorderThickness="1"
+                CornerRadius="10"
+                Padding="24,20">
+
+            <StackPanel>
+
+                <!-- Icon + Title row -->
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
+                    <Border x:Name="IconBorder"
+                            Width="36" Height="36"
+                            CornerRadius="18"
+                            Background="#3322c55e"
+                            Margin="0,0,12,0"
+                            VerticalAlignment="Center">
+                        <TextBlock x:Name="IconText"
+                                   Text="✓"
+                                   FontSize="18"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"/>
+                    </Border>
+                    <TextBlock x:Name="TitleText"
+                               Text="Success"
+                               FontSize="15"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource AppTextColor}"
+                               FontFamily="Segoe UI"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <!-- Message -->
+                <TextBlock x:Name="MessageText"
+                           Text=""
+                           FontSize="13"
+                           Foreground="{StaticResource AppTextSecondaryColor}"
+                           FontFamily="Segoe UI"
+                           TextWrapping="Wrap"
+                           LineHeight="20"
+                           Margin="0,0,0,24"/>
+
+                <!-- Optional detail box (shown only when Detail is non-empty) -->
+                <Border x:Name="DetailBox"
+                        Background="{StaticResource AppCardColor}"
+                        BorderBrush="{StaticResource AppBorderColor}"
+                        BorderThickness="1"
+                        CornerRadius="6"
+                        Padding="12"
+                        Margin="0,0,0,18"
+                        Visibility="Collapsed">
+                    <TextBlock x:Name="DetailText"
+                               FontFamily="Consolas"
+                               FontSize="12"
+                               Foreground="{StaticResource AppTextSecondaryColor}"
+                               TextWrapping="Wrap"
+                               LineHeight="18"/>
+                </Border>
+
+                <!-- OK button -->
+                <Button Content="OK"
+                        Width="90"
+                        Height="34"
+                        HorizontalAlignment="Right"
+                        Click="OkButton_Click"
+                        IsDefault="True"
+                        Style="{StaticResource Win11Button}"/>
+
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

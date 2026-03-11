@@ -1,4 +1,7 @@
-﻿using PackItPro.Models;
+﻿// PackItPro/ViewModels/SettingsViewModel.cs - v2.1
+// Added: ScanOnAdd property (wraps AppSettings.ScanOnAdd)
+//        LoadSettingsAsync now restores ScanOnAdd from JSON.
+using PackItPro.Models;
 using PackItPro.Services;
 using System;
 using System.ComponentModel;
@@ -96,6 +99,16 @@ namespace PackItPro.ViewModels
             set { SettingsModel.CompressionLevel = value; OnPropertyChanged(); }
         }
 
+        /// <summary>
+        /// When true, a VirusTotal scan is triggered automatically after files are added.
+        /// Requires ScanWithVirusTotal = true and a valid API key — checked at call-time.
+        /// </summary>
+        public bool ScanOnAdd
+        {
+            get => SettingsModel.ScanOnAdd;
+            set { SettingsModel.ScanOnAdd = value; OnPropertyChanged(); }
+        }
+
         public SettingsViewModel(string settingsFilePath)
         {
             SettingsModel = new AppSettings();
@@ -114,7 +127,7 @@ namespace PackItPro.ViewModels
                     if (loadedSettings != null)
                     {
                         SettingsModel.OutputLocation = loadedSettings.OutputLocation;
-                        // OutputFileName is per-package, not a persistent preference — do NOT restore it.
+                        // OutputFileName is per-package — do NOT restore it.
                         SettingsModel.OnlyScanExecutables = loadedSettings.OnlyScanExecutables;
                         SettingsModel.AutoRemoveInfectedFiles = loadedSettings.AutoRemoveInfectedFiles;
                         SettingsModel.MinimumDetectionsToFlag = loadedSettings.MinimumDetectionsToFlag;
@@ -124,9 +137,8 @@ namespace PackItPro.ViewModels
                         SettingsModel.VerifyIntegrity = loadedSettings.VerifyIntegrity;
                         SettingsModel.ScanWithVirusTotal = loadedSettings.ScanWithVirusTotal;
                         SettingsModel.CompressionLevel = loadedSettings.CompressionLevel;
+                        SettingsModel.ScanOnAdd = loadedSettings.ScanOnAdd;   // NEW
 
-                        // Preserve user's trusted-engine customisations if present in JSON.
-                        // If absent (first run / old settings file), the default list in AppSettings applies.
                         if (loadedSettings.TrustedEngines?.Count > 0)
                             SettingsModel.TrustedEngines = loadedSettings.TrustedEngines;
 
@@ -134,34 +146,24 @@ namespace PackItPro.ViewModels
                     }
                 }
             }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
+            catch (OperationCanceledException) { throw; }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[SettingsViewModel] Load failed: {ex.Message}");
             }
         }
 
-        /// <summary>
-        /// One-time migration: if DPAPI storage is empty and the JSON file still contains
-        /// a plaintext VirusTotalApiKey field, move it to DPAPI and remove it from JSON.
-        /// </summary>
         private async Task MigrateLegacyApiKeyIfNeededAsync(string jsonContent, CancellationToken ct)
         {
             try
             {
-                if (CredentialStore.HasStoredKey())
-                    return;
+                if (CredentialStore.HasStoredKey()) return;
 
                 using var doc = JsonDocument.Parse(jsonContent);
-                if (!doc.RootElement.TryGetProperty("virusTotalApiKey", out var keyElement))
-                    return;
+                if (!doc.RootElement.TryGetProperty("virusTotalApiKey", out var keyElement)) return;
 
                 string? legacyKey = keyElement.GetString();
-                if (string.IsNullOrWhiteSpace(legacyKey))
-                    return;
+                if (string.IsNullOrWhiteSpace(legacyKey)) return;
 
                 CredentialStore.SaveVirusTotalKey(legacyKey);
                 _virusTotalApiKey = legacyKey;
@@ -197,7 +199,7 @@ namespace PackItPro.ViewModels
                 var json = JsonSerializer.Serialize(SettingsModel, new JsonSerializerOptions { WriteIndented = true });
                 await File.WriteAllTextAsync(_settingsFilePath, json, _saveCts.Token);
             }
-            catch (OperationCanceledException) { /* save superseded by a newer call */ }
+            catch (OperationCanceledException) { /* superseded by a newer save call */ }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[SettingsViewModel] Save failed: {ex.Message}");
@@ -209,11 +211,6 @@ namespace PackItPro.ViewModels
             }
         }
 
-        /// <summary>
-        /// Validates that the output location is set and exists.
-        /// Does NOT write a test file — write-permission check is the responsibility of
-        /// SettingsHandler when the user explicitly changes the output location.
-        /// </summary>
         public bool ValidateSettings(out string errorMessage)
         {
             errorMessage = "";
@@ -236,13 +233,11 @@ namespace PackItPro.ViewModels
         protected virtual void Dispose(bool disposing)
         {
             if (_disposed) return;
-
             if (disposing)
             {
                 _saveCts?.Cancel();
                 _saveCts?.Dispose();
             }
-
             _disposed = true;
         }
 
