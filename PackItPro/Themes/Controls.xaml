@@ -176,8 +176,10 @@
                                     MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
                                     MaxHeight="{TemplateBinding MaxDropDownHeight}"
                                     Margin="0,4,0,0">
+                                <!-- Use shared frozen effect from Colors.xaml — avoids allocating
+                                     a new DropShadowEffect object on every dropdown open. -->
                                 <Border.Effect>
-                                    <DropShadowEffect Color="Black" Opacity="0.45" BlurRadius="18" ShadowDepth="4"/>
+                                    <StaticResource ResourceKey="AppCardShadow"/>
                                 </Border.Effect>
                                 <ScrollViewer x:Name="DropDownScrollViewer" Margin="4">
                                     <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained"/>
@@ -363,30 +365,62 @@
                 <ControlTemplate TargetType="Button">
                     <Border Background="{TemplateBinding Background}"
                             BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="8">
+                            CornerRadius="8"
+                            RenderTransformOrigin="0.5,0.5">
+                        <!-- Named transform declared once in the template — never re-allocated.
+                             Trigger below animates ScaleX/ScaleY directly on this instance
+                             instead of assigning a new ScaleTransform object per press. -->
+                        <Border.RenderTransform>
+                            <ScaleTransform x:Name="ButtonScale" ScaleX="1" ScaleY="1"/>
+                        </Border.RenderTransform>
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
                                           Margin="{TemplateBinding Padding}"/>
                     </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Background" Value="{StaticResource AppPrimaryHoverColor}"/>
+                            <!-- DropShadowEffect removed from hover: applying/removing a
+                                 DropShadowEffect forces WPF to allocate and free an offscreen
+                                 render surface on every mouse-enter/leave event. For a button
+                                 hovered many times per session this is measurable CPU/GPU cost.
+                                 The background colour change alone gives sufficient hover feedback. -->
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter Property="Background" Value="{StaticResource AppPrimaryPressedColor}"/>
+                            <!-- Animate the named ScaleTransform rather than assigning a new
+                                 ScaleTransform instance via Setter — zero allocation per press. -->
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="ButtonScale"
+                                                         Storyboard.TargetProperty="ScaleX"
+                                                         To="0.98" Duration="0:0:0.05"/>
+                                        <DoubleAnimation Storyboard.TargetName="ButtonScale"
+                                                         Storyboard.TargetProperty="ScaleY"
+                                                         To="0.98" Duration="0:0:0.05"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="ButtonScale"
+                                                         Storyboard.TargetProperty="ScaleX"
+                                                         To="1.0" Duration="0:0:0.08"/>
+                                        <DoubleAnimation Storyboard.TargetName="ButtonScale"
+                                                         Storyboard.TargetProperty="ScaleY"
+                                                         To="1.0" Duration="0:0:0.08"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.6"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
-        <Style.Triggers>
-            <Trigger Property="IsMouseOver" Value="True">
-                <Setter Property="Background" Value="{StaticResource AppPrimaryHoverColor}"/>
-                <Setter Property="Effect" Value="{StaticResource AppButtonShadow}"/>
-            </Trigger>
-            <Trigger Property="IsPressed" Value="True">
-                <Setter Property="Background" Value="{StaticResource AppPrimaryPressedColor}"/>
-                <Setter Property="RenderTransform">
-                    <Setter.Value>
-                        <ScaleTransform ScaleX="0.98" ScaleY="0.98"/>
-                    </Setter.Value>
-                </Setter>
-            </Trigger>
-            <Trigger Property="IsEnabled" Value="False">
-                <Setter Property="Opacity" Value="0.6"/>
-            </Trigger>
-        </Style.Triggers>
     </Style>
 
     <!-- ── Rounded ProgressBar ──────────────────────────────────────────────── -->
