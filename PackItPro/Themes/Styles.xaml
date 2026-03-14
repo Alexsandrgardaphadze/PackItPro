@@ -1,6 +1,7 @@
 ﻿<!-- Themes/Styles.xaml -->
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:po="http://schemas.microsoft.com/winfx/2006/xaml/presentation/options">
 
     <!-- ToolTip Style -->
     <Style TargetType="ToolTip">
@@ -72,8 +73,10 @@
                                         BorderThickness="1"
                                         CornerRadius="8"
                                         Padding="4"
-                                        Margin="0,4,0,0"
-                                        Effect="{StaticResource AppCardShadow}">
+                                        Margin="0,4,0,0">
+                                    <Border.Effect>
+                                        <DropShadowEffect Color="Black" Opacity="0.4" BlurRadius="20" ShadowDepth="5" po:Freeze="True"/>
+                                    </Border.Effect>
                                     <ItemsPresenter/>
                                 </Border>
                             </Popup>
