@@ -1,227 +1,179 @@
-﻿// PackItPro/ViewModels/CommandHandlers/HelpHandler.cs - v2.3 (WITH UPDATE CHECK)
-// Changes vs v2.2:
-//   [1] Added CheckForUpdatesAsync method and command.
-//       Queries GitHub API for latest release, compares version, offers download.
-//   [2] Added UpdateService dependency injection.
-//   [3] Added UpdateService reference to constructor.
-//   [4] Added UpdateService to field list.
+﻿// PackItPro/ViewModels/CommandHandlers/HelpHandler.cs - v2.0
+// Changes vs v1.x:
+//   [1] CheckUpdatesCommand now opens UpdateAvailableWindow (download + install)
+//       instead of just navigating to the GitHub releases page in a browser.
+//   [2] CheckForUpdatesOnStartupAsync() added -- call from MainViewModel after
+//       InitializeAsync completes. Delays 8 s, checks silently, shows the dialog
+//       only when an update is actually available. Fully silent otherwise.
 using PackItPro.Services;
 using PackItPro.Views;
 using System;
 using System.Diagnostics;
-using System.Runtime.Intrinsics.X86;
-using System.Security.Policy;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
-using static System.Net.WebRequestMethods;
 
 namespace PackItPro.ViewModels.CommandHandlers
 {
     public class HelpHandler : CommandHandlerBase
     {
-        private readonly UpdateService _updateService; // ✅ NEW DEPENDENCY
+        private readonly UpdateService _updateService;
         private readonly StatusViewModel _status;
         private readonly ILogService _log;
-
-        // Cancellation support for update check
-        private CancellationTokenSource? _checkCts;
+        private bool _checkInProgress;
 
         public ICommand DocumentationCommand { get; }
         public ICommand GitHubCommand { get; }
         public ICommand ReportIssueCommand { get; }
-        public ICommand CheckUpdatesCommand { get; } // ✅ NEW COMMAND
+        public ICommand CheckUpdatesCommand { get; }
         public ICommand AboutCommand { get; }
 
+        private const string DocsUrl = "https://github.com/Alexsandrgardaphadze/PackItPro/wiki";
+        private const string GitHubUrl = "https://github.com/Alexsandrgardaphadze/PackItPro";
+        private const string IssuesUrl = "https://github.com/Alexsandrgardaphadze/PackItPro/issues/new";
+
         public HelpHandler(
-            UpdateService updateService, // ✅ NEW PARAMETER
+            UpdateService updateService,
             StatusViewModel status,
             ILogService log)
         {
-            _updateService = updateService ?? throw new ArgumentNullException(nameof(updateService)); // ✅ STORE NEW DEPENDENCY
+            _updateService = updateService ?? throw new ArgumentNullException(nameof(updateService));
             _status = status ?? throw new ArgumentNullException(nameof(status));
             _log = log ?? throw new ArgumentNullException(nameof(log));
 
-            DocumentationCommand = new RelayCommand(ExecuteDocumentation);
-            GitHubCommand = new RelayCommand(ExecuteGitHub);
-            ReportIssueCommand = new RelayCommand(ExecuteReportIssue);
-            CheckUpdatesCommand = new AsyncRelayCommand(ExecuteCheckUpdatesAsync, CanExecuteCheckUpdates); // ✅ NEW COMMAND INITIALIZATION
-            AboutCommand = new RelayCommand(ExecuteAbout);
-
-            // Subscribe to status changes for CanExecute updates
-            _status.PropertyChanged += OnStatusPropertyChanged;
+            DocumentationCommand = new RelayCommand(_ => OpenUrl(DocsUrl));
+            GitHubCommand = new RelayCommand(_ => OpenUrl(GitHubUrl));
+            ReportIssueCommand = new RelayCommand(_ => OpenUrl(IssuesUrl));
+            AboutCommand = new RelayCommand(_ => ShowAbout());
+            CheckUpdatesCommand = new RelayCommand(
+                _ => _ = CheckUpdatesAsync(userInitiated: true),
+                _ => !_checkInProgress);
         }
 
-        private void OnStatusPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+        // ---- Manual check ---------------------------------------------------
+
+        private async Task CheckUpdatesAsync(bool userInitiated)
         {
-            if (e.PropertyName == nameof(StatusViewModel.IsBusy))
-                RaiseCanExecuteChanged();
-        }
+            if (_checkInProgress) return;
+            _checkInProgress = true;
+            RaiseCanExecuteChanged();
 
-        private bool CanExecuteCheckUpdates(object? parameter) => !_status.IsBusy; // ✅ NEW: Disable while other operations run
-
-        private async Task ExecuteCheckUpdatesAsync(object? parameter)
-        {
-            if (!CanExecuteCheckUpdates(parameter)) return;
-
+            string prevStatus = _status.Message;
             _status.Message = "Checking for updates...";
-            _checkCts = new CancellationTokenSource(TimeSpan.FromSeconds(15)); // 15s timeout
-            _log.Info($"[HelpHandler] Checking for updates. Current: {UpdateService.CurrentVersion}");
+            _log.Info("Checking for updates...");
 
+            UpdateCheckResult result;
             try
             {
-                var result = await _updateService.CheckAsync(_checkCts.Token);
-
-                if (!result.Success)
-                {
-                    _log.Warning($"[HelpHandler] Update check failed: {result.ErrorMessage}");
-                    AlertDialog.Show(
-                        Application.Current?.MainWindow,
-                        "Update Check Failed",
-                        "Could not reach the update server. Check your internet connection.",
-                        detail: result.ErrorMessage,
-                        kind: AlertDialog.Kind.Warning);
-                    return;
-                }
-
-                if (result.NoReleasesPublished)
-                {
-                    AlertDialog.Show(
-                        Application.Current?.MainWindow,
-                        "Up to Date",
-                        $"You're running PackItPro {UpdateService.CurrentVersion}.\n" +
-                        "No releases have been published yet — you already have the latest build.",
-                        kind: AlertDialog.Kind.Info);
-                    return;
-                }
-
-                _log.Info($"[HelpHandler] Latest: {result.LatestVersion}, Update available: {result.UpdateAvailable}");
-
-                if (!result.UpdateAvailable)
-                {
-                    AlertDialog.Show(
-                        Application.Current?.MainWindow,
-                        "You're Up to Date",
-                        $"PackItPro {result.CurrentVersion ?? UpdateService.CurrentVersion} is the latest version.",
-                        kind: AlertDialog.Kind.Success);
-                    return;
-                }
-
-                // Toast fires immediately; dialog appears on top
-                if (!string.IsNullOrEmpty(result.ReleaseUrl))
-                    ToastService.NotifyUpdateAvailable(result.CurrentVersion, result.LatestVersion, result.ReleaseUrl);
-
-                var updateWindow = new UpdateAvailableWindow(
-                    result.CurrentVersion ?? UpdateService.CurrentVersion,
-                    result.LatestVersion,
-                    result.PublishedAt?.UtcDateTime,
-                    result.ReleaseNotes,
-                    result.ReleaseUrl)
-                {
-                    Owner = Application.Current?.MainWindow
-                };
-                updateWindow.ShowDialog();
-
-                if (updateWindow.ShouldDownload && !string.IsNullOrEmpty(result.ReleaseUrl))
-                    OpenUrl(result.ReleaseUrl);
-            }
-            catch (OperationCanceledException)
-            {
-                _log.Warning("[HelpHandler] Update check timed out.");
-                AlertDialog.Show(
-                    Application.Current?.MainWindow,
-                    "Request Timed Out",
-                    "Update check timed out after 15 seconds.\nCheck your internet connection and try again.",
-                    kind: AlertDialog.Kind.Warning);
+                result = await _updateService.CheckAsync();
             }
             finally
             {
-                _status.Message = string.Empty; // Clear message
-                _checkCts?.Dispose();
-                _checkCts = null;
+                _checkInProgress = false;
+                _status.Message = prevStatus;
+                RaiseCanExecuteChanged();
             }
+
+            _log.Info($"Update check: success={result.Success} " +
+                      $"available={result.UpdateAvailable} latest={result.LatestVersion}");
+
+            if (!result.Success)
+            {
+                if (userInitiated)
+                    AlertDialog.Show(
+                        Application.Current.MainWindow,
+                        "Update Check Failed",
+                        result.ErrorMessage ?? "Unknown error.",
+                        kind: AlertDialog.Kind.Warning);
+                return;
+            }
+
+            if (result.NoReleasesPublished)
+            {
+                if (userInitiated)
+                    AlertDialog.Show(
+                        Application.Current.MainWindow,
+                        "No Releases",
+                        "No releases have been published for this project yet.",
+                        kind: AlertDialog.Kind.Info);
+                return;
+            }
+
+            if (!result.UpdateAvailable)
+            {
+                if (userInitiated)
+                    AlertDialog.Show(
+                        Application.Current.MainWindow,
+                        "Up to Date",
+                        $"PackItPro {result.CurrentVersion} is the latest version.",
+                        kind: AlertDialog.Kind.Success);
+                return;
+            }
+
+            // An update exists -- show the download dialog
+            UpdateAvailableWindow.Show(
+                Application.Current.MainWindow,
+                _updateService,
+                result);
         }
 
-        private void ExecuteDocumentation(object? parameter)
+        // ---- Silent startup check -------------------------------------------
+
+        /// <summary>
+        /// Call once from MainViewModel.InitializeAsync() -- fire and forget.
+        /// Delays 8 s so the main window is fully visible before any dialog appears.
+        /// Shows UpdateAvailableWindow only when an update is available.
+        /// Completely silent on "up to date", network error, or no releases yet.
+        /// </summary>
+        public async Task CheckForUpdatesOnStartupAsync(CancellationToken ct = default)
         {
             try
             {
-                Process.Start(new ProcessStartInfo("https://github.com/Alexsandrgardaphadze/PackItPro/wiki") { UseShellExecute = true });
+                await Task.Delay(TimeSpan.FromSeconds(8), ct);
+
+                _log.Info("Background update check (startup)...");
+                var result = await _updateService.CheckAsync(ct);
+
+                if (!result.Success || !result.UpdateAvailable) return;
+
+                _log.Info($"Startup update check: {result.LatestVersion} available.");
+
+                Application.Current.Dispatcher.Invoke(() =>
+                    UpdateAvailableWindow.Show(
+                        Application.Current.MainWindow,
+                        _updateService,
+                        result));
             }
+            catch (OperationCanceledException) { /* app shutting down, ignore */ }
             catch (Exception ex)
             {
-                AlertDialog.Show(Application.Current?.MainWindow, "Cannot Open Browser",
-                    "Could not open the documentation page.",
-                    detail: "https://github.com/Alexsandrgardaphadze/PackItPro/wiki\n\n" + ex.Message,
-                    kind: AlertDialog.Kind.Error);
+                _log.Error("Startup update check failed (non-fatal)", ex);
             }
         }
 
-        private void ExecuteGitHub(object? parameter)
+        // ---- Other commands -------------------------------------------------
+
+        private static void ShowAbout()
         {
-            try
+            var win = new AboutWindow
             {
-                Process.Start(new ProcessStartInfo("https://github.com/Alexsandrgardaphadze/PackItPro") { UseShellExecute = true });
-            }
-            catch (Exception ex)
-            {
-                AlertDialog.Show(Application.Current?.MainWindow, "Cannot Open Browser",
-                    "Could not open the GitHub repository.",
-                    detail: "https://github.com/Alexsandrgardaphadze/PackItPro\n\n" + ex.Message,
-                    kind: AlertDialog.Kind.Error);
-            }
+                Owner = Application.Current?.MainWindow
+            };
+            win.ShowDialog();
         }
-
-        private void ExecuteReportIssue(object? parameter)
-        {
-            try
-            {
-                Process.Start(new ProcessStartInfo("https://github.com/Alexsandrgardaphadze/PackItPro/issues") { UseShellExecute = true });
-            }
-            catch (Exception ex)
-            {
-                AlertDialog.Show(Application.Current?.MainWindow, "Cannot Open Browser",
-                    "Could not open the issue tracker.",
-                    detail: "https://github.com/Alexsandrgardaphadze/PackItPro/issues\n\n" + ex.Message,
-                    kind: AlertDialog.Kind.Error);
-            }
-        }
-
-        private void ExecuteAbout(object? parameter)
-        {
-            new AboutWindow { Owner = Application.Current?.MainWindow }.ShowDialog();
-        }
-
-        // ── Helpers ───────────────────────────────────────────────────────────
 
         private static void OpenUrl(string url)
         {
             try
             {
-                Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = url,
+                    UseShellExecute = true
+                });
             }
-            catch (Exception ex)
-            {
-                AlertDialog.Show(Application.Current?.MainWindow, "Cannot Open Browser",
-                    "Could not launch the browser. Visit the release page manually:",
-                    detail: url + "\n\n" + ex.Message,
-                    kind: AlertDialog.Kind.Error);
-            }
-        }
-
-        private static string Truncate(string text, int max)
-        {
-            if (text.Length <= max) return text;
-            return text[..max].TrimEnd() + "\n…(see release page for full notes)";
-        }
-
-        public override void Dispose()
-        {
-            _status.PropertyChanged -= OnStatusPropertyChanged;
-            _checkCts?.Cancel();
-            _checkCts?.Dispose();
-            base.Dispose();
+            catch { /* best effort */ }
         }
     }
 }

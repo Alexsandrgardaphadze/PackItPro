@@ -1,0 +1,102 @@
+# .github/workflows/release.yml
+#
+# Triggers on any tag push matching v* (e.g. v0.7.2, v1.0.0).
+# Builds PackItPro as a self-contained single-file win-x64 exe,
+# creates a GitHub Release, and uploads PackItPro.exe as an asset.
+#
+# The asset named "PackItPro.exe" is exactly what UpdateService.cs
+# looks for when resolving the download URL — do not rename it.
+#
+# To trigger a release:
+#   git tag v0.7.2
+#   git push origin v0.7.2
+#
+# Make sure PackItPro.csproj <Version> matches the tag (without the v prefix):
+#   Tag: v0.7.2  →  <Version>0.7.2</Version>
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write   # needed to create releases and upload assets
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    steps:
+      # ── Checkout ────────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history so git describe works if needed
+
+      # ── .NET 8 SDK ──────────────────────────────────────────────────────────
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      # ── Build ────────────────────────────────────────────────────────────────
+      # Run your existing build.ps1 with -NoPause so it doesn't wait for a keypress.
+      # This publishes StubInstaller → Resources\ → PackItPro as a single exe.
+      - name: Build with build.ps1
+        shell: pwsh
+        run: |
+          .\build.ps1 -NoPause -Configuration Release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      # ── Verify output exists ─────────────────────────────────────────────────
+      - name: Verify PackItPro.exe exists
+        shell: pwsh
+        run: |
+          $exe = "PackItPro\publish\PackItPro.exe"
+          if (-not (Test-Path $exe)) {
+            Write-Error "PackItPro.exe not found at: $exe"
+            exit 1
+          }
+          $size = (Get-Item $exe).Length
+          Write-Host "PackItPro.exe — $([math]::Round($size/1MB,1)) MB"
+
+      # ── Extract version and release notes from CHANGELOG.md ─────────────────
+      # Reads the top-most ## vX.Y.Z block and uses it as the release body.
+      - name: Extract release notes
+        id: notes
+        shell: pwsh
+        run: |
+          $tag     = "${{ github.ref_name }}"          # e.g. v0.7.2
+          $version = $tag.TrimStart('v')               # e.g. 0.7.2
+          $content = Get-Content "CHANGELOG.md" -Raw
+
+          # Find the block for this version
+          $pattern = "(?ms)## v$([regex]::Escape($version))\r?\n(.*?)(?=\r?\n## v|\Z)"
+          if ($content -match $pattern) {
+              $notes = $Matches[1].Trim()
+          } else {
+              $notes = "Release $tag"
+          }
+
+          # Write multiline output safely
+          $delimiter = [System.Guid]::NewGuid().ToString()
+          "NOTES<<$delimiter" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          $notes       | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          $delimiter   | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+          "VERSION=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      # ── Create GitHub Release and upload exe ─────────────────────────────────
+      - name: Create release and upload asset
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name:   ${{ github.ref_name }}
+          name:       PackItPro ${{ github.ref_name }}
+          body:       ${{ steps.notes.outputs.NOTES }}
+          draft:      false
+          prerelease: false
+          files:      PackItPro/publish/PackItPro.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

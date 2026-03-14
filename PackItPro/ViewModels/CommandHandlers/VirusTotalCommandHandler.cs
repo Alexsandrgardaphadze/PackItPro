@@ -99,10 +99,12 @@ namespace PackItPro.ViewModels.CommandHandlers
         {
             if (!CanExecuteScan(parameter)) return;
 
+            bool succeeded = false;
             try
             {
                 _status.SetStatusScanning();
                 await ExecuteScanFilesWithVirusTotalAsync();
+                succeeded = true;
             }
             catch (OperationCanceledException)
             {
@@ -119,7 +121,10 @@ namespace PackItPro.ViewModels.CommandHandlers
             }
             finally
             {
-                _status.SetStatusReady();
+                // SetStatusSuccess keeps the bar at 100%; SetStatusReady resets to 0.
+                // Only reset to ready on failure/cancel — success was already set inside
+                // ExecuteScanFilesWithVirusTotalAsync via _status.Message assignment.
+                if (!succeeded) _status.SetStatusReady();
                 _scanCts?.Dispose();
                 _scanCts = null;
             }

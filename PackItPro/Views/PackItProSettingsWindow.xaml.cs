@@ -21,6 +21,7 @@ namespace PackItPro.Views
         public int MinDetections { get; private set; }
         public bool VerifyIntegrity { get; private set; }
         public int MaxFiles { get; private set; }
+        public bool ScanOnAdd { get; private set; }
 
         public PackItProSettingsWindow(AppSettings current, string settingsFilePath,
                                        TrustStore? trustStore = null)
@@ -36,6 +37,7 @@ namespace PackItPro.Views
             MinDetectionsBox.Text = current.MinimumDetectionsToFlag.ToString();
             MaxFilesBox.Text = current.MaxFilesInList.ToString();
             VerifyIntegrityBox.IsChecked = current.VerifyIntegrity;
+            ScanOnAddBox.IsChecked = current.ScanOnAdd;
 
             LoadTrustEntries();
             TrustedHashList.ItemsSource = _trustRows;
@@ -111,6 +113,7 @@ namespace PackItPro.Views
             MinDetections = minDet;
             VerifyIntegrity = VerifyIntegrityBox.IsChecked == true;
             MaxFiles = maxFiles;
+            ScanOnAdd = ScanOnAddBox.IsChecked == true;
 
             DialogResult = true;
             Close();
@@ -154,7 +157,7 @@ namespace PackItPro.Views
             Hash = entry.Hash;
             FileName = entry.FileName;
             ShortHash = entry.Hash.Length >= 8 ? entry.Hash[..8] + "…" : entry.Hash;
-            TrustedAtFormatted = entry.TrustedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm");
+            TrustedAtFormatted = entry.TrustedAt.ToLocalTime().ToString("dd MM yyyy HH:mm");
         }
     }
 }

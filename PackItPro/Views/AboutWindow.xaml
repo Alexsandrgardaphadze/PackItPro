@@ -71,7 +71,7 @@
                             <TextBlock Grid.Column="0" Text="Author"
                                        FontSize="12" Foreground="{StaticResource AppTextTertiaryColor}"
                                        FontFamily="Segoe UI"/>
-                            <TextBlock Grid.Column="1" Text="Alexsandrgardaphadze"
+                            <TextBlock Grid.Column="1" Text="ZenQuant"
                                        FontSize="12" Foreground="{StaticResource AppTextColor}"
                                        FontFamily="Segoe UI" FontWeight="SemiBold"/>
                         </Grid>

@@ -64,16 +64,24 @@
                                       VerticalAlignment="Center"/>
                         </Grid>
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <TextBlock Text="Total Files" 
-                                      FontSize="10" 
+                            <TextBlock Text="Total Files"
+                                      FontSize="10"
                                       Foreground="{StaticResource AppTextTertiaryColor}"
                                       FontFamily="Segoe UI"
                                       Margin="0,0,0,2"/>
-                            <TextBlock Text="{Binding Files}" 
-                                      FontSize="20" 
+                            <TextBlock Text="{Binding FilesLabel}"
+                                      FontSize="20"
                                       FontWeight="Bold"
                                       FontFamily="Segoe UI"
                                       Foreground="{StaticResource AppTextColor}"/>
+                            <!-- Capacity bar -->
+                            <ProgressBar Value="{Binding Files, Mode=OneWay}"
+                                         Maximum="{Binding MaxFiles, Mode=OneWay}"
+                                         Height="3"
+                                         Margin="0,6,0,0"
+                                         BorderThickness="0"
+                                         Background="{StaticResource AppBorderColor}"
+                                         Foreground="{StaticResource AppStatusCleanColor}"/>
                         </StackPanel>
                     </Grid>
                 </Border>
@@ -132,6 +140,72 @@
 
                 <!-- Additional Stats -->
                 <StackPanel>
+                    <!-- Scan Coverage -->
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                  Text="Scanned"
+                                  FontSize="12"
+                                  Foreground="{StaticResource AppTextTertiaryColor}"
+                                  FontFamily="Segoe UI"
+                                  VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="1"
+                                  FontSize="13"
+                                  FontWeight="SemiBold"
+                                  FontFamily="Consolas"
+                                  HorizontalAlignment="Right">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Foreground" Value="{StaticResource AppTextTertiaryColor}"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding AllScanned}" Value="True">
+                                            <Setter Property="Foreground" Value="{StaticResource AppStatusCleanColor}"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                            <Run Text="{Binding ScannedFiles, Mode=OneWay}"/>
+                            <Run Text=" / "/>
+                            <Run Text="{Binding Files, Mode=OneWay}"/>
+                        </TextBlock>
+                    </Grid>
+
+                    <!-- VirusTotal status -->
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                  Text="VirusTotal"
+                                  FontSize="12"
+                                  Foreground="{StaticResource AppTextTertiaryColor}"
+                                  FontFamily="Segoe UI"
+                                  VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="1"
+                                  FontSize="13"
+                                  FontWeight="SemiBold"
+                                  FontFamily="Segoe UI"
+                                  HorizontalAlignment="Right">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Text" Value="Off"/>
+                                    <Setter Property="Foreground" Value="{StaticResource AppStatusErrorColor}"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding DataContext.Settings.ScanWithVirusTotal,
+                                            RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                            <Setter Property="Text" Value="Active"/>
+                                            <Setter Property="Foreground" Value="{StaticResource AppStatusCleanColor}"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Grid>
+
                     <!-- Status -->
                     <Grid Margin="0,0,0,10">
                         <Grid.ColumnDefinitions>
@@ -139,26 +213,22 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0"
-                                  Text="Status" 
+                                  Text="Status"
                                   FontSize="12"
                                   Foreground="{StaticResource AppTextTertiaryColor}"
                                   FontFamily="Segoe UI"
                                   VerticalAlignment="Center"/>
-                        <!-- FIX: Removed nested Border with Opacity — now single unified badge -->
                         <Border Grid.Column="1"
-                               Background="{StaticResource AppStatusCleanColor}"
-                               CornerRadius="3"
-                               Padding="8,3"
-                               Opacity="0.15"/>
-                        <TextBlock Grid.Column="1"
-                                  Text="{Binding Status}" 
-                                  Foreground="{StaticResource AppStatusCleanColor}" 
-                                  FontSize="11"
-                                  FontWeight="SemiBold"
-                                  FontFamily="Segoe UI"
-                                  Padding="8,3"
-                                  HorizontalAlignment="Right"
-                                  VerticalAlignment="Center"/>
+                                CornerRadius="3"
+                                Padding="8,3"
+                                Background="{StaticResource AppStatusCleanColor}"
+                                Opacity="0.85">
+                            <TextBlock Text="{Binding Status}"
+                                      Foreground="{StaticResource AppBackgroundColor}"
+                                      FontSize="11"
+                                      FontWeight="SemiBold"
+                                      FontFamily="Segoe UI"/>
+                        </Border>
                     </Grid>
 
                     <!-- Package Size -->

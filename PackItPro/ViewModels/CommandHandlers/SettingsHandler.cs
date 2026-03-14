@@ -293,6 +293,7 @@ namespace PackItPro.ViewModels.CommandHandlers
             _settings.SettingsModel.MinimumDetectionsToFlag = window.MinDetections;
             _settings.SettingsModel.VerifyIntegrity = window.VerifyIntegrity;
             _settings.SettingsModel.MaxFilesInList = window.MaxFiles;
+            _settings.SettingsModel.ScanOnAdd = window.ScanOnAdd;
 
             _ = _settings.SaveSettingsAsync();
             _log.Info("Advanced settings saved via PackItProSettingsWindow.");

@@ -53,6 +53,15 @@ namespace PackItPro.Models
         /// </summary>
         public bool ScanOnAdd { get; set; } = false;
 
+        /// <summary>
+        /// True after the user has accepted the packaging disclaimer.
+        /// Once set, the disclaimer dialog is suppressed on subsequent packs.
+        /// Reset to false on major version upgrades if the disclaimer text changes.
+        /// NOTE: Set to true here so VM testing is not blocked by the dialog.
+        ///       Change back to false before shipping to end users.
+        /// </summary>
+        public bool DisclaimerAccepted { get; set; } = true;
+
         // Kept for backward compatibility
         public bool UseLZMACompression
         {

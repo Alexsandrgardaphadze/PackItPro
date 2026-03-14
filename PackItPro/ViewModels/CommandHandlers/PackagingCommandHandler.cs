@@ -1,5 +1,6 @@
 ﻿// PackItPro/ViewModels/CommandHandlers/PackagingCommandHandler.cs
 using Microsoft.Win32;
+using PackItPro.Models;
 using PackItPro.Services;
 using PackItPro.Views;
 using System;
@@ -78,6 +79,34 @@ namespace PackItPro.ViewModels.CommandHandlers
                 {
                     _error.ShowError($"Cannot create package: {settingsError}");
                     return;
+                }
+
+                // Show disclaimer on first pack. Once accepted with "do not show again"
+                // ticked, it is saved to settings.json and suppressed on future packs.
+                if (!_settings.SettingsModel.DisclaimerAccepted)
+                {
+                    int pendingCount = _fileList.Items.Count(f => f.Status == FileStatusEnum.Pending);
+                    int scannedCount = _fileList.CleanCount + _fileList.InfectedCount + _fileList.FailedCount;
+                    int trustedCount = _fileList.Items.Count(f => f.Status == FileStatusEnum.Trusted);
+
+                    bool accepted = DisclaimerWindow.Show(
+                        Application.Current?.MainWindow,
+                        out bool suppress,
+                        fileCount: _fileList.Count,
+                        scannedCount: scannedCount,
+                        infectedCount: _fileList.InfectedCount,
+                        trustedCount: trustedCount,
+                        requiresAdmin: _settings.SettingsModel.RequiresAdmin,
+                        hasInfectedFiles: _fileList.HasInfectedFiles,
+                        hasUnscannedFiles: pendingCount > 0);
+
+                    if (!accepted) return;
+
+                    if (suppress)
+                    {
+                        _settings.SettingsModel.DisclaimerAccepted = true;
+                        _ = _settings.SaveSettingsAsync();
+                    }
                 }
 
                 var saveDialog = new SaveFileDialog

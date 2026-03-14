@@ -1,5 +1,5 @@
 ﻿// PackItPro/ViewModels/MainViewModel.cs
-// v2.1 — TrustStore now passed to VirusTotalCommandHandler (fixes #2/#3: trusted files
+// v2.1  -  TrustStore now passed to VirusTotalCommandHandler (fixes #2/#3: trusted files
 //         were being re-scanned and re-flagged every time because the handler had no
 //         reference to the store).
 // No other logic changed.
@@ -17,7 +17,7 @@ using System.Reflection;
 namespace PackItPro.ViewModels
 {
     /// <summary>
-    /// Main ViewModel — orchestrates all CommandHandlers and sub-ViewModels.
+    /// Main ViewModel  -  orchestrates all CommandHandlers and sub-ViewModels.
     /// </summary>
     public class MainViewModel : INotifyPropertyChanged, IDisposable
     {
@@ -171,6 +171,10 @@ namespace PackItPro.ViewModels
                 _isInitialized = true;
                 Status.SetStatusReady();
                 _logService.Info("========== INITIALIZATION SUCCESS ==========");
+
+                // Silent background update check -- never blocks startup.
+                // Shows UpdateAvailableWindow only if a newer version exists.
+                _ = _helpHandler!.CheckForUpdatesOnStartupAsync();
             }
             catch (Exception ex)
             {

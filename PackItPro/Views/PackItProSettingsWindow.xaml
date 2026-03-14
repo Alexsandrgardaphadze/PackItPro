@@ -108,6 +108,25 @@
                                   VerticalAlignment="Center" Margin="2,0,0,0"/>
                     </Grid>
 
+                    <Grid Margin="0,0,0,6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="180"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock Text="Scan on add"
+                                       FontSize="13" Foreground="{StaticResource AppTextSecondaryColor}"
+                                       FontFamily="Segoe UI"
+                                       ToolTip="Automatically scan files with VirusTotal when added to the list"/>
+                            <TextBlock Text="Requires API key"
+                                       FontSize="10" Foreground="{StaticResource AppTextTertiaryColor}"
+                                       FontFamily="Segoe UI"/>
+                        </StackPanel>
+                        <CheckBox Grid.Column="1" x:Name="ScanOnAddBox"
+                                  VerticalAlignment="Center" Margin="2,0,0,0"
+                                  ToolTip="Automatically scan files with VirusTotal when added to the list. Requires ScanWithVirusTotal = true and a valid API key."/>
+                    </Grid>
+
                     <!-- Divider -->
                     <Border Height="1" Background="{StaticResource AppDividerColor}" Margin="0,12,0,12"/>
 

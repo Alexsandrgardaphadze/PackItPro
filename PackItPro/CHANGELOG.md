@@ -1,5 +1,61 @@
 ﻿# PackItPro — Changelog
 
+## v0.7.2
+
+### New Features
+- **Auto-Update System:** PackItPro can now download and install its own updates directly.
+  `UpdateService` resolves the direct `.exe` asset from GitHub Releases, streams it to a temp
+  file with progress reporting, then hands off to `UpdaterLauncher` which writes a PowerShell
+  swap script, launches it hidden, and exits. The script waits for the process to exit, renames
+  the temp file over the running exe (atomic on same drive), and restarts. A silent background
+  check fires 8 seconds after startup and shows the dialog only if a newer version is available.
+- **Packaging Disclaimer:** A `DisclaimerWindow` now appears before the first pack (suppressed
+  after the user ticks "I understand"). Shows three permanent clauses (responsibility, legal use,
+  scanning limitations) plus three contextual warning cards shown only when relevant: unscanned
+  files, admin privileges requested, and infected files detected. Includes a live file summary
+  strip (Files / Scanned / Unscanned / Infected / Trusted) so the user has full context.
+  Accept button is disabled until the checkbox is ticked. ESC cancels. Persisted to
+  `AppSettings.DisclaimerAccepted`.
+- **SummaryPanel — Scan Coverage:** Two new rows added: "Scanned X / Y" (turns green when all
+  files have scan results) and "VirusTotal Active/Off". The Total Files card now shows "X / Y"
+  with a capacity progress bar.
+- **AppConstants.cs:** All magic strings (file names, directory names, GitHub owner/repo,
+  numeric limits) centralized in one file to prevent path drift across callsites.
+
+### Fixes
+- **`Assembly.Location` warning eliminated:** `UpdateService.DownloadUpdateAsync` and
+  `UpdaterLauncher.GetCurrentExePath` now use `Environment.ProcessPath` (correct API for
+  .NET 6+ single-file publish). `Assembly.GetExecutingAssembly().Location` always returns
+  an empty string in single-file apps and triggered compiler warning IL3000.
+- **VirusTotal scan progress bar no longer resets to 0% on success:** `VirusTotalCommandHandler`
+  now calls `SetStatusReady()` only on failure or cancellation. On a clean scan completion the
+  progress bar stays at 100%, consistent with how the pack flow behaves.
+- **Per-file Notes now written into `packitmeta.json`:** `ManifestGenerator` gains a
+  `FileEntry` record and a primary `Generate(List<FileEntry>)` overload. `PackagingCommandHandler`
+  now passes `FilePath + Notes` instead of just `FilePath`. Empty notes are omitted from the
+  JSON (`WhenWritingNull`). The old `List<string>` overload is kept as a backward-compatible
+  delegate.
+- **`ScanOnAdd` setting now persists:** `PackItProSettingsWindow` had no checkbox for
+  `ScanOnAdd` — the setting existed in `AppSettings` and `SettingsViewModel` but was never
+  exposed in the UI or written back by `SettingsHandler`. Checkbox added to the SECURITY
+  section; `SettingsHandler` now writes `window.ScanOnAdd` back after save.
+- **`FileOperationsHandler` — all `MessageBox.Show` calls replaced:** Browse skip feedback
+  now uses `FileAddResultWindow` (consistent with the drag-and-drop path), "Clear all?"
+  uses `ConfirmDialog`, export success/failure uses `AlertDialog`. Memory leak from anonymous
+  `PropertyChanged` subscription also fixed with named method + `Dispose()` unsubscription.
+- **`SummaryPanel` Status badge fixed:** The tinted background `Border` and the `TextBlock`
+  were siblings in the same Grid cell — the Border rendered nearly invisible (Opacity 0.15)
+  and the text floated on top unstyled. `TextBlock` is now a child of `Border` so the
+  background correctly tints behind the text.
+- **Top menu bar decluttered:** File counter pill ("0 / 20 files") and VirusTotal badge
+  removed from the menu bar. Both pieces of information are now in SummaryPanel where
+  they have context alongside the rest of the package stats.
+
+### Notes for this release
+- `AppSettings.DisclaimerAccepted` defaults to `true` in this build to avoid interrupting
+  VM testing. **Change back to `false` before shipping to end users.**
+- Auto-update download requires a `PackItPro.exe` asset attached to the GitHub Release.
+
 ## v0.7.1
 - **New Feature — Per-File Notes:** Each file in the list now has an inline editable Notes column. Notes are displayed as a transparent input that looks like a label at rest and shows a border on hover/focus. Notes are persisted into `packitmeta.json` so the stub can display them during installation.
 - **New Feature — Scan on Add:** New `ScanOnAdd` setting (off by default) automatically triggers a VirusTotal scan as soon as files are added via the browse dialog or drag-and-drop. Requires a valid API key and `ScanWithVirusTotal = true` — both are checked at call-time so API quota is never burned silently.

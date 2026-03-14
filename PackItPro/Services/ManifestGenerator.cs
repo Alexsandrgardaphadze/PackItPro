@@ -43,26 +43,36 @@ namespace PackItPro.Services
 
         // ── Public API ────────────────────────────────────────────────────────
 
+        /// <summary>
+        /// A file path paired with an optional user note.
+        /// Notes are written into the manifest JSON and visible to the stub.
+        /// </summary>
+        public record FileEntry(string Path, string? Notes = null);
+
+        /// <summary>
+        /// Primary overload — preserves per-file Notes in the manifest.
+        /// </summary>
         public static string Generate(
-            List<string> filePaths,
+            List<FileEntry> files,
             string packageName,
             bool requiresAdmin,
             bool includeWingetUpdateScript = false)
         {
-            var files = filePaths
-                .OrderBy(p => p)
-                .Select((path, index) =>
+            var manifestFiles = files
+                .OrderBy(f => f.Path)
+                .Select((entry, index) =>
                 {
-                    var (type, source) = DetectInstallTypeWithSource(path);
+                    var (type, source) = DetectInstallTypeWithSource(entry.Path);
                     return new ManifestFile
                     {
-                        Name = Path.GetFileName(path),
+                        Name = Path.GetFileName(entry.Path),
+                        Notes = string.IsNullOrWhiteSpace(entry.Notes) ? null : entry.Notes.Trim(),
                         InstallType = type,
                         DetectionSource = source,
                         SilentArgs = GetDefaultSilentArgs(type),
                         RequiresAdmin = false,
                         InstallOrder = index,
-                        TimeoutMinutes = GetDefaultTimeout(path),
+                        TimeoutMinutes = GetDefaultTimeout(entry.Path),
                     };
                 })
                 .ToList();
@@ -70,13 +80,27 @@ namespace PackItPro.Services
             var manifest = new PackageManifest
             {
                 PackageName = packageName,
-                Files = files,
+                Files = manifestFiles,
                 RequiresAdmin = requiresAdmin,
                 Cleanup = true,
                 AutoUpdateScript = includeWingetUpdateScript ? "update_all.bat" : null,
             };
 
             return JsonSerializer.Serialize(manifest, WriteOptions);
+        }
+
+        /// <summary>
+        /// Backward-compatible overload for callers that don't have Notes.
+        /// Converts to FileEntry list and delegates to the primary overload.
+        /// </summary>
+        public static string Generate(
+            List<string> filePaths,
+            string packageName,
+            bool requiresAdmin,
+            bool includeWingetUpdateScript = false)
+        {
+            var entries = filePaths.Select(p => new FileEntry(p)).ToList();
+            return Generate(entries, packageName, requiresAdmin, includeWingetUpdateScript);
         }
 
         /// <summary>Returns just the install type string (for callers that don't need the source).</summary>
@@ -227,6 +251,10 @@ namespace PackItPro.Services
         public bool RequiresAdmin { get; set; } = false;
         public int InstallOrder { get; set; } = 0;
         public int TimeoutMinutes { get; set; } = 10;
+
+        /// <summary>Optional user note — visible in the manifest, passed to the stub.</summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? Notes { get; set; }
 
         /// <summary>
         /// How InstallType was determined:

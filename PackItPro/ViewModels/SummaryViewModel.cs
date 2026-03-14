@@ -59,6 +59,10 @@ namespace PackItPro.ViewModels
             OnPropertyChanged(nameof(EstimatedPackageSize));
             OnPropertyChanged(nameof(EstimatedTime));
             OnPropertyChanged(nameof(RequiresAdminText));
+            OnPropertyChanged(nameof(FilesLabel));
+            OnPropertyChanged(nameof(MaxFiles));
+            OnPropertyChanged(nameof(ScannedFiles));
+            OnPropertyChanged(nameof(AllScanned));
         }
 
         // ── File list summary ─────────────────────────────────────────────────
@@ -70,6 +74,18 @@ namespace PackItPro.ViewModels
         public int FailedScans => _fileListViewModel.FailedCount;
         public int SkippedFiles => _fileListViewModel.SkippedCount;
         public string RequiresAdminText => _settingsViewModel.RequiresAdmin ? "Yes" : "No";
+
+        /// <summary>Maximum files allowed, sourced from settings.</summary>
+        public int MaxFiles => _settingsViewModel.SettingsModel.MaxFilesInList;
+
+        /// <summary>"X / Y" label shown in the Total Files card.</summary>
+        public string FilesLabel => $"{Files} / {MaxFiles}";
+
+        /// <summary>Number of files that have been scanned (clean + infected + failed).</summary>
+        public int ScannedFiles => CleanFiles + InfectedFiles + FailedScans;
+
+        /// <summary>True when every file in the list has been scanned.</summary>
+        public bool AllScanned => Files > 0 && ScannedFiles == Files;
 
         public string Status
         {
