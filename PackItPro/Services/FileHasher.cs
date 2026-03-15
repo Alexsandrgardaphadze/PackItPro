@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -114,6 +115,71 @@ namespace PackItPro.Services
             foreach (var h in perFile)
                 final.Write(h, 0, h.Length);
 
+            final.Position = 0;
+            return sha256.ComputeHash(final);
+        }
+
+        /// <summary>
+        /// Hashes a list of source file paths plus the manifest file.
+        /// Used instead of ComputeDirectoryHash when files are zipped directly
+        /// from their source locations (no tempDir copy).
+        ///
+        /// IMPORTANT: The hash format must match IntegrityChecker.ComputeFileEntry in
+        /// StubInstaller exactly, or every package will fail integrity verification.
+        /// Format: per-file entry = SHA256(UTF8(filename_as_forward_slash_relpath) ++ rawFileHash)
+        /// Since the ZIP is always flat (no subdirectories), relPath == filename for all entries.
+        /// The manifest is excluded from the per-file list (it contains the checksum itself).
+        /// </summary>
+        public static byte[] ComputeFileListHash(List<string> filePaths, string manifestPath)
+        {
+            using var sha256 = SHA256.Create();
+            var perFile = new List<byte[]>();
+
+            // Hash source files only — manifest is excluded because it contains
+            // the expected hash value (hashing it would be circular).
+            // install.log is excluded because it doesn't exist at pack time.
+            // Sort by filename for determinism regardless of OS traversal order.
+            var sortedPaths = filePaths
+                .OrderBy(p => Path.GetFileName(p), StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            foreach (var filePath in sortedPaths)
+            {
+                byte[] fileHash;
+                try { fileHash = ComputeFileHash(filePath); }
+                catch (Exception ex)
+                {
+                    throw new IOException(
+                        $"Cannot hash '{filePath}' — package cannot be built with an unreadable file. " +
+                        $"Ensure the file is not locked and you have read permissions.", ex);
+                }
+
+                // Entry format matches IntegrityChecker.ComputeFileEntry:
+                //   UTF8(filename.Replace('\\', '/'))  ++  rawFileHash
+                // For a flat ZIP, this is identical to using relPath from the extraction root.
+                string name = Path.GetFileName(filePath).Replace('\\', '/');
+                byte[] nameBytes = Encoding.UTF8.GetBytes(name);
+
+                using var ms = new MemoryStream(nameBytes.Length + fileHash.Length);
+                ms.Write(nameBytes, 0, nameBytes.Length);
+                ms.Write(fileHash, 0, fileHash.Length);
+                ms.Position = 0;
+                perFile.Add(sha256.ComputeHash(ms));
+                sha256.Initialize();
+            }
+
+            // Sort per-file hashes for determinism (same as IntegrityChecker)
+            perFile.Sort((a, b) =>
+            {
+                int len = Math.Min(a.Length, b.Length);
+                for (int i = 0; i < len; i++)
+                    if (a[i] != b[i]) return a[i].CompareTo(b[i]);
+                return a.Length.CompareTo(b.Length);
+            });
+
+            // Final hash = SHA256 of all per-file hashes concatenated
+            using var final = new MemoryStream(perFile.Count * 32);
+            foreach (var h in perFile) final.Write(h, 0, h.Length);
             final.Position = 0;
             return sha256.ComputeHash(final);
         }

@@ -15,7 +15,7 @@ namespace PackItPro.Views
             _cacheFilePath = cacheFilePath;
 
             EntryCountText.Text = entryCount.ToString();
-            CacheSizeText.Text = FormatBytes(fileSizeBytes);
+            CacheSizeText.Text = AppConstants.FormatBytes(fileSizeBytes);
             LastModText.Text = lastModified.ToString("MMM d\nyyyy HH:mm");
             CachePathText.Text = cacheFilePath;
         }
@@ -41,11 +41,5 @@ namespace PackItPro.Views
 
         private void CloseButton_Click(object sender, RoutedEventArgs e) => Close();
 
-        private static string FormatBytes(long bytes)
-        {
-            if (bytes >= 1_048_576) return $"{bytes / 1_048_576.0:0.##} MB";
-            if (bytes >= 1024) return $"{bytes / 1024.0:0.##} KB";
-            return $"{bytes} B";
-        }
     }
 }

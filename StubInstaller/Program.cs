@@ -56,40 +56,15 @@ namespace StubInstaller
 
         private static async Task<int> RunFreshAsync()
         {
-            // STEP 1 — Extract payload bytes from the end of this EXE
+            // STEPS 1+2 — Extract and decompress payload in one streaming pass.
+            // The payload is never loaded into RAM — ZipArchive reads directly
+            // from a SubStream positioned at the payload offset in the exe file.
             StubLogger.Log("");
-            StubLogger.Log("STEP 1: Extracting payload from executable...");
-            byte[] payloadData;
-            try
-            {
-                payloadData = PayloadExtractor.ExtractPayloadFromEndOfFile();
-                StubLogger.Log($"✅ Payload: {Util.FormatBytes(payloadData.Length)}");
-            }
-            catch (InvalidOperationException ex) when (ex.Message.Contains("PAYLOAD INTEGRITY CHECK FAILED"))
-            {
-                StubLogger.LogError("FATAL: Payload integrity verification failed", ex);
-                StubUI.ShowError(
-                    $"Package integrity check failed!\n\n" +
-                    $"The payload may have been corrupted or tampered with.\n\n" +
-                    $"Error: {ex.Message}\n\n" +
-                    $"Installation cannot proceed.",
-                    "Integrity Verification Failed");
-                return 1;
-            }
-            catch (Exception ex)
-            {
-                StubLogger.LogError("FATAL: Failed to extract payload", ex);
-                StubUI.ShowError($"Failed to extract the package payload.\n\nError: {ex.Message}", "Extraction Failed");
-                return 1;
-            }
-
-            // STEP 2 — Unzip to temp directory; migrate log into extraction dir
-            StubLogger.Log("");
-            StubLogger.Log("STEP 2: Extracting to temporary directory...");
+            StubLogger.Log("STEP 1+2: Extracting and decompressing payload (streaming)...");
             string tempDir;
             try
             {
-                tempDir = PayloadExtractor.ExtractPayloadToTempDirectory(payloadData);
+                tempDir = PayloadExtractor.ExtractAndDecompressPayload();
                 MigrateLogToTempDir(tempDir);
 
                 StubLogger.Log($"✅ Extracted to: {tempDir}");
@@ -97,10 +72,20 @@ namespace StubInstaller
                 foreach (var f in Directory.GetFiles(tempDir).OrderBy(x => x))
                     StubLogger.Log($"  {Path.GetFileName(f)}  ({Util.FormatBytes(new FileInfo(f).Length)})");
             }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("PAYLOAD INTEGRITY CHECK FAILED"))
+            {
+                StubLogger.LogError("FATAL: Payload integrity verification failed", ex);
+                StubUI.ShowError(
+                    "Package integrity check failed!\n\n" +
+                    "The payload may have been corrupted or tampered with.\n\n" +
+                    $"Error: {ex.Message}\n\nInstallation cannot proceed.",
+                    "Integrity Verification Failed");
+                return 1;
+            }
             catch (Exception ex)
             {
-                StubLogger.LogError("FATAL: Failed to extract ZIP", ex);
-                StubUI.ShowError($"Failed to extract package contents.\n\nError: {ex.Message}", "Extraction Failed");
+                StubLogger.LogError("FATAL: Failed to extract payload", ex);
+                StubUI.ShowError($"Failed to extract the package payload.\n\nError: {ex.Message}", "Extraction Failed");
                 return 1;
             }
 
@@ -181,13 +166,18 @@ namespace StubInstaller
             if (_rebootRequired)
                 StubLogger.Log("NOTE: A reboot is required — user has been notified.");
 
-            // STEP 9 — Cleanup
+            // STEP 9 — Cleanup (non-blocking — don't hold up the completion message)
             StubLogger.Log("");
             if (manifest.Cleanup)
             {
-                StubLogger.Log("STEP 9: Cleaning up...");
-                await Cleanup.CleanupTempDirectoryAsync(tempDir, true,
-                    StubLogger.Log, msg => StubLogger.LogError(msg, null));
+                StubLogger.Log("STEP 9: Scheduling cleanup (background)...");
+                // Fire and forget — if cleanup fails after retries it logs a warning
+                // but the user has already seen the completion dialog.
+                _ = Task.Run(async () =>
+                {
+                    await Cleanup.CleanupTempDirectoryAsync(tempDir, true,
+                        StubLogger.Log, msg => StubLogger.LogError(msg, null));
+                });
             }
             else
             {
@@ -212,13 +202,7 @@ namespace StubInstaller
                 StubLogger.Log($"--- Installer {i + 1}/{ordered.Count}: {file.Name} ---");
 
                 bool argsFromManifest = file.SilentArgs?.Length > 0;
-                string[] silentArgs = argsFromManifest
-                    ? file.SilentArgs!
-                    : InstallerDetector.GetSilentArgs(file.InstallType);
-
-                StubLogger.Log(argsFromManifest
-                    ? $"  Silent args: {string.Join(" ", silentArgs)} (manifest)"
-                    : $"  Silent args: {string.Join(" ", silentArgs)} (InstallerDetector fallback)");
+                string[] silentArgs = InstallerRunner.ResolveSilentArgs(file, StubLogger.Log);
 
                 string filePath = Path.Combine(tempDir, file.Name);
                 if (!File.Exists(filePath))

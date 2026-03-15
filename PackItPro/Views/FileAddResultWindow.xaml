@@ -114,6 +114,7 @@
                         Width="90" Height="34"
                         HorizontalAlignment="Right"
                         IsDefault="True"
+                        IsCancel="True"
                         Click="OkButton_Click"
                         Style="{StaticResource Win11Button}"/>
 

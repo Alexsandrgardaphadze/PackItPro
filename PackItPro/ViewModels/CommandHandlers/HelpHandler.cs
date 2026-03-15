@@ -111,7 +111,12 @@ namespace PackItPro.ViewModels.CommandHandlers
                 return;
             }
 
-            // An update exists -- show the download dialog
+            // An update exists -- toast first, then show the download dialog
+            ToastService.NotifyUpdateAvailable(
+                result.CurrentVersion,
+                result.LatestVersion,
+                result.ReleaseUrl);
+
             UpdateAvailableWindow.Show(
                 Application.Current.MainWindow,
                 _updateService,
@@ -138,6 +143,12 @@ namespace PackItPro.ViewModels.CommandHandlers
                 if (!result.Success || !result.UpdateAvailable) return;
 
                 _log.Info($"Startup update check: {result.LatestVersion} available.");
+
+                // Fire toast first (non-blocking, no focus steal), then show dialog
+                ToastService.NotifyUpdateAvailable(
+                    result.CurrentVersion,
+                    result.LatestVersion,
+                    result.ReleaseUrl);
 
                 Application.Current.Dispatcher.Invoke(() =>
                     UpdateAvailableWindow.Show(

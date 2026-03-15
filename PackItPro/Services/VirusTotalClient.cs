@@ -29,12 +29,10 @@ namespace PackItPro.Services
         private readonly ConcurrentDictionary<string, CachedScanResult> _cache = new();
         private readonly string _cacheFilePath;
 
-        private readonly HashSet<string> _exeExtensions = new(StringComparer.OrdinalIgnoreCase)
-        {
-            ".exe", ".dll", ".bat", ".cmd", ".ps1", ".vbs", ".js", ".jar", ".msi", ".com",
-            ".scr", ".pif", ".gadget", ".application", ".msc", ".cpl", ".hta", ".reg",
-            ".vb", ".vbe", ".jse", ".ws", ".wsf", ".wsc", ".wsh", ".lnk", ".inf", ".scf",
-        };
+        // Extension list is shared with MainViewModel via AppConstants.ExecutableExtensions
+        // so both sides stay in sync. Do not maintain a separate copy here.
+        public bool IsExecutable(string filePath) =>
+            AppConstants.ExecutableExtensions.Contains(Path.GetExtension(filePath));
 
         public VirusTotalClient(string cacheFilePath, string apiKey = "")
         {
@@ -54,9 +52,6 @@ namespace PackItPro.Services
             if (!string.IsNullOrWhiteSpace(key))
                 _http.DefaultRequestHeaders.Add("x-apikey", key);
         }
-
-        public bool IsExecutable(string filePath) =>
-            _exeExtensions.Contains(Path.GetExtension(filePath));
 
         // ──────────────────────────────────────────────────────────────
         // Public API
@@ -193,7 +188,12 @@ namespace PackItPro.Services
             }
             finally
             {
-                await Task.Delay(RequestDelay, ct);
+                // Rate-limit delay MUST use CancellationToken.None.
+                // If ct is cancelled while we are inside finally, Task.Delay(ct) throws
+                // OperationCanceledException which propagates out of finally — _gate.Release()
+                // is never called, the semaphore sticks at 0, and every future scan hangs
+                // forever waiting for a gate that will never open.
+                await Task.Delay(RequestDelay, CancellationToken.None);
                 _gate.Release();
             }
         }

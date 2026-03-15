@@ -2,6 +2,8 @@
 // Single source of truth for all magic strings, file names, and limits.
 // Reference this instead of scattering literals across files — if a name
 // ever changes, it changes here and the compiler catches every callsite.
+using System;
+using System.Collections.Generic;
 namespace PackItPro
 {
     internal static class AppConstants
@@ -34,5 +36,32 @@ namespace PackItPro
         // ── VirusTotal ────────────────────────────────────────────────────────
         public const int MinDetectionsToFlag = 1;
         public const int MaxDetectionsToFlag = 72;
+
+        // ── Executable extensions scanned by VirusTotal ───────────────────────
+        // Shared between VirusTotalClient and MainViewModel so both sides
+        // stay in sync. Add new extensions here only.
+        public static readonly IReadOnlyCollection<string> ExecutableExtensions =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ".exe", ".dll", ".bat", ".cmd", ".ps1", ".vbs", ".js",
+                ".jar", ".msi", ".com", ".scr", ".pif", ".gadget",
+                ".application", ".msc", ".cpl", ".hta", ".reg",
+                ".vb", ".vbe", ".jse", ".ws", ".wsf", ".wsc", ".wsh",
+                ".lnk", ".inf", ".scf",
+            };
+
+
+        // ── Formatting helpers ────────────────────────────────────────────────────
+        // Single implementation — reference this instead of duplicating in every class.
+        // StubInstaller uses Util.FormatBytes (its own equivalent in the stub project).
+        public static string FormatBytes(long bytes)
+        {
+            if (bytes <= 0) return "0 B";
+            string[] suffixes = { "B", "KB", "MB", "GB", "TB" };
+            int i = 0;
+            double size = bytes;
+            while (size >= 1024 && i < suffixes.Length - 1) { size /= 1024; i++; }
+            return $"{size:0.##} {suffixes[i]}";
+        }
     }
 }

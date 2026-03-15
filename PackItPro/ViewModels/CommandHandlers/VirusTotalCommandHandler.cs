@@ -29,9 +29,12 @@ namespace PackItPro.ViewModels.CommandHandlers
         private readonly StatusViewModel _status;
         private readonly ErrorViewModel _error;
         private readonly VirusTotalClient _virusTotalClient;
-        private readonly TrustStore _trustStore;                 // NEW — injected
+        private readonly TrustStore _trustStore;
         private readonly ILogService _logService;
-        private readonly HashSet<string> _executableExtensions;
+        // Extension list sourced from AppConstants — same set as MainViewModel and VirusTotalClient.
+        // The constructor parameter is kept for backward compatibility but ignored in favour of
+        // AppConstants so callers don't need to pass it.
+        // TODO: remove the parameter in the next major refactor once all callers are updated.
 
         // Cancellation support
         private CancellationTokenSource? _scanCts;
@@ -58,7 +61,7 @@ namespace PackItPro.ViewModels.CommandHandlers
             _virusTotalClient = virusTotalClient ?? throw new ArgumentNullException(nameof(virusTotalClient));
             _trustStore = trustStore ?? throw new ArgumentNullException(nameof(trustStore));
             _logService = logService ?? throw new ArgumentNullException(nameof(logService));
-            _executableExtensions = executableExtensions ?? throw new ArgumentNullException(nameof(executableExtensions));
+            // executableExtensions parameter accepted but AppConstants used at call-sites below
 
             ScanFilesCommand = new AsyncRelayCommand(ExecuteScanFilesCommandAsync, CanExecuteScan);
             CancelScanCommand = new RelayCommand(_ => CancelScan(), CanCancelScan);
@@ -140,7 +143,7 @@ namespace PackItPro.ViewModels.CommandHandlers
 
             var totalFiles = _fileList.Items.Count(f =>
                 !_settings.OnlyScanExecutables ||
-                _executableExtensions.Contains(Path.GetExtension(f.FilePath)));
+                AppConstants.ExecutableExtensions.Contains(Path.GetExtension(f.FilePath)));
 
             if (totalFiles == 0)
             {
@@ -168,7 +171,7 @@ namespace PackItPro.ViewModels.CommandHandlers
 
                 // ── Extension filter ─────────────────────────────────────────
                 if (_settings.OnlyScanExecutables &&
-                    !_executableExtensions.Contains(Path.GetExtension(item.FilePath)))
+                    !AppConstants.ExecutableExtensions.Contains(Path.GetExtension(item.FilePath)))
                 {
                     item.Status = FileStatusEnum.Skipped;
                     skippedCount++;
@@ -261,9 +264,13 @@ namespace PackItPro.ViewModels.CommandHandlers
             if (trustedCount > 0) parts.Add($"{trustedCount} trusted (skipped)");
             if (skippedCount > 0) parts.Add($"{skippedCount} non-exe skipped");
 
-            _status.Message = parts.Count > 0
+            var scanSummary = parts.Count > 0
                 ? $"Scan completed — {string.Join(", ", parts)}. Check log."
                 : "Scan completed successfully.";
+
+            // SetStatusSuccess holds the progress bar at 100% with a green "Done" state.
+            // Mirrors what PackagingCommandHandler does after a successful pack.
+            _status.SetStatusSuccess(scanSummary);
         }
 
         // ── Helpers ───────────────────────────────────────────────────────────

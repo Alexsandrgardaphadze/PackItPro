@@ -213,7 +213,6 @@
                         <Setter Property="FontSize" Value="13"/>
                         <Style.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="{StaticResource AppPrimaryColor}"/>
                                 <Setter Property="Background" Value="#2d2d44"/>
                                 <Setter Property="Opacity" Value="0.7"/>
                             </Trigger>

@@ -18,7 +18,10 @@ namespace PackItPro.ViewModels.CommandHandlers
         public ApplicationHandler(SettingsViewModel settings)
         {
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
-            ExitCommand = new RelayCommand(async _ => await ExecuteExitAsync());
+            // AsyncRelayCommand is required here — RelayCommand takes Action<object?>
+            // which would silently create an async void delegate. Exceptions from
+            // SaveSettingsAsync would be unobserved and crash the process on exit.
+            ExitCommand = new AsyncRelayCommand(async _ => await ExecuteExitAsync());
         }
 
         private async Task ExecuteExitAsync()

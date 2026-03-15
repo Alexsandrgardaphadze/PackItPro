@@ -30,8 +30,49 @@ namespace PackItPro.Services
             _ => 6,
         };
 
-        public static async Task<string> CreatePackageAsync(
+        /// <summary>
+        /// Primary overload — preserves per-file Notes in the manifest.
+        /// </summary>
+        public static Task<string> CreatePackageAsync(
+            List<ManifestGenerator.FileEntry> filePaths,
+            string outputDirectory,
+            string packageName,
+            bool requiresAdmin,
+            int compressionLevel,
+            bool includeWingetUpdateScript,
+            IProgress<(int percentage, string message)>? progress = null,
+            ILogService? log = null,
+            CancellationToken ct = default)
+            => CreatePackageAsync(
+                filePaths.Select(e => e.Path).ToList(),
+                filePaths,
+                outputDirectory, packageName, requiresAdmin,
+                compressionLevel, includeWingetUpdateScript,
+                progress, log, ct);
+
+        /// <summary>
+        /// Backward-compatible overload for callers that don't have Notes.
+        /// </summary>
+        public static Task<string> CreatePackageAsync(
             List<string> filePaths,
+            string outputDirectory,
+            string packageName,
+            bool requiresAdmin,
+            int compressionLevel,
+            bool includeWingetUpdateScript,
+            IProgress<(int percentage, string message)>? progress = null,
+            ILogService? log = null,
+            CancellationToken ct = default)
+            => CreatePackageAsync(
+                filePaths,
+                filePaths.Select(p => new ManifestGenerator.FileEntry(p)).ToList(),
+                outputDirectory, packageName, requiresAdmin,
+                compressionLevel, includeWingetUpdateScript,
+                progress, log, ct);
+
+        private static async Task<string> CreatePackageAsync(
+            List<string> filePaths,
+            List<ManifestGenerator.FileEntry> fileEntries,
             string outputDirectory,
             string packageName,
             bool requiresAdmin,
@@ -55,26 +96,24 @@ namespace PackItPro.Services
                 log.Info($"Package: '{packageName}' | Files: {filePaths.Count} | Admin: {requiresAdmin} | Compression: {compressionLevel} | Winget: {includeWingetUpdateScript}");
 
                 // ============================================================
-                // STEP 1: COPY FILES TO TEMP
+                // STEP 1: VERIFY FILES ARE READABLE
+                // Files are NOT copied to temp — they are zipped directly from
+                // their source paths. This eliminates one full copy of the payload
+                // from %TEMP%, reducing peak disk usage by up to 50%.
                 // ============================================================
-                Report(progress, 8, "Step 1 of 6 — Copying files...");
-                log.Info($"STEP 1: Copying {filePaths.Count} file(s)...");
+                Report(progress, 8, "Step 1 of 6 — Verifying files...");
+                log.Info($"STEP 1: Verifying {filePaths.Count} file(s)...");
 
                 for (int i = 0; i < filePaths.Count; i++)
                 {
                     ct.ThrowIfCancellationRequested();
-
                     string src = filePaths[i];
-                    string dest = Path.Combine(tempDir, Path.GetFileName(src));
-
                     try
                     {
-                        // Verify accessible before committing to copy
                         using (File.Open(src, FileMode.Open, FileAccess.Read, FileShare.Read)) { }
-                        File.Copy(src, dest, overwrite: true);
                         log.Info($"  [{i + 1}/{filePaths.Count}] {Path.GetFileName(src)} ({FormatBytes(new FileInfo(src).Length)})");
                         Report(progress, 8 + (int)((i + 1.0) / filePaths.Count * 12),
-                            $"Step 1 of 6 — Copying files ({i + 1}/{filePaths.Count})...");
+                            $"Step 1 of 6 — Verifying files ({i + 1}/{filePaths.Count})...");
                     }
                     catch (UnauthorizedAccessException ex)
                     {
@@ -106,7 +145,7 @@ namespace PackItPro.Services
                 log.Info("STEP 2: Generating manifest...");
 
                 var manifestJson = ManifestGenerator.Generate(
-                    filePaths,
+                    fileEntries,
                     packageName,
                     requiresAdmin,
                     includeWingetUpdateScript);
@@ -122,8 +161,9 @@ namespace PackItPro.Services
                 Report(progress, 25, "Step 3 of 6 — Computing integrity hash...");
                 log.Info("STEP 3: Hashing installer files...");
 
+                // Hash the source files directly (no tempDir copies exist any more)
                 string dirHash = await Task.Run(
-                    () => Convert.ToBase64String(FileHasher.ComputeDirectoryHash(tempDir)), ct);
+                    () => Convert.ToBase64String(FileHasher.ComputeFileListHash(filePaths, manifestPath)), ct);
                 log.Info($"  Hash: {dirHash[..16]}...");
 
                 var manifestObj = JsonSerializer.Deserialize<PackageManifest>(manifestJson)
@@ -144,7 +184,13 @@ namespace PackItPro.Services
 
                 zipPath = Path.Combine(Path.GetTempPath(), $"payload_{Guid.NewGuid()}.zip");
 
-                var allFiles = Directory.GetFiles(tempDir, "*", SearchOption.AllDirectories).ToList();
+                // Zip directly from source paths — no tempDir copies
+                var allFiles = filePaths.ToList(); // source paths
+                if (includeWingetUpdateScript)
+                {
+                    var batPath = Path.Combine(tempDir, "update_all.bat");
+                    allFiles.Add(batPath); // only the bat is in tempDir
+                }
                 long totalBytes = allFiles.Sum(f => new FileInfo(f).Length);
                 int zipLevel = MapCompressionLevel(compressionLevel);
                 string compressionDesc = compressionLevel switch
@@ -178,7 +224,8 @@ namespace PackItPro.Services
                         ct.ThrowIfCancellationRequested();
 
                         var filePath = installers[i];
-                        var entryName = Path.GetRelativePath(tempDir, filePath);
+                        // Use just the filename as the ZIP entry name
+                        var entryName = Path.GetFileName(filePath);
                         var fileSize = new FileInfo(filePath).Length;
 
                         AddFileToZipSync(zip, filePath, entryName, ZipEpoch);
@@ -207,7 +254,10 @@ namespace PackItPro.Services
                 string stubPath = StubLocator.FindStubInstaller(log);
                 log.Info($"  Stub: {stubPath} ({FormatBytes(new FileInfo(stubPath).Length)})");
 
-                finalTemp = Path.GetTempFileName();
+                // Write the assembled exe next to its final destination (same drive).
+                // Using %TEMP% (which is on C:) would require copying gigabytes across
+                // drives on systems where the output folder is on a different drive.
+                finalTemp = Path.Combine(outputDirectory, $".{packageName}_{Guid.NewGuid():N}.tmp");
 
                 await Task.Run(() => ResourceInjector.InjectPayload(stubPath, zipPath, finalTemp, ct), ct);
 

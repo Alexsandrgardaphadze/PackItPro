@@ -18,11 +18,11 @@ namespace PackItPro
             // Initialize directories
             var appDataDir = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "PackItPro");
-            Directory.CreateDirectory(Path.Combine(appDataDir, "Cache"));
-            Directory.CreateDirectory(Path.Combine(appDataDir, "Logs"));
+                AppConstants.AppName);
+            Directory.CreateDirectory(Path.Combine(appDataDir, AppConstants.CacheSubDir));
+            Directory.CreateDirectory(Path.Combine(appDataDir, AppConstants.LogsSubDir));
 
-            _logPath = Path.Combine(appDataDir, "Logs", "crash.log");
+            _logPath = Path.Combine(appDataDir, AppConstants.LogsSubDir, AppConstants.CrashLogFileName);
 
             // Initialize Windows Toast notification infrastructure.
             // Must run before any ToastService.Notify*() calls.

@@ -60,7 +60,7 @@ namespace PackItPro.Models
         /// NOTE: Set to true here so VM testing is not blocked by the dialog.
         ///       Change back to false before shipping to end users.
         /// </summary>
-        public bool DisclaimerAccepted { get; set; } = true;
+        public bool DisclaimerAccepted { get; set; } = false;
 
         // Kept for backward compatibility
         public bool UseLZMACompression

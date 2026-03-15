@@ -53,6 +53,7 @@ namespace PackItPro.ViewModels
         public int InfectedCount => _items.Count(f => f.Status == FileStatusEnum.Infected);
         public int FailedCount => _items.Count(f => f.Status == FileStatusEnum.ScanFailed);
         public int SkippedCount => _items.Count(f => f.Status == FileStatusEnum.Skipped);
+        public int TrustedCount => _items.Count(f => f.Status == FileStatusEnum.Trusted);
         public bool HasFiles => _items.Any();
         public bool HasInfectedFiles => _items.Any(f => f.Status == FileStatusEnum.Infected);
 
@@ -211,6 +212,7 @@ namespace PackItPro.ViewModels
             OnPropertyChanged(nameof(InfectedCount));
             OnPropertyChanged(nameof(FailedCount));
             OnPropertyChanged(nameof(SkippedCount));
+            OnPropertyChanged(nameof(TrustedCount));
         }
 
         private static string FormatBytes(long bytes)

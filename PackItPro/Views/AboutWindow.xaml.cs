@@ -19,7 +19,7 @@ namespace PackItPro.Views
             try
             {
                 Process.Start(new ProcessStartInfo(
-                    "https://github.com/Alexsandrgardaphadze/PackItPro")
+                    $"https://github.com/{AppConstants.GitHubOwner}/{AppConstants.GitHubRepo}")
                 { UseShellExecute = true });
             }
             catch (Exception ex)

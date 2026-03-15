@@ -36,12 +36,11 @@ namespace PackItPro.ViewModels
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PackItPro");
         private readonly string _cacheFilePath;
         private readonly string _trustStorePath;
-        private readonly HashSet<string> _executableExtensions = new(StringComparer.OrdinalIgnoreCase)
-        {
-            ".exe", ".dll", ".bat", ".cmd", ".ps1", ".vbs", ".js", ".jar", ".msi", ".com",
-            ".scr", ".pif", ".gadget", ".application", ".msc", ".cpl", ".hta", ".reg",
-            ".vb", ".vbe", ".jse", ".ws", ".wsf", ".wsc", ".wsh", ".lnk", ".inf", ".scf"
-        };
+        // Single source of truth — AppConstants.ExecutableExtensions.
+        // FileListViewModel, VirusTotalCommandHandler, and VirusTotalClient all
+        // reference the same set so adding a new extension is a one-line change.
+        private static readonly HashSet<string> _executableExtensions =
+            new(AppConstants.ExecutableExtensions, StringComparer.OrdinalIgnoreCase);
 
         private VirusTotalClient? _virusTotalClient;
         private TrustStore? _trustStore;

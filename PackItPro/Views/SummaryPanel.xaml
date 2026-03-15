@@ -221,8 +221,23 @@
                         <Border Grid.Column="1"
                                 CornerRadius="3"
                                 Padding="8,3"
-                                Background="{StaticResource AppStatusCleanColor}"
                                 Opacity="0.85">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Background" Value="{StaticResource AppStatusCleanColor}"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Status}" Value="⚠️ Infected Files">
+                                            <Setter Property="Background" Value="{StaticResource AppStatusErrorColor}"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding Status}" Value="⚠️ Scan Errors">
+                                            <Setter Property="Background" Value="{StaticResource AppStatusWarningColor}"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding Status}" Value="No Files">
+                                            <Setter Property="Background" Value="{StaticResource AppTextTertiaryColor}"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
                             <TextBlock Text="{Binding Status}"
                                       Foreground="{StaticResource AppBackgroundColor}"
                                       FontSize="11"

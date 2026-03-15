@@ -137,7 +137,10 @@ namespace PackItPro.ViewModels
                         SettingsModel.VerifyIntegrity = loadedSettings.VerifyIntegrity;
                         SettingsModel.ScanWithVirusTotal = loadedSettings.ScanWithVirusTotal;
                         SettingsModel.CompressionLevel = loadedSettings.CompressionLevel;
-                        SettingsModel.ScanOnAdd = loadedSettings.ScanOnAdd;   // NEW
+                        SettingsModel.CompressionMethod = loadedSettings.CompressionMethod;
+                        SettingsModel.MaxFilesInList = loadedSettings.MaxFilesInList;
+                        SettingsModel.DisclaimerAccepted = loadedSettings.DisclaimerAccepted;
+                        SettingsModel.ScanOnAdd = loadedSettings.ScanOnAdd;
 
                         if (loadedSettings.TrustedEngines?.Count > 0)
                             SettingsModel.TrustedEngines = loadedSettings.TrustedEngines;

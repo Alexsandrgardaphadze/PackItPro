@@ -1,6 +1,18 @@
-﻿// StubInstaller/PayloadExtractor.cs - FINAL CORRECTED VERSION v2.0
-// Updated to extract and verify payload using footer-based SHA256 hash.
-// Supports both old (v2.2: 18 bytes) and new (v2.3: 50 bytes) footer formats.
+﻿// StubInstaller/PayloadExtractor.cs - v3.0
+// Changes vs v2.0:
+//   [1] Streaming extraction — payload is never loaded into RAM as byte[].
+//       v2.0 allocated new byte[payloadSize] (up to 2 GB on the LOH) then wrapped
+//       it in a MemoryStream for ZIP extraction. On machines with 4 GB RAM and a
+//       large package this caused an OutOfMemoryException before a single file was
+//       extracted. v3.0 seeks the FileStream to the payload offset and passes it
+//       directly to ZipArchive — zero payload allocation.
+//   [2] LogDebug now delegates to StubLogger.Log instead of writing to a separate
+//       PackItPro_Extraction.log in %TEMP%. All output goes to the single install
+//       log so diagnosis is not split across two files.
+//   [3] Console.WriteLine removed — produces no output in the WinForms stub and
+//       cluttered console mode with duplicate lines already in StubLogger.
+//   [4] ExtractPayloadToTempDirectory(byte[]) kept as an internal compatibility
+//       shim (calls the streaming overload) but marked Obsolete.
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -12,522 +24,369 @@ namespace StubInstaller
 {
     public static class PayloadExtractor
     {
-        // Constants for new v2.3 footer format with hash
-        private const string PAYLOAD_MARKER = "PACKIT_END"; // 10 bytes ASCII
-        private const int MARKER_LENGTH = 10;
-        private const int SIZE_LENGTH = sizeof(long); // 8 bytes
-        private const int HASH_LENGTH = 32; // SHA256 output is 32 bytes
-        private const int FOOTER_LENGTH_V23 = SIZE_LENGTH + HASH_LENGTH + MARKER_LENGTH; // 50 bytes
-        
-        // Legacy v2.2 format
-        private const int FOOTER_LENGTH_V22 = SIZE_LENGTH + MARKER_LENGTH; // 18 bytes
+        private const string PayloadMarker = "PACKIT_END";
+        private const int MarkerLength = 10;
+        private const int SizeLength = sizeof(long);
+        private const int HashLength = 32;
+        private const int FooterLengthV23 = SizeLength + HashLength + MarkerLength; // 50
+        private const int FooterLengthV22 = SizeLength + MarkerLength;              // 18
+
+        // ── Public API ────────────────────────────────────────────────────────
 
         /// <summary>
-        /// Extracts the payload that was appended to the end of this executable file.
-        /// Verifies integrity by computing SHA256 hash of extracted payload and comparing
-        /// to hash stored in footer (if v2.3 format is detected).
+        /// Extracts the ZIP payload appended to this executable directly to a
+        /// temp directory without loading it into RAM.
+        ///
+        /// Returns the path of the temp directory containing the extracted files.
+        /// Throws <see cref="InvalidOperationException"/> on any validation failure.
         /// </summary>
-        public static byte[] ExtractPayloadFromEndOfFile()
+        public static string ExtractAndDecompressPayload()
         {
-            LogDebug("========== PAYLOAD EXTRACTION START ==========");
+            string exePath = ResolveExePath();
+            Log($"Executable: {exePath}");
+            Log($"File size:  {Util.FormatBytes(new FileInfo(exePath).Length)}");
 
-            // ============================================================
-            // STEP 1: DETERMINE EXECUTABLE PATH
-            // ============================================================
-            LogDebug("Step 1: Determining executable path...");
+            // Read footer to get payload offset, size, and optional hash
+            var (payloadOffset, payloadSize, expectedHash, footerVersion) =
+                ReadFooter(exePath);
 
-            string? exePath = null;
+            Log($"Footer:     v{footerVersion} ({(footerVersion == 23 ? FooterLengthV23 : FooterLengthV22)} bytes)");
+            Log($"Payload:    {Util.FormatBytes(payloadSize)} at offset {payloadOffset}");
 
-            // Method 1: MainModule (most reliable)
+            // Create temp directory
+            string tempPath = Path.Combine(Path.GetTempPath(), "PackItPro", Guid.NewGuid().ToString());
+            Directory.CreateDirectory(tempPath);
+            Log($"Temp dir:   {tempPath}");
+
             try
             {
-                exePath = Process.GetCurrentProcess().MainModule?.FileName;
-                LogDebug($"Method 1 (MainModule): {exePath ?? "null"}");
-            }
-            catch (Exception ex)
-            {
-                LogDebug($"Method 1 failed: {ex.Message}");
-            }
+                // Stream directly from the exe file — no payload byte[] allocation
+                using var fs = new FileStream(exePath, FileMode.Open, FileAccess.Read,
+                    FileShare.Read, bufferSize: 81920);
 
-            // Method 2: ProcessPath
-            if (string.IsNullOrEmpty(exePath))
-            {
-                exePath = Environment.ProcessPath;
-                LogDebug($"Method 2 (ProcessPath): {exePath ?? "null"}");
-            }
-
-            // Method 3: Command line arguments
-            if (string.IsNullOrEmpty(exePath))
-            {
-                var args = Environment.GetCommandLineArgs();
-                if (args.Length > 0)
-                {
-                    // Command line arg might be relative, make it absolute
-                    string arg0 = args[0];
-                    if (!Path.IsPathRooted(arg0))
-                    {
-                        arg0 = Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, arg0));
-                    }
-                    exePath = arg0;
-                    LogDebug($"Method 3 (CommandLine): {exePath ?? "null"}");
-                }
-            }
-
-            // Method 4: BaseDirectory + exe name (for single-file apps)
-            if (string.IsNullOrEmpty(exePath))
-            {
-                string baseDir = AppContext.BaseDirectory;
-                string exeName = Process.GetCurrentProcess().ProcessName + ".exe";
-                exePath = Path.Combine(baseDir, exeName);
-                LogDebug($"Method 4 (BaseDirectory): {exePath ?? "null"}");
-            }
-
-            // Validate
-            if (string.IsNullOrEmpty(exePath) || !File.Exists(exePath))
-            {
-                throw new InvalidOperationException(
-                    $"Cannot determine executable path. Attempted methods:\n" +
-                    $"  MainModule: {TryGetMainModule() ?? "null"}\n" +
-                    $"  ProcessPath: {Environment.ProcessPath ?? "null"}\n" +
-                    $"  CommandLine: {TryGetCommandLine() ?? "null"}\n" +
-                    $"  BaseDirectory: {AppContext.BaseDirectory ?? "null"}\n\n" +
-                    $"Final path: {exePath ?? "null"}\n" +
-                    $"File exists: {(!string.IsNullOrEmpty(exePath) && File.Exists(exePath))}");
-            }
-
-            LogDebug($"✅ Executable path resolved: {exePath}");
-
-            var fileInfo = new FileInfo(exePath);
-            LogDebug($"File size: {FormatBytes(fileInfo.Length)}");
-
-            // ============================================================
-            // STEP 2: VALIDATE FILE SIZE
-            // ============================================================
-            LogDebug("Step 2: Validating file size...");
-
-            // Try v2.3 first, fall back to v2.2
-            int footerSize = FOOTER_LENGTH_V23;
-            if (fileInfo.Length < FOOTER_LENGTH_V23)
-            {
-                if (fileInfo.Length < FOOTER_LENGTH_V22)
-                {
-                    throw new InvalidOperationException(
-                        $"File is too small ({fileInfo.Length} bytes) to contain payload footer.\n" +
-                        $"Minimum required: {FOOTER_LENGTH_V22} bytes (v2.2) or {FOOTER_LENGTH_V23} bytes (v2.3).\n" +
-                        $"This EXE may not be a packaged installer.\n" +
-                        $"Expected: Packaged installer with embedded payload\n" +
-                        $"Found: Raw stub executable");
-                }
-                // File is large enough for v2.2 but not v2.3, will detect version in step 3
-                footerSize = -1; // Let step 3 decide
-            }
-
-            // ============================================================
-            // STEP 3: READ AND DETECT FOOTER VERSION
-            // ============================================================
-            LogDebug("Step 3: Reading and analyzing footer...");
-
-            byte[] footer;
-            int detectedFooterSize;
-
-            using (var fs = File.OpenRead(exePath))
-            {
-                // Try reading v2.3 footer first (50 bytes)
-                fs.Seek(-FOOTER_LENGTH_V23, SeekOrigin.End);
-                footer = new byte[FOOTER_LENGTH_V23];
-
-                int totalRead = 0;
-                while (totalRead < FOOTER_LENGTH_V23)
-                {
-                    int bytesRead = fs.Read(footer, totalRead, FOOTER_LENGTH_V23 - totalRead);
-                    if (bytesRead <= 0)
-                    {
-                        throw new InvalidOperationException(
-                            $"Failed to read footer. Read {totalRead}/{FOOTER_LENGTH_V23} bytes.");
-                    }
-                    totalRead += bytesRead;
-                }
-
-                LogDebug($"Footer read successfully: {totalRead} bytes");
-            }
-
-            // Check marker position to determine version
-            string marker23 = Encoding.ASCII.GetString(footer, SIZE_LENGTH + HASH_LENGTH, MARKER_LENGTH);
-            string marker22 = Encoding.ASCII.GetString(footer, SIZE_LENGTH, MARKER_LENGTH);
-
-            if (marker23 == PAYLOAD_MARKER)
-            {
-                detectedFooterSize = FOOTER_LENGTH_V23;
-                LogDebug("✅ Detected footer version: v2.3 (with SHA256 hash)");
-            }
-            else if (marker22 == PAYLOAD_MARKER)
-            {
-                detectedFooterSize = FOOTER_LENGTH_V22;
-                LogDebug("ℹ️  Detected footer version: v2.2 (without hash) — falling back");
-                // Trim footer to v2.2 size
-                Array.Resize(ref footer, FOOTER_LENGTH_V22);
-            }
-            else
-            {
-                throw new InvalidOperationException(
-                    $"Invalid payload marker.\n" +
-                    $"Expected: '{PAYLOAD_MARKER}'\n" +
-                    $"Found (v2.3 pos): '{marker23}'\n" +
-                    $"Found (v2.2 pos): '{marker22}'\n\n" +
-                    $"This file may not be a packaged installer, or it may be corrupted.");
-            }
-
-            // ============================================================
-            // STEP 4: PARSE PAYLOAD SIZE
-            // ============================================================
-            LogDebug("Step 4: Parsing payload size...");
-
-            byte[] sizeBytes = new byte[SIZE_LENGTH];
-            Array.Copy(footer, 0, sizeBytes, 0, SIZE_LENGTH);
-            long payloadSize = BitConverter.ToInt64(sizeBytes, 0);
-
-            LogDebug($"Raw size bytes: {BitConverter.ToString(sizeBytes)}");
-            LogDebug($"Parsed payload size: {FormatBytes(payloadSize)} ({payloadSize} bytes)");
-
-            if (payloadSize <= 0)
-            {
-                throw new InvalidOperationException(
-                    $"Invalid payload size: {payloadSize} bytes.\n" +
-                    $"Size must be positive.\n" +
-                    $"Raw bytes: {BitConverter.ToString(sizeBytes)}\n\n" +
-                    $"This indicates you are running the RAW STUB, not the PACKAGED installer.\n" +
-                    $"Current file: {exePath}\n" +
-                    $"File size: {FormatBytes(fileInfo.Length)}\n\n" +
-                    $"Make sure you are running the packaged EXE created by PackItPro, not StubInstaller.exe directly!");
-            }
-
-            if (payloadSize > fileInfo.Length - detectedFooterSize)
-            {
-                throw new InvalidOperationException(
-                    $"Payload size ({FormatBytes(payloadSize)}) is larger than available space.\n" +
-                    $"File size: {FormatBytes(fileInfo.Length)}\n" +
-                    $"Footer size: {detectedFooterSize} bytes\n" +
-                    $"Max payload: {FormatBytes(fileInfo.Length - detectedFooterSize)}");
-            }
-
-            // ============================================================
-            // STEP 5: EXTRACT PAYLOAD HASH (if v2.3)
-            // ============================================================
-            byte[]? expectedPayloadHash = null;
-            if (detectedFooterSize == FOOTER_LENGTH_V23)
-            {
-                LogDebug("Step 5: Extracting payload hash from footer...");
-                expectedPayloadHash = new byte[HASH_LENGTH];
-                Array.Copy(footer, SIZE_LENGTH, expectedPayloadHash, 0, HASH_LENGTH);
-                LogDebug($"Expected hash: {Convert.ToBase64String(expectedPayloadHash)}");
-            }
-            else
-            {
-                LogDebug("Step 5: Skipped (v2.2 format has no hash)");
-            }
-
-            // ============================================================
-            // STEP 6: CALCULATE PAYLOAD OFFSET
-            // ============================================================
-            LogDebug("Step 6: Calculating payload offset...");
-
-            long payloadOffset = fileInfo.Length - detectedFooterSize - payloadSize;
-
-            LogDebug($"File size: {fileInfo.Length}");
-            LogDebug($"Footer size: {detectedFooterSize}");
-            LogDebug($"Payload size: {payloadSize}");
-            LogDebug($"Calculated offset: {payloadOffset}");
-
-            if (payloadOffset < 0)
-            {
-                throw new InvalidOperationException(
-                    $"Invalid payload offset: {payloadOffset}\n" +
-                    $"This suggests the payload size in the footer is incorrect.");
-            }
-
-            // ============================================================
-            // STEP 7: EXTRACT PAYLOAD (and compute hash if needed)
-            // ============================================================
-            LogDebug("Step 7: Extracting payload...");
-
-            byte[] payload = new byte[payloadSize];
-            byte[]? computedPayloadHash = null;
-
-            using (var fs = File.OpenRead(exePath))
-            using (var sha = expectedPayloadHash != null ? SHA256.Create() : null)
-            {
                 fs.Seek(payloadOffset, SeekOrigin.Begin);
 
-                int totalRead = 0;
-                while (totalRead < payloadSize)
-                {
-                    int remaining = (int)(payloadSize - totalRead);
-                    int toRead = Math.Min(remaining, 81920); // 80 KB chunks
+                // Wrap the payload region in a length-limited stream so ZipArchive
+                // cannot read past the end of the payload into the footer
+                using var payloadStream = new SubStream(fs, payloadSize);
 
-                    int bytesRead = fs.Read(payload, totalRead, toRead);
-                    if (bytesRead <= 0)
+                // Verify hash while streaming if v2.3 footer
+                Stream hashingStream = payloadStream;
+                SHA256? sha = null;
+                if (expectedHash != null)
+                {
+                    sha = SHA256.Create();
+                    hashingStream = new HashingReadStream(payloadStream, sha);
+                }
+
+                // Validate ZIP header before opening the archive
+                var headerBuf = new byte[4];
+                int headerRead = hashingStream.Read(headerBuf, 0, 4);
+                if (headerRead == 4 &&
+                    !(headerBuf[0] == 0x50 && headerBuf[1] == 0x4B &&
+                      headerBuf[2] == 0x03 && headerBuf[3] == 0x04))
+                {
+                    Log($"WARNING: Unexpected ZIP header: {headerBuf[0]:X2} {headerBuf[1]:X2} {headerBuf[2]:X2} {headerBuf[3]:X2}");
+                }
+
+                // Rewind so ZipArchive sees the complete ZIP including its header
+                hashingStream.Seek(0, SeekOrigin.Begin);
+
+                string safeTempDir = Path.GetFullPath(tempPath + Path.DirectorySeparatorChar);
+                int extracted = 0;
+
+                using (var archive = new ZipArchive(hashingStream, ZipArchiveMode.Read, leaveOpen: true))
+                {
+                    Log($"ZIP entries: {archive.Entries.Count}");
+                    foreach (var entry in archive.Entries)
+                    {
+                        if (string.IsNullOrEmpty(entry.Name)) continue; // directory entry
+
+                        // Zip Slip guard
+                        string destPath = Path.GetFullPath(Path.Combine(tempPath, entry.FullName));
+                        if (!destPath.StartsWith(safeTempDir, StringComparison.OrdinalIgnoreCase))
+                            throw new InvalidOperationException(
+                                $"SECURITY: ZIP entry '{entry.FullName}' resolves outside extraction root. " +
+                                "This archive may be malicious. Extraction aborted.");
+
+                        var destDir = Path.GetDirectoryName(destPath);
+                        if (!string.IsNullOrEmpty(destDir) && !Directory.Exists(destDir))
+                            Directory.CreateDirectory(destDir);
+
+                        entry.ExtractToFile(destPath, overwrite: true);
+                        extracted++;
+                        Log($"  [{extracted}/{archive.Entries.Count}] {entry.FullName} ({Util.FormatBytes(entry.Length)})");
+                    }
+                }
+
+                // Verify hash after extraction if v2.3
+                if (sha != null && expectedHash != null)
+                {
+                    sha.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+                    byte[] actualHash = sha.Hash!;
+                    if (!CryptographicOperations.FixedTimeEquals(expectedHash, actualHash))
                     {
                         throw new InvalidOperationException(
-                            $"Unexpected EOF while reading payload. " +
-                            $"Read {totalRead}/{payloadSize} bytes.");
+                            "PAYLOAD INTEGRITY CHECK FAILED!\n\n" +
+                            "The ZIP payload has been modified or corrupted.\n\n" +
+                            $"Expected: {Convert.ToBase64String(expectedHash)}\n" +
+                            $"Actual:   {Convert.ToBase64String(actualHash)}\n\n" +
+                            "Possible causes: file tampered, disk corruption, antivirus modification.\n" +
+                            "Installation cannot proceed.");
                     }
-
-                    // Hash as we read (streaming hash)
-                    if (sha != null)
-                    {
-                        sha.TransformBlock(payload, totalRead, bytesRead, null, 0);
-                    }
-
-                    totalRead += bytesRead;
-
-                    if (totalRead % (1024 * 1024) == 0) // Log every MB
-                    {
-                        LogDebug($"  Read {FormatBytes(totalRead)}/{FormatBytes(payloadSize)}...");
-                    }
+                    Log("Payload integrity verified.");
                 }
 
-                // Finalize hash if computing
-                if (sha != null)
-                {
-                    sha.TransformFinalBlock(payload, 0, 0);
-                    computedPayloadHash = sha.Hash;
-                }
-
-                LogDebug($"✅ Payload extracted: {FormatBytes(totalRead)}");
-            }
-
-            // ============================================================
-            // STEP 8: VERIFY PAYLOAD INTEGRITY (if v2.3)
-            // ============================================================
-            if (expectedPayloadHash != null && computedPayloadHash != null)
-            {
-                LogDebug("Step 8: Verifying payload integrity...");
-
-                string expectedHashStr = Convert.ToBase64String(expectedPayloadHash);
-                string computedHashStr = Convert.ToBase64String(computedPayloadHash);
-
-                LogDebug($"Expected: {expectedHashStr}");
-                LogDebug($"Computed: {computedHashStr}");
-
-                if (!ByteArraysEqual(expectedPayloadHash, computedPayloadHash))
-                {
-                    throw new InvalidOperationException(
-                        $"⚠️ PAYLOAD INTEGRITY CHECK FAILED!\n\n" +
-                        $"The ZIP payload has been modified or corrupted.\n\n" +
-                        $"Expected hash: {expectedHashStr}\n" +
-                        $"Computed hash: {computedHashStr}\n\n" +
-                        $"Possible causes:\n" +
-                        $"  • File was tampered with\n" +
-                        $"  • Disk corruption during transfer\n" +
-                        $"  • Network transmission error\n" +
-                        $"  • Antivirus modification\n\n" +
-                        $"Installation cannot proceed.");
-                }
-
-                LogDebug("✅ Payload integrity verified successfully!");
-            }
-            else if (detectedFooterSize == FOOTER_LENGTH_V22)
-            {
-                LogDebug("Step 8: Skipped (v2.2 format has no hash to verify)");
-            }
-
-            // ============================================================
-            // STEP 9: VERIFY ZIP HEADER
-            // ============================================================
-            LogDebug("Step 9: Verifying ZIP header...");
-
-            if (payload.Length >= 4)
-            {
-                // ZIP files start with "PK\x03\x04" (0x50 0x4B 0x03 0x04)
-                if (payload[0] == 0x50 && payload[1] == 0x4B &&
-                    payload[2] == 0x03 && payload[3] == 0x04)
-                {
-                    LogDebug("✅ Valid ZIP header detected (PK\\x03\\x04)");
-                }
-                else
-                {
-                    LogDebug($"⚠️ WARNING: Unexpected header bytes: " +
-                             $"{payload[0]:X2} {payload[1]:X2} {payload[2]:X2} {payload[3]:X2}");
-                    LogDebug("Expected ZIP header: 50 4B 03 04");
-                    LogDebug("Payload may not be a valid ZIP file!");
-                }
-            }
-
-            LogDebug("========== PAYLOAD EXTRACTION SUCCESS ==========");
-            return payload;
-        }
-
-        /// <summary>
-        /// Extracts the provided payload bytes (assumed to be a ZIP archive) to a temporary directory.
-        /// SECURITY: Validates all extraction paths to prevent Zip Slip (directory traversal) attacks.
-        /// </summary>
-        public static string ExtractPayloadToTempDirectory(byte[] payloadData)
-        {
-            LogDebug("========== ZIP EXTRACTION START ==========");
-            LogDebug($"Payload size: {FormatBytes(payloadData.Length)}");
-
-            // Create unique temp directory
-            var tempPath = Path.Combine(
-                Path.GetTempPath(),
-                "PackItPro",
-                Guid.NewGuid().ToString());
-
-            LogDebug($"Creating temp directory: {tempPath}");
-            Directory.CreateDirectory(tempPath);
-
-            try
-            {
-                // SECURITY: Normalize the extraction root for path validation
-                // Add separator to ensure extracted paths are within this directory
-                string fullTempPath = Path.GetFullPath(tempPath + Path.DirectorySeparatorChar);
-                LogDebug($"Extraction root (normalized): {fullTempPath}");
-
-                // Extract ZIP from memory
-                using (var zipStream = new MemoryStream(payloadData))
-                {
-                    LogDebug("Opening ZIP archive...");
-
-                    using (var archive = new ZipArchive(zipStream, ZipArchiveMode.Read))
-                    {
-                        LogDebug($"ZIP contains {archive.Entries.Count} entries");
-
-                        int extracted = 0;
-                        foreach (var entry in archive.Entries)
-                        {
-                            // Skip directory entries
-                            if (string.IsNullOrEmpty(entry.Name))
-                                continue;
-
-                            // SECURITY: Validate entry path to prevent Zip Slip (CWE-22)
-                            // This prevents malicious ZIPs with paths like "../../../etc/passwd"
-                            string destPath = Path.Combine(tempPath, entry.FullName);
-                            string fullDestPath = Path.GetFullPath(destPath);
-
-                            // Ensure the normalized destination path is within the extraction root
-                            if (!fullDestPath.StartsWith(fullTempPath, StringComparison.OrdinalIgnoreCase))
-                            {
-                                throw new InvalidOperationException(
-                                    $"SECURITY VIOLATION: ZIP entry path attempts to escape extraction directory.\n" +
-                                    $"Entry: {entry.FullName}\n" +
-                                    $"Resolves to: {fullDestPath}\n" +
-                                    $"Extraction root: {fullTempPath}\n" +
-                                    $"This ZIP archive may be malicious or corrupted. Extraction aborted.");
-                            }
-
-                            // Create directory if needed
-                            var destDir = Path.GetDirectoryName(fullDestPath);
-                            if (!string.IsNullOrEmpty(destDir) && !Directory.Exists(destDir))
-                            {
-                                Directory.CreateDirectory(destDir);
-                            }
-
-                            LogDebug($"  [{extracted + 1}/{archive.Entries.Count}] Extracting: {entry.FullName} ({FormatBytes(entry.Length)})");
-
-                            entry.ExtractToFile(fullDestPath, overwrite: true);
-                            extracted++;
-                        }
-
-                        LogDebug($"✅ Extracted {extracted} file(s)");
-                    }
-                }
-
-                LogDebug($"✅ Extraction complete: {tempPath}");
-                LogDebug("========== ZIP EXTRACTION SUCCESS ==========");
-
+                sha?.Dispose();
+                Log($"Extracted {extracted} file(s) to: {tempPath}");
                 return tempPath;
             }
-            catch (Exception ex)
+            catch
             {
-                LogDebug($"❌ ZIP extraction failed: {ex.Message}");
-                LogDebug($"Stack trace: {ex.StackTrace}");
-
-                // Clean up on failure
-                try
-                {
-                    if (Directory.Exists(tempPath))
-                    {
-                        Directory.Delete(tempPath, true);
-                    }
-                }
-                catch
-                {
-                    // Ignore cleanup errors
-                }
-
+                // Clean up on failure — don't leave partial extractions
+                try { if (Directory.Exists(tempPath)) Directory.Delete(tempPath, true); } catch { }
                 throw;
             }
         }
 
-        #region Helper Methods
-
-        private static string? TryGetMainModule()
+        /// <summary>
+        /// Backward-compatible shim for callers that used the old two-step API.
+        /// Prefer <see cref="ExtractAndDecompressPayload"/> for new code.
+        /// </summary>
+        [Obsolete("Use ExtractAndDecompressPayload() — streams directly without RAM allocation.")]
+        public static byte[] ExtractPayloadFromEndOfFile()
         {
+            // For compatibility: read the raw payload bytes.
+            // This still allocates — migrate callers to ExtractAndDecompressPayload.
+            string exePath = ResolveExePath();
+            var (payloadOffset, payloadSize, _, _) = ReadFooter(exePath);
+
+            var payload = new byte[payloadSize];
+            using var fs = File.OpenRead(exePath);
+            fs.Seek(payloadOffset, SeekOrigin.Begin);
+            int totalRead = 0;
+            while (totalRead < payloadSize)
+            {
+                int read = fs.Read(payload, totalRead, (int)(payloadSize - totalRead));
+                if (read == 0) throw new InvalidOperationException("Unexpected EOF reading payload.");
+                totalRead += read;
+            }
+            return payload;
+        }
+
+        /// <summary>
+        /// Backward-compatible shim — wraps ExtractAndDecompressPayload.
+        /// <paramref name="payloadData"/> is ignored; extraction reads from the exe.
+        /// </summary>
+        [Obsolete("Use ExtractAndDecompressPayload() instead.")]
+        public static string ExtractPayloadToTempDirectory(byte[] payloadData)
+            => ExtractAndDecompressPayload();
+
+        // ── Footer parsing ────────────────────────────────────────────────────
+
+        private static (long offset, long size, byte[]? hash, int version)
+            ReadFooter(string exePath)
+        {
+            var fi = new FileInfo(exePath);
+
+            if (fi.Length < FooterLengthV22)
+                throw new InvalidOperationException(
+                    $"File too small ({fi.Length} bytes) to contain a payload footer. " +
+                    "This may not be a packaged installer, or it may be the raw stub.");
+
+            using var fs = File.OpenRead(exePath);
+
+            // Try v2.3 first (50-byte footer)
+            if (fi.Length >= FooterLengthV23)
+            {
+                fs.Seek(-FooterLengthV23, SeekOrigin.End);
+                var footer = ReadExact(fs, FooterLengthV23);
+                string marker = Encoding.ASCII.GetString(footer, SizeLength + HashLength, MarkerLength);
+                if (marker == PayloadMarker)
+                {
+                    long size = BitConverter.ToInt64(footer, 0);
+                    var hash = new byte[HashLength];
+                    Array.Copy(footer, SizeLength, hash, 0, HashLength);
+                    ValidatePayloadSize(size, fi.Length, FooterLengthV23);
+                    long offset = fi.Length - FooterLengthV23 - size;
+                    return (offset, size, hash, 23);
+                }
+            }
+
+            // Fall back to v2.2 (18-byte footer)
+            fs.Seek(-FooterLengthV22, SeekOrigin.End);
+            var footer22 = ReadExact(fs, FooterLengthV22);
+            string marker22 = Encoding.ASCII.GetString(footer22, SizeLength, MarkerLength);
+            if (marker22 != PayloadMarker)
+                throw new InvalidOperationException(
+                    $"Invalid payload marker. Expected '{PayloadMarker}'. " +
+                    "This file is not a packaged installer, or it is corrupted.");
+
+            long size22 = BitConverter.ToInt64(footer22, 0);
+            ValidatePayloadSize(size22, fi.Length, FooterLengthV22);
+            long offset22 = fi.Length - FooterLengthV22 - size22;
+            Log("Footer version: v2.2 (no hash — integrity check skipped)");
+            return (offset22, size22, null, 22);
+        }
+
+        private static void ValidatePayloadSize(long size, long fileSize, int footerSize)
+        {
+            if (size <= 0)
+                throw new InvalidOperationException(
+                    $"Invalid payload size: {size}. " +
+                    "You may be running the raw stub instead of a packaged installer.");
+            if (size > fileSize - footerSize)
+                throw new InvalidOperationException(
+                    $"Payload size ({Util.FormatBytes(size)}) exceeds available space in file.");
+        }
+
+        private static byte[] ReadExact(Stream stream, int count)
+        {
+            var buf = new byte[count];
+            int totalRead = 0;
+            while (totalRead < count)
+            {
+                int read = stream.Read(buf, totalRead, count - totalRead);
+                if (read == 0) throw new InvalidOperationException(
+                    $"Unexpected EOF reading footer (read {totalRead}/{count} bytes).");
+                totalRead += read;
+            }
+            return buf;
+        }
+
+        // ── Exe path resolution ───────────────────────────────────────────────
+
+        private static string ResolveExePath()
+        {
+            // Environment.ProcessPath is the correct API for .NET 6+ single-file apps
+            string? path = Environment.ProcessPath;
+            if (!string.IsNullOrEmpty(path) && File.Exists(path))
+                return path;
+
+            // Fallback: MainModule (may be null in some sandbox environments)
             try
             {
-                return Process.GetCurrentProcess().MainModule?.FileName;
+                path = Process.GetCurrentProcess().MainModule?.FileName;
+                if (!string.IsNullOrEmpty(path) && File.Exists(path)) return path;
             }
-            catch
-            {
-                return null;
-            }
+            catch { }
+
+            throw new InvalidOperationException(
+                "Cannot determine the executable path.\n" +
+                $"ProcessPath: {Environment.ProcessPath ?? "null"}\n" +
+                $"BaseDirectory: {AppContext.BaseDirectory}");
         }
 
-        private static string? TryGetCommandLine()
+        // ── Logging ───────────────────────────────────────────────────────────
+
+        private static void Log(string message) => StubLogger.Log($"[PayloadExtractor] {message}");
+    }
+
+    // ── Helper streams ────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Limits reads to <see cref="_remaining"/> bytes of an underlying stream.
+    /// Used to prevent ZipArchive from reading past the payload into the footer.
+    /// </summary>
+    internal sealed class SubStream : Stream
+    {
+        private readonly Stream _inner;
+        private long _remaining;
+
+        internal SubStream(Stream inner, long length)
         {
-            try
-            {
-                var args = Environment.GetCommandLineArgs();
-                return args.Length > 0 ? args[0] : null;
-            }
-            catch
-            {
-                return null;
-            }
+            _inner = inner;
+            _remaining = length;
         }
 
-        private static bool ByteArraysEqual(byte[] a, byte[] b)
+        public override bool CanRead => true;
+        public override bool CanSeek => _inner.CanSeek;
+        public override bool CanWrite => false;
+        public override long Length => _remaining;
+        public override long Position
         {
-            if (a.Length != b.Length) return false;
-            for (int i = 0; i < a.Length; i++)
-            {
-                if (a[i] != b[i]) return false;
-            }
-            return true;
+            get => _inner.CanSeek ? _inner.Position : 0;
+            set => Seek(value, SeekOrigin.Begin);
         }
 
-        private static void LogDebug(string message)
+        public override int Read(byte[] buffer, int offset, int count)
         {
-            var logMessage = $"[PayloadExtractor] {message}";
-            Debug.WriteLine(logMessage);
-            Console.WriteLine(logMessage);
-
-            // Also write to temp log file
-            try
-            {
-                var logPath = Path.Combine(Path.GetTempPath(), "PackItPro_Extraction.log");
-                File.AppendAllText(logPath, $"[{DateTime.Now:HH:mm:ss.fff}] {logMessage}\n");
-            }
-            catch
-            {
-                // Ignore log write failures
-            }
+            if (_remaining <= 0) return 0;
+            int toRead = (int)Math.Min(count, _remaining);
+            int read = _inner.Read(buffer, offset, toRead);
+            _remaining -= read;
+            return read;
         }
 
-        private static string FormatBytes(long bytes)
+        public override long Seek(long offset, SeekOrigin origin)
         {
-            if (bytes == 0) return "0 B";
-
-            string[] sizes = { "B", "KB", "MB", "GB", "TB" };
-            double len = bytes;
-            int order = 0;
-            while (len >= 1024 && order < sizes.Length - 1)
+            if (!_inner.CanSeek) throw new NotSupportedException();
+            // Translate to absolute position in the inner stream
+            long newPos = origin switch
             {
-                order++;
-                len /= 1024;
-            }
-            return $"{len:0.##} {sizes[order]}";
+                SeekOrigin.Begin => _inner.Position - (Length - _remaining) + offset,
+                SeekOrigin.Current => _inner.Position + offset,
+                SeekOrigin.End => _inner.Position + (_remaining) + offset,
+                _ => throw new ArgumentOutOfRangeException(nameof(origin))
+            };
+            _inner.Seek(newPos, SeekOrigin.Begin);
+            return newPos;
         }
 
-        #endregion
+        public override void Flush() { }
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
+
+    /// <summary>
+    /// Wraps a readable stream and feeds all bytes through a <see cref="SHA256"/>
+    /// transform as they are read, allowing hash-while-extract without buffering.
+    /// </summary>
+    internal sealed class HashingReadStream : Stream
+    {
+        private readonly Stream _inner;
+        private readonly SHA256 _sha;
+        private readonly long _length;
+        private long _position;
+
+        internal HashingReadStream(Stream inner, SHA256 sha)
+        {
+            _inner = inner;
+            _sha = sha;
+            _length = inner.CanSeek ? inner.Length : -1;
+        }
+
+        public override bool CanRead => true;
+        public override bool CanSeek => _inner.CanSeek;
+        public override bool CanWrite => false;
+        public override long Length => _length >= 0 ? _length : throw new NotSupportedException();
+        public override long Position
+        {
+            get => _position;
+            set => Seek(value, SeekOrigin.Begin);
+        }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            int read = _inner.Read(buffer, offset, count);
+            if (read > 0)
+            {
+                _sha.TransformBlock(buffer, offset, read, null, 0);
+                _position += read;
+            }
+            return read;
+        }
+
+        public override long Seek(long offset, SeekOrigin origin)
+        {
+            if (!_inner.CanSeek) throw new NotSupportedException();
+            long newPos = _inner.Seek(offset, origin);
+            _position = newPos;
+            return newPos;
+        }
+
+        public override void Flush() { }
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 }

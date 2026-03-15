@@ -93,10 +93,12 @@ namespace PackItPro.Services
 
                 output.Write(markerBytes, 0, MARKER_LENGTH);
 
-                // FIX: Flush(true) — forces OS write-through to disk before we
-                // read the file back for verification. Without this, the file system
-                // cache may serve stale data and verification will fail spuriously.
-                output.Flush(flushToDisk: true);
+                // Flush to the OS buffer. The FileStream.Dispose() that follows will
+                // ensure data is written before we do the size check.
+                // flushToDisk:true (FlushFileBuffers) is NOT used here — on VMs backed
+                // by a VHD/VMDK it forces a full write-through to the physical disk and
+                // can make a 500 MB package take 10-20x longer than necessary.
+                output.Flush(flushToDisk: false);
             }
 
             long actualSize = new FileInfo(outputPath).Length;

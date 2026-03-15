@@ -43,18 +43,24 @@ namespace PackItPro.ViewModels.CommandHandlers
             PackCommand = new AsyncRelayCommand(ExecutePackAsync, CanExecutePack);
             TestPackageCommand = new RelayCommand(ExecuteTestPackage, CanTestPackage);
 
-            _fileList.PropertyChanged += (s, e) =>
-            {
-                if (e.PropertyName == nameof(_fileList.HasFiles)) RaiseCanExecuteChanged();
-            };
-            _status.PropertyChanged += (s, e) =>
-            {
-                if (e.PropertyName == nameof(_status.IsBusy)) RaiseCanExecuteChanged();
-            };
-            _settings.PropertyChanged += (s, e) =>
-            {
-                if (e.PropertyName == nameof(_settings.OutputLocation)) RaiseCanExecuteChanged();
-            };
+            _fileList.PropertyChanged += OnFileListPropertyChanged;
+            _status.PropertyChanged += OnStatusPropertyChanged;
+            _settings.PropertyChanged += OnSettingsPropertyChanged;
+        }
+
+        private void OnFileListPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(_fileList.HasFiles)) RaiseCanExecuteChanged();
+        }
+
+        private void OnStatusPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(_status.IsBusy)) RaiseCanExecuteChanged();
+        }
+
+        private void OnSettingsPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(_settings.OutputLocation)) RaiseCanExecuteChanged();
         }
 
         // ── Can Execute ───────────────────────────────────────────────────────
@@ -81,9 +87,9 @@ namespace PackItPro.ViewModels.CommandHandlers
                     return;
                 }
 
-                // Show disclaimer on first pack. Once accepted with "do not show again"
-                // ticked, it is saved to settings.json and suppressed on future packs.
-                if (!_settings.SettingsModel.DisclaimerAccepted)
+                // Show disclaimer before every package. The "Do not show again" checkbox
+                // was removed — the disclaimer is a lightweight safety acknowledgement and
+                // should always be shown. DisclaimerAccepted is no longer persisted.
                 {
                     int pendingCount = _fileList.Items.Count(f => f.Status == FileStatusEnum.Pending);
                     int scannedCount = _fileList.CleanCount + _fileList.InfectedCount + _fileList.FailedCount;
@@ -91,7 +97,7 @@ namespace PackItPro.ViewModels.CommandHandlers
 
                     bool accepted = DisclaimerWindow.Show(
                         Application.Current?.MainWindow,
-                        out bool suppress,
+                        out bool _,                  // suppressFuture ignored — always show
                         fileCount: _fileList.Count,
                         scannedCount: scannedCount,
                         infectedCount: _fileList.InfectedCount,
@@ -101,12 +107,6 @@ namespace PackItPro.ViewModels.CommandHandlers
                         hasUnscannedFiles: pendingCount > 0);
 
                     if (!accepted) return;
-
-                    if (suppress)
-                    {
-                        _settings.SettingsModel.DisclaimerAccepted = true;
-                        _ = _settings.SaveSettingsAsync();
-                    }
                 }
 
                 var saveDialog = new SaveFileDialog
@@ -131,7 +131,11 @@ namespace PackItPro.ViewModels.CommandHandlers
                 });
 
                 string outputPath = await Packager.CreatePackageAsync(
-                    filePaths: _fileList.Items.Select(f => f.FilePath).ToList(),
+                    filePaths: _fileList.Items
+                        .Select(f => new ManifestGenerator.FileEntry(
+                            f.FilePath,
+                            string.IsNullOrWhiteSpace(f.Notes) ? null : f.Notes))
+                        .ToList(),
                     outputDirectory: Path.GetDirectoryName(saveDialog.FileName) ?? _settings.OutputLocation,
                     packageName: Path.GetFileNameWithoutExtension(saveDialog.FileName),
                     requiresAdmin: _settings.RequiresAdmin,
@@ -290,6 +294,9 @@ namespace PackItPro.ViewModels.CommandHandlers
 
         public override void Dispose()
         {
+            _fileList.PropertyChanged -= OnFileListPropertyChanged;
+            _status.PropertyChanged -= OnStatusPropertyChanged;
+            _settings.PropertyChanged -= OnSettingsPropertyChanged;
             _packCts?.Cancel();
             _packCts?.Dispose();
             base.Dispose();

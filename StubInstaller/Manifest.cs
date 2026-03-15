@@ -92,5 +92,12 @@ namespace StubInstaller
         /// </summary>
         [JsonPropertyName("detectionSource")]
         public string DetectionSource { get; set; } = "extension";
+
+        /// <summary>
+        /// Optional user note set in PackItPro UI. Informational only —
+        /// the stub does not act on it but it round-trips through the manifest.
+        /// </summary>
+        [JsonPropertyName("notes")]
+        public string? Notes { get; set; }
     }
 }

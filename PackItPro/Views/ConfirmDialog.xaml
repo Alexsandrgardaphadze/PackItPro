@@ -59,6 +59,7 @@
                             Width="90"
                             Height="34"
                             Margin="0,0,10,0"
+                            IsCancel="True"
                             Click="NoButton_Click">
                         <Button.Style>
                             <Style TargetType="Button">

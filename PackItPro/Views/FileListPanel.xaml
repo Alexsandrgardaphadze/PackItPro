@@ -154,7 +154,14 @@
                                LineHeight="20" FontFamily="Segoe UI" Margin="0,0,0,18">
                         <Run Text="Drag and drop files or folders here"/>
                         <LineBreak/>
-                        <Run Text="Maximum 20 files per package" FontSize="11"/>
+                        <Run FontSize="11">
+                            <Run.Text>
+                                <MultiBinding StringFormat="Maximum {0} files per package">
+                                    <Binding RelativeSource="{RelativeSource AncestorType=Window}"
+                                             Path="DataContext.Settings.SettingsModel.MaxFilesInList"/>
+                                </MultiBinding>
+                            </Run.Text>
+                        </Run>
                     </TextBlock>
 
                     <Button Content="Browse Files"

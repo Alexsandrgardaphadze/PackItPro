@@ -1,5 +1,73 @@
 ﻿# PackItPro — Changelog
 
+## v0.7.3
+
+### Fixes
+- **Disclaimer now shows on every pack:** `AppSettings.DisclaimerAccepted` defaulted to
+  `true`, meaning the disclaimer never appeared — not even once. Default changed to `false`.
+  The "Do not show again" suppress path has been removed entirely; the disclaimer is a
+  lightweight acknowledgement and is now shown unconditionally before every pack.
+- **`out _` discard compile error fixed:** `PackagingCommandHandler` used `out _` for the
+  `suppressFuture` parameter of `DisclaimerWindow.Show`. The compiler could not resolve the
+  type and emitted `CS1503: cannot convert from 'out object' to 'out bool'`. Changed to
+  `out bool _`.
+- **`PackagingCommandHandler` memory leak fixed:** Three anonymous `PropertyChanged` lambdas
+  on `FileList`, `Status`, and `Settings` were replaced with named methods so `Dispose()` can
+  properly unsubscribe. Mirrors the fix previously applied to `FileOperationsHandler`.
+- **Notes now passed through to `packitmeta.json`:** `PackagingCommandHandler` was still
+  passing `filePaths: Items.Select(f => f.FilePath)` — per-file Notes were silently dropped.
+  Now builds `List<ManifestGenerator.FileEntry>` with `FilePath + Notes`. `Packager` gained a
+  `List<FileEntry>` primary overload; the `List<string>` overload delegates to it.
+- **`VirusTotalCommandHandler` scan success calls `SetStatusSuccess`:** On a clean scan the
+  handler set `_status.Message` directly, leaving `IsSuccess = false` and the progress bar
+  not green. Now calls `SetStatusSuccess(scanSummary)` to match the pack flow.
+- **`AppConstants.ExecutableExtensions` used everywhere:** `MainViewModel._executableExtensions`
+  private `HashSet` replaced with `new HashSet<string>(AppConstants.ExecutableExtensions)`.
+  `VirusTotalCommandHandler._executableExtensions` field removed — both extension filter loops
+  now call `AppConstants.ExecutableExtensions.Contains` directly.
+- **`CommandHandlerBase.RaiseCanExecuteChanged` now works:** Previously fired a dead event
+  nobody subscribed to. Now calls `CommandManager.InvalidateRequerySuggested()` via
+  `Dispatcher.BeginInvoke`, correctly invalidating all bound `RelayCommand`/`AsyncRelayCommand`
+  instances.
+- **`SettingsViewModel.LoadSettingsAsync` no longer drops three fields:** `MaxFilesInList`,
+  `CompressionMethod`, and `DisclaimerAccepted` were omitted from the restore block, resetting
+  to defaults on every app restart.
+- **`ApplicationHandler.ExitCommand` async void fixed:** `RelayCommand(async _ => ...)` created
+  an unobserved `async void` delegate — exceptions from `SaveSettingsAsync` would crash the
+  process on exit. Switched to `AsyncRelayCommand`.
+- **`AppConstants.FormatBytes` added:** Six private `FormatBytes` copies across
+  `FileListViewModel`, `SummaryViewModel`, `SettingsHandler`, `UpdateAvailableWindow`,
+  `CacheViewWindow`, and `App.xaml.cs` consolidated into one static method.
+- **`SummaryPanel` status badge colour fixed:** Background was hardcoded to green regardless
+  of `Status`. Added `DataTrigger`s for "⚠️ Infected Files" (red), "⚠️ Scan Errors" (amber),
+  and "No Files" (grey).
+- **`SummaryViewModel.AllScanned` trusted-file bug fixed:** `ScannedFiles` formula excluded
+  `Trusted` files, so `AllScanned` was `false` even when all files were either scanned or
+  explicitly trusted. Formula now: `CleanFiles + InfectedFiles + FailedScans + TrustedFiles`.
+  `FileListViewModel` gains a `TrustedCount` property notified via `NotifyListChanged`.
+- **`AlertDialog` detail box can no longer grow off-screen:** Long stack traces or paths now
+  scroll inside a `MaxHeight="150"` `ScrollViewer` instead of pushing the window off the
+  display edge.
+- **`IsCancel` added to all dialogs:** `ConfirmDialog`, `AlertDialog`, `AboutWindow`,
+  `FileAddResultWindow`, `ScanResultsWindow`, `PackItProSettingsWindow`, and
+  `UpdateAvailableWindow` all gain `IsCancel="True"` on their dismiss/cancel buttons. ESC now
+  closes every dialog in the app.
+- **`VirusApiKeyWindow` buttons unstyled:** Both buttons used raw system chrome. Cancel now
+  has the app's standard secondary style; Save uses `Win11Button` with `IsDefault="True"`.
+- **`PackSettingsPanel` duplicate `ComboBoxItem` setter removed:** The `IsMouseOver` trigger
+  had two `Background` setters — the first (`AppPrimaryColor`) was silently ignored; only
+  `#2d2d44` is kept.
+- **`ErrorPanel` animation flash fixed:** `ErrorBorder` now starts at `Opacity="0"` so the
+  slide-in animation begins from invisible rather than flashing at full opacity first.
+- **`ErrorPanel` `DropShadowEffect` frozen** — `po:Freeze="True"` added.
+- **`StatusPanel` Pack Now button `DropShadowEffect` frozen** — `po:Freeze="True"` added.
+- **`App.xaml.cs` hardcoded path strings replaced** with `AppConstants.AppName`,
+  `AppConstants.CacheSubDir`, `AppConstants.LogsSubDir`, `AppConstants.CrashLogFileName`.
+- **`AboutWindow` GitHub URL uses `AppConstants`** instead of a hardcoded literal.
+- **`CacheViewWindow` private `FormatBytes` removed** — now calls `AppConstants.FormatBytes`.
+- **`FileListPanel` "Maximum 20 files" label bound** to `MaxFilesInList` via `MultiBinding`
+  `StringFormat` so it reflects the actual configured limit.
+
 ## v0.7.2
 
 ### New Features
@@ -21,6 +89,7 @@
   with a capacity progress bar.
 - **AppConstants.cs:** All magic strings (file names, directory names, GitHub owner/repo,
   numeric limits) centralized in one file to prevent path drift across callsites.
+
 
 ### Fixes
 - **`Assembly.Location` warning eliminated:** `UpdateService.DownloadUpdateAsync` and
@@ -52,8 +121,6 @@
   they have context alongside the rest of the package stats.
 
 ### Notes for this release
-- `AppSettings.DisclaimerAccepted` defaults to `true` in this build to avoid interrupting
-  VM testing. **Change back to `false` before shipping to end users.**
 - Auto-update download requires a `PackItPro.exe` asset attached to the GitHub Release.
 
 ## v0.7.1

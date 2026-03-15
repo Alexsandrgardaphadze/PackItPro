@@ -35,14 +35,30 @@ namespace PackItPro.Services
             if (stream != null)
             {
                 Directory.CreateDirectory(CacheDir);
-                byte[] embedded = ReadFully(stream);
-                string embeddedHash = ComputeHash(embedded);
 
-                if (!File.Exists(CachedStubPath) ||
-                    ComputeFileHash(CachedStubPath) != embeddedHash)
+                // Stream directly to disk instead of loading into RAM first.
+                // The self-contained stub is ~90 MB — a ReadFully() allocation
+                // would put 90 MB on the LOH every pack operation.
+                if (!File.Exists(CachedStubPath) || !StubHashMatches(stream, CachedStubPath, log))
                 {
-                    log?.Info($"[StubLocator] Extracting stub ({embedded.Length / 1024} KB) to cache");
-                    File.WriteAllBytes(CachedStubPath, embedded);
+                    stream.Position = 0; // reset after hash check
+                    log?.Info($"[StubLocator] Extracting stub to cache: {CachedStubPath}");
+                    string tmpPath = CachedStubPath + ".tmp";
+                    try
+                    {
+                        using (var fs = new FileStream(
+                            tmpPath, FileMode.Create, FileAccess.Write,
+                            FileShare.None, bufferSize: 81920))
+                        {
+                            stream.CopyTo(fs);
+                        }
+                        File.Move(tmpPath, CachedStubPath, overwrite: true);
+                    }
+                    catch
+                    {
+                        try { if (File.Exists(tmpPath)) File.Delete(tmpPath); } catch { }
+                        throw;
+                    }
                 }
                 else
                 {
@@ -70,17 +86,29 @@ namespace PackItPro.Services
                 "Release builds: ensure StubInstaller.exe is an EmbeddedResource in PackItPro.csproj");
         }
 
-        private static byte[] ReadFully(Stream stream)
+        /// <summary>
+        /// Returns true if the embedded stream hash matches the cached file on disk.
+        /// Reads both streams without loading either fully into memory.
+        /// </summary>
+        private static bool StubHashMatches(Stream embedded, string cachedPath, ILogService? log)
         {
-            using var ms = new MemoryStream();
-            stream.CopyTo(ms);
-            return ms.ToArray();
+            try
+            {
+                string embeddedHash = ComputeStreamHash(embedded);
+                string cachedHash = ComputeFileHash(cachedPath);
+                return embeddedHash == cachedHash;
+            }
+            catch (Exception ex)
+            {
+                log?.Warning($"[StubLocator] Hash check failed: {ex.Message} — will re-extract");
+                return false;
+            }
         }
 
-        private static string ComputeHash(byte[] data)
+        private static string ComputeStreamHash(Stream stream)
         {
             using var sha = SHA256.Create();
-            return Convert.ToHexString(sha.ComputeHash(data));
+            return Convert.ToHexString(sha.ComputeHash(stream));
         }
 
         private static string ComputeFileHash(string path)

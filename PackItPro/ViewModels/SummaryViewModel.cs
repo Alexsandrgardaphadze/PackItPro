@@ -32,7 +32,8 @@ namespace PackItPro.ViewModels
                                or nameof(FileListViewModel.CleanCount)
                                or nameof(FileListViewModel.InfectedCount)
                                or nameof(FileListViewModel.FailedCount)
-                               or nameof(FileListViewModel.SkippedCount))
+                               or nameof(FileListViewModel.SkippedCount)
+                               or nameof(FileListViewModel.TrustedCount))
             {
                 NotifySummaryChanged();
             }
@@ -54,6 +55,7 @@ namespace PackItPro.ViewModels
             OnPropertyChanged(nameof(InfectedFiles));
             OnPropertyChanged(nameof(FailedScans));
             OnPropertyChanged(nameof(SkippedFiles));
+            OnPropertyChanged(nameof(TrustedFiles));
             OnPropertyChanged(nameof(TotalSize));
             OnPropertyChanged(nameof(Status));
             OnPropertyChanged(nameof(EstimatedPackageSize));
@@ -73,6 +75,7 @@ namespace PackItPro.ViewModels
         public int InfectedFiles => _fileListViewModel.InfectedCount;
         public int FailedScans => _fileListViewModel.FailedCount;
         public int SkippedFiles => _fileListViewModel.SkippedCount;
+        public int TrustedFiles => _fileListViewModel.TrustedCount;
         public string RequiresAdminText => _settingsViewModel.RequiresAdmin ? "Yes" : "No";
 
         /// <summary>Maximum files allowed, sourced from settings.</summary>
@@ -81,10 +84,16 @@ namespace PackItPro.ViewModels
         /// <summary>"X / Y" label shown in the Total Files card.</summary>
         public string FilesLabel => $"{Files} / {MaxFiles}";
 
-        /// <summary>Number of files that have been scanned (clean + infected + failed).</summary>
-        public int ScannedFiles => CleanFiles + InfectedFiles + FailedScans;
+        /// <summary>
+        /// Files that have a definitive scan result: clean, infected, failed, or trusted.
+        /// Trusted files count as "resolved" — the user has explicitly acknowledged them.
+        /// </summary>
+        public int ScannedFiles => CleanFiles + InfectedFiles + FailedScans + TrustedFiles;
 
-        /// <summary>True when every file in the list has been scanned.</summary>
+        /// <summary>
+        /// True when every file in the list has been either scanned or marked trusted.
+        /// Previously this was false whenever any file was trusted, which was wrong.
+        /// </summary>
         public bool AllScanned => Files > 0 && ScannedFiles == Files;
 
         public string Status

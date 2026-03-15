@@ -53,7 +53,13 @@ namespace StubInstaller
             long availableMB = GetAvailableDiskMB(tempExtractionPath);
             long neededMB = requiredMB + HeadroomMB;
 
-            log($"   Disk: {availableMB} MB available, {neededMB} MB needed " +
+            // NOTE: We check the drive containing %TEMP% (the extraction path),
+            // not the final install target drive. If installers write to a different
+            // drive (e.g. D:\Program Files) this check may pass even if that drive
+            // is nearly full. This is a known limitation — install targets are not
+            // known until the installer actually runs.
+            string checkedDrive = Path.GetPathRoot(tempExtractionPath) ?? "C:\\";
+            log($"   Disk ({checkedDrive}): {availableMB} MB available, {neededMB} MB needed " +
                 $"({requiredMB} estimated + {HeadroomMB} MB headroom)");
 
             if (availableMB < neededMB)
