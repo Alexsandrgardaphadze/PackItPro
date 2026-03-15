@@ -1,4 +1,4 @@
-// Converters/ByteToSizeConverter.cs - v2.3 OPTIMIZED
+// PackItPro/Converters/ByteToSizeConverter.cs
 using System;
 using System.Globalization;
 using System.Windows.Data;

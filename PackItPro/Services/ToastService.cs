@@ -1,14 +1,4 @@
-﻿// Services/ToastService.cs - v2.0 SOUND + MORE NOTIFICATIONS
-// Changes vs v1.0:
-//   - SOUND: Every toast now includes <audio src="ms-winsoundevent:Notification.Default"/>
-//     (the standard Windows notification chime). The previous version had no <audio>
-//     element at all, so Windows silently suppressed the sound.
-//   - NEW: NotifyScanStarted   — fires when VirusTotal scan begins
-//   - NEW: NotifyScanComplete  — summarises scan (clean / threats found)
-//   - NEW: NotifyTrustChanged  — fires when user marks/unmarks a file as trusted
-//   - NEW: NotifyError         — fires on non-fatal errors the user should see
-//   - All methods are null-safe and swallow toast exceptions so they never
-//     crash the app if the notification subsystem is unavailable.
+﻿// PackItPro/Services/ToastService.cs
 using Microsoft.Toolkit.Uwp.Notifications;
 using System;
 using System.Xml.Linq;

@@ -1,5 +1,4 @@
-﻿// Converters/StatusToBackgroundConverter.cs - v2.4
-// Added: Trusted → teal semi-transparent background (matches IsTrustedFalsePositive visual language)
+﻿// Converters/StatusToBackgroundConverter.cs
 using System;
 using System.Globalization;
 using System.Windows.Data;
@@ -13,7 +12,6 @@ namespace PackItPro.Converters
     /// </summary>
     public class StatusToBackgroundConverter : IValueConverter
     {
-        // 15% opacity = alpha 38 (0x26)
         private static readonly SolidColorBrush CleanBackground = new(Color.FromArgb(38, 0x10, 0xB9, 0x81)); // emerald
         private static readonly SolidColorBrush InfectedBackground = new(Color.FromArgb(38, 0xEF, 0x44, 0x44)); // red
         private static readonly SolidColorBrush FailedBackground = new(Color.FromArgb(38, 0xF5, 0x9E, 0x0B)); // amber

@@ -1,4 +1,4 @@
-﻿// Views/ErrorPanel.xaml.cs - UPDATED VERSION
+﻿// PackItPro/Views/ErrorPanel.xaml.cs
 using System;
 using System.Windows;
 using System.Windows.Controls;

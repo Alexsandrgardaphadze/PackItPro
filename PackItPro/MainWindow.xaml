@@ -1,13 +1,4 @@
-﻿<!-- MainWindow.xaml - v4.0 UI IMPROVEMENTS
-     Changes vs v3.0:
-       - Menu bar: converted inner layout to DockPanel so menu items sit LEFT
-         and a status strip sits RIGHT (file counter, VirusTotal shield badge,
-         version label). This fills the empty right space naturally.
-       - MenuItemStyle: top-level items now have a subtle left accent bar on hover
-         and a slightly brighter foreground, making them clearly clickable.
-         (See updated Styles.xaml MenuItemStyle)
-       - All functional bindings unchanged.
--->
+﻿<!-- MainWindow.xaml -->
 <Window x:Class="PackItPro.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"

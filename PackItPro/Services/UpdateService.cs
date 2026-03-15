@@ -1,9 +1,4 @@
-﻿// PackItPro/Services/UpdateService.cs - v3.1
-// Changes vs v3.0:
-//   [1] Fixed: Assembly.GetExecutingAssembly().Location always returns "" in a
-//       single-file publish (compiler warning IL3000). DownloadUpdateAsync now
-//       uses Environment.ProcessPath (correct API for .NET 6+ single-file apps)
-//       with AppContext.BaseDirectory as fallback. Assembly.Location removed.
+﻿// PackItPro/Services/UpdateService.cs
 using System;
 using System.Collections.Generic;
 using System.IO;

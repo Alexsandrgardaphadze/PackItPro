@@ -1,4 +1,4 @@
-﻿<!-- Views/PackSettingsPanel.xaml -->
+﻿<!-- PackItPro/Views/PackSettingsPanel.xaml -->
 <UserControl x:Class="PackItPro.Views.PackSettingsPanel"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"

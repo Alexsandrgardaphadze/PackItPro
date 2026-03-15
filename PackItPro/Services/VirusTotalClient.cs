@@ -1,4 +1,4 @@
-﻿// PackItPro/Services/VirusTotalClient.cs - v2.2
+﻿// PackItPro/Services/VirusTotalClient.cs
 #nullable enable
 using System;
 using System.Collections.Concurrent;

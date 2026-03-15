@@ -1,4 +1,4 @@
-﻿// Views/AboutWindow.xaml.cs
+﻿// PackItPro/Views/AboutWindow.xaml.cs
 using PackItPro.Services;
 using System;
 using System.Diagnostics;

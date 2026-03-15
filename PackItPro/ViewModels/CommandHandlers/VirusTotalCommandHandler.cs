@@ -1,12 +1,4 @@
-﻿// PackItPro/ViewModels/CommandHandlers/VirusTotalCommandHandler.cs - v2.4 (TRUST STORE FIX)
-// Changes vs v2.3:
-//   [1] TrustStore injected via constructor — trusted files are now SKIPPED during scanning.
-//       Previously the handler had no reference to TrustStore, so every scan would re-flag
-//       files the user had already marked as false positives. Files whose SHA-256 hash is in
-//       TrustStore are now marked FileStatusEnum.Trusted and counted as "skipped (trusted)".
-//   [2] Hash computation is done inline using SHA256 on the file path, consistent with how
-//       MarkTrustCommandHandler computes hashes before calling TrustStore.TrustAsync.
-//   [3] Trusted-file skip is logged so users can verify the behaviour in packitpro.log.
+﻿// PackItPro/ViewModels/CommandHandlers/VirusTotalCommandHandler.cs
 using PackItPro.Models;
 using PackItPro.Services;
 using PackItPro.Views;

@@ -1,4 +1,4 @@
-﻿// PackItPro/Services/ILogService.cs - v2.2
+﻿// PackItPro/Services/ILogService.cs
 using System;
 using System.Diagnostics;
 using System.IO;

@@ -1,8 +1,5 @@
-﻿// Views/AlertDialog.xaml.cs
-// Styled single-button alert. Replaces all MessageBox.Show(..., OK) calls.
-// Usage:
-//   AlertDialog.Show(owner, "Key Saved", "Your API key was saved successfully.", kind: AlertDialog.Kind.Success);
-//   AlertDialog.Show(owner, "Error", "Could not write file.", detail: ex.Message, kind: AlertDialog.Kind.Error);
+﻿// PackItPro/Views/AlertDialog.xaml.cs
+
 using System.Windows;
 using System.Windows.Media;
 

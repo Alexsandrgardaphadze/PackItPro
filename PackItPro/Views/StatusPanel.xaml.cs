@@ -1,6 +1,4 @@
-﻿// Views/StatusPanel.xaml.cs - v3.0 SPINNER ANIMATION
-// Drives the Fluent spinner arc by listening to StatusViewModel.IsBusy.
-// The XAML DataTriggers handle show/hide; this file only manages Begin/Stop.
+﻿// PackItPro/Views/StatusPanel.xaml.cs
 using PackItPro.ViewModels;
 using System.ComponentModel;
 using System.Windows;

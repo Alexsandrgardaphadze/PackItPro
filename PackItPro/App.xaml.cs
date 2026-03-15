@@ -1,4 +1,4 @@
-﻿// App.xaml.cs
+﻿// PackItPro/App.xaml.cs
 using PackItPro.Services;
 using System;
 using System.IO;

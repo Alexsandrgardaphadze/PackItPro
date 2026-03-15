@@ -1,5 +1,4 @@
-﻿// PackItPro/Models/FileStatusEnum.cs - v2.4
-// Added: Trusted — file hash is in TrustStore; scan skipped, treated as safe.
+﻿// PackItPro/Models/FileStatusEnum.cs
 namespace PackItPro.Models
 {
     /// <summary>

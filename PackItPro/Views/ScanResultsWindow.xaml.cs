@@ -1,9 +1,4 @@
-﻿// Views/ScanResultsWindow.xaml.cs
-// Replaces the three end-of-scan MessageBox.Show calls in VirusTotalCommandHandler.
-// Usage:
-//   ScanResultsWindow.ShowInfected(owner, infectedCount, totalFiles, autoRemoved: true);
-//   ScanResultsWindow.ShowErrors(owner, failedCount);
-//   ScanResultsWindow.ShowClean(owner, totalFiles, skippedCount);
+﻿// PackItPro/Views/ScanResultsWindow.xaml.cs
 using System.Windows;
 using System.Windows.Media;
 

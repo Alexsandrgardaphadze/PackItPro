@@ -1,8 +1,4 @@
 ﻿// PackItPro/ViewModels/MainViewModel.cs
-// v2.1  -  TrustStore now passed to VirusTotalCommandHandler (fixes #2/#3: trusted files
-//         were being re-scanned and re-flagged every time because the handler had no
-//         reference to the store).
-// No other logic changed.
 using PackItPro.Services;
 using PackItPro.ViewModels.CommandHandlers;
 using System;

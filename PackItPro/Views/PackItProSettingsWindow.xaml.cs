@@ -1,5 +1,4 @@
-﻿// Views/PackItProSettingsWindow.xaml.cs
-// v2.0 — added TrustStore viewer with per-entry remove buttons
+﻿// PackItPro/Views/PackItProSettingsWindow.xaml.cs
 using PackItPro.Models;
 using PackItPro.Services;
 using System;

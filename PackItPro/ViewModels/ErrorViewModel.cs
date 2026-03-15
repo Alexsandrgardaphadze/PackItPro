@@ -1,9 +1,4 @@
-﻿// PackItPro/ViewModels/ErrorViewModel.cs - v2.2 (ASYNC RETRY SUPPORT)
-// Changes vs v2.1:
-//   [1] Added _retryActionAsync field and property for async retry actions.
-//   [2] Added ShowErrorAsync method to accept Func<Task> retryActionAsync.
-//   [3] ExecuteRetry now handles both sync and async actions.
-//   [4] RelayCommand for RetryCommand now uses async execution.
+﻿// PackItPro/ViewModels/ErrorViewModel.cs
 using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;

@@ -1,7 +1,4 @@
-﻿// PackItPro/ViewModels/FileItemViewModel.cs - v2.1
-// Added: Notes property — free-text label per file (install order hints, etc.)
-//        Surfaces in the file list Notes column and is written into packitmeta.json
-//        by ManifestGenerator so the stub can display it during installation.
+﻿// PackItPro/ViewModels/FileItemViewModel.cs
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;

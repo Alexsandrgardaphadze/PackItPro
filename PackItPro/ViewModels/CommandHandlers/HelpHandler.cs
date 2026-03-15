@@ -1,10 +1,4 @@
-﻿// PackItPro/ViewModels/CommandHandlers/HelpHandler.cs - v2.0
-// Changes vs v1.x:
-//   [1] CheckUpdatesCommand now opens UpdateAvailableWindow (download + install)
-//       instead of just navigating to the GitHub releases page in a browser.
-//   [2] CheckForUpdatesOnStartupAsync() added -- call from MainViewModel after
-//       InitializeAsync completes. Delays 8 s, checks silently, shows the dialog
-//       only when an update is actually available. Fully silent otherwise.
+﻿// PackItPro/ViewModels/CommandHandlers/HelpHandler.cs
 using PackItPro.Services;
 using PackItPro.Views;
 using System;

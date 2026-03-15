@@ -1,5 +1,4 @@
-﻿// PackItPro/Models/AppSettings.cs - v2.1
-// Added: ScanOnAdd — when true, VirusTotal scan fires automatically after files are added.
+﻿// PackItPro/Models/AppSettings.cs
 using System;
 using System.Collections.Generic;
 

@@ -1,6 +1,4 @@
-﻿// PackItPro/ViewModels/SettingsViewModel.cs - v2.1
-// Added: ScanOnAdd property (wraps AppSettings.ScanOnAdd)
-//        LoadSettingsAsync now restores ScanOnAdd from JSON.
+﻿// PackItPro/ViewModels/SettingsViewModel.cs
 using PackItPro.Models;
 using PackItPro.Services;
 using System;

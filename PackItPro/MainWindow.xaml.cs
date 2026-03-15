@@ -1,12 +1,4 @@
-﻿// MainWindow.xaml.cs - v2.1
-// Fix: Memory leak — Application.Current.DispatcherUnhandledException was subscribed
-//      inside OnInitialized with a lambda capturing 'this'. Because Application lives
-//      for the entire process lifetime, that subscription kept the Window (and its
-//      entire visual tree) alive indefinitely, preventing GC. The handler is now a
-//      named method and is unsubscribed in Window_Closing.
-// Fix: Redundant DispatcherUnhandledException handler removed — App.xaml.cs already
-//      registers the authoritative handler in OnStartup. Having a second handler here
-//      caused every unhandled exception to show two dialogs.
+﻿// PackItPro/MainWindow.xaml.cs
 using System;
 using System.ComponentModel;
 using System.Threading.Tasks;

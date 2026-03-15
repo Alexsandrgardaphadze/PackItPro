@@ -1,5 +1,4 @@
-﻿// Converters/FileStatusToColorConverter.cs - v2.4
-// Added: Trusted → cyan-500 solid brush (matches StatusToBackgroundConverter palette)
+﻿// Converters/FileStatusToColorConverter.cs
 using System;
 using System.Globalization;
 using System.Windows.Data;

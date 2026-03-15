@@ -1,7 +1,4 @@
 ﻿// PackItPro/Services/TrustStore.cs
-// Per-user false-positive allowlist keyed by SHA-256 hash.
-// Stored in %LocalAppData%\PackItPro\trusted_hashes.json.
-// Thread-safe for concurrent reads; writes are serialised through a lock.
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;

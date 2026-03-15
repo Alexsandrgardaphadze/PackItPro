@@ -1,16 +1,4 @@
-﻿<!-- Views/StatusPanel.xaml - v4.0 UI IMPROVEMENTS
-
-     Changes vs v3.0:
-
-       - FIXED: Spinner rotation center — moved from Canvas (broken) to a Grid
-
-         with RenderTransformOrigin="0.5,0.5" so the arc spins around its true centre.
-
-         Canvas ignores RenderTransformOrigin because it has no layout bounds.
-
-       - FIXED: Spinner arc replaced with a symmetric donut arc that looks centred.
-
--->
+﻿<!-- Views/StatusPanel.xaml -->
 
 <UserControl x:Class="PackItPro.Views.StatusPanel"
 

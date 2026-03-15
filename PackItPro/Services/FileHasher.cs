@@ -1,4 +1,4 @@
-﻿// PackItPro/Services/FileHasher.cs - v2.2
+﻿// PackItPro/Services/FileHasher.cs
 using System;
 using System.Collections.Generic;
 using System.IO;

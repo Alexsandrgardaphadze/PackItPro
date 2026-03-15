@@ -1,4 +1,4 @@
-﻿// PackItPro/Services/StubLocator.cs - v2.2
+﻿// PackItPro/Services/StubLocator.cs
 using System;
 using System.IO;
 using System.Reflection;

@@ -1,9 +1,4 @@
 ﻿// PackItPro/ViewModels/FileListViewModel.cs
-// v2.1 — Duplicate file detection (#4)
-//   AddFilesWithValidation now checks for existing paths (OrdinalIgnoreCase)
-//   before any other guard. Duplicates are reported as "already in list" in
-//   SkipReasons so FileAddResultWindow surfaces them to the user.
-//   No other logic changed.
 using PackItPro.Models;
 using System;
 using System.Collections.Generic;

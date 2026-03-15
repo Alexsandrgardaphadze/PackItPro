@@ -1,29 +1,4 @@
 ﻿// PackItPro/Services/UpdaterLauncher.cs - v1.0
-//
-// Replaces the running PackItPro.exe with a downloaded update and restarts.
-//
-// Why a separate script?
-//   A running Windows exe is memory-mapped and locked by the OS. You cannot
-//   overwrite it from within the same process. The standard pattern is:
-//     1. Drop a small helper script into %TEMP%
-//     2. Launch the script (it runs in a separate process)
-//     3. Shut down the current process
-//     4. The script waits for the current process to exit, then renames the
-//        downloaded temp file over the old exe, then restarts the new exe
-//
-// Why PowerShell and not a second C# exe?
-//   PowerShell is present on every supported Windows version (Win10+) and
-//   doesn't require us to ship an extra binary. The script is ~20 lines and
-//   does nothing beyond wait/rename/start -- easy to audit.
-//
-// Security considerations:
-//   - The temp file was downloaded over HTTPS with EnsureSuccessStatusCode().
-//   - The script is written to the user's own %TEMP% (no elevation needed).
-//   - The rename target is the directory that contains the running exe, which
-//     the user already has write access to (otherwise the app couldn't have
-//     been launched from there).
-//   - If anything fails the script writes to a log file in %TEMP% and exits
-//     without doing anything destructive.
 using System;
 using System.Diagnostics;
 using System.IO;

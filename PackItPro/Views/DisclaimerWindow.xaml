@@ -32,63 +32,6 @@
                        Foreground="{StaticResource AppTextTertiaryColor}"
                        Margin="0,4,0,0"/>
         </StackPanel>
-        <!-- File summary — populated in code-behind -->
-        <Border x:Name="FileSummaryBorder"
-                Grid.Row="0"
-                Background="{StaticResource AppCardColor}"
-                BorderBrush="{StaticResource AppBorderColor}"
-                BorderThickness="1" CornerRadius="8"
-                Padding="14,10" Margin="0,10,0,0">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-                <StackPanel Grid.Column="0" HorizontalAlignment="Center">
-                    <TextBlock Text="FILES" FontSize="9" FontWeight="SemiBold"
-                               FontFamily="Segoe UI" HorizontalAlignment="Center"
-                               Foreground="{StaticResource AppTextTertiaryColor}" Margin="0,0,0,3"/>
-                    <TextBlock x:Name="SummaryFilesText" FontSize="15" FontWeight="SemiBold"
-                               FontFamily="Consolas" HorizontalAlignment="Center"
-                               Foreground="{StaticResource AppTextColor}"/>
-                </StackPanel>
-                <StackPanel Grid.Column="1" HorizontalAlignment="Center">
-                    <TextBlock Text="SCANNED" FontSize="9" FontWeight="SemiBold"
-                               FontFamily="Segoe UI" HorizontalAlignment="Center"
-                               Foreground="{StaticResource AppTextTertiaryColor}" Margin="0,0,0,3"/>
-                    <TextBlock x:Name="SummaryScannedText" FontSize="15" FontWeight="SemiBold"
-                               FontFamily="Consolas" HorizontalAlignment="Center"
-                               Foreground="{StaticResource AppTextColor}"/>
-                </StackPanel>
-                <StackPanel Grid.Column="2" HorizontalAlignment="Center">
-                    <TextBlock Text="UNSCANNED" FontSize="9" FontWeight="SemiBold"
-                               FontFamily="Segoe UI" HorizontalAlignment="Center"
-                               Foreground="{StaticResource AppTextTertiaryColor}" Margin="0,0,0,3"/>
-                    <TextBlock x:Name="SummaryUnscannedText" FontSize="15" FontWeight="SemiBold"
-                               FontFamily="Consolas" HorizontalAlignment="Center"
-                               Foreground="{StaticResource AppStatusErrorColor}"/>
-                </StackPanel>
-                <StackPanel Grid.Column="3" HorizontalAlignment="Center">
-                    <TextBlock Text="INFECTED" FontSize="9" FontWeight="SemiBold"
-                               FontFamily="Segoe UI" HorizontalAlignment="Center"
-                               Foreground="{StaticResource AppTextTertiaryColor}" Margin="0,0,0,3"/>
-                    <TextBlock x:Name="SummaryInfectedText" FontSize="15" FontWeight="SemiBold"
-                               FontFamily="Consolas" HorizontalAlignment="Center"
-                               Foreground="{StaticResource AppStatusErrorColor}"/>
-                </StackPanel>
-                <StackPanel Grid.Column="4" HorizontalAlignment="Center">
-                    <TextBlock Text="TRUSTED" FontSize="9" FontWeight="SemiBold"
-                               FontFamily="Segoe UI" HorizontalAlignment="Center"
-                               Foreground="{StaticResource AppTextTertiaryColor}" Margin="0,0,0,3"/>
-                    <TextBlock x:Name="SummaryTrustedText" FontSize="15" FontWeight="SemiBold"
-                               FontFamily="Consolas" HorizontalAlignment="Center"
-                               Foreground="{StaticResource AppTextColor}"/>
-                </StackPanel>
-            </Grid>
-        </Border>
 
         <!-- Clauses -->
         <ScrollViewer Grid.Row="1"
@@ -233,16 +176,17 @@
             </StackPanel>
         </ScrollViewer>
 
-        <!-- Do not show again -->
-        <CheckBox Grid.Row="2"
-                  x:Name="DoNotShowAgainBox"
-                  Content="I understand — do not show this again"
-                  FontFamily="Segoe UI" FontSize="12"
-                  Foreground="{StaticResource AppTextSecondaryColor}"
-                  IsChecked="False"
-                  Checked="DoNotShowAgain_Checked"
-                  Unchecked="DoNotShowAgain_Unchecked"
-                  Margin="0,0,0,16"/>
+        <!-- Acknowledgement row - no checkbox needed since disclaimer always shows -->
+        <Border Grid.Row="2"
+                Background="{StaticResource AppCardColor}"
+                BorderBrush="{StaticResource AppBorderColor}"
+                BorderThickness="1" CornerRadius="6"
+                Padding="12,8" Margin="0,0,0,14">
+            <TextBlock Text="By clicking Accept &amp; Continue you confirm you have read and understood the above."
+                       FontFamily="Segoe UI" FontSize="11"
+                       Foreground="{StaticResource AppTextTertiaryColor}"
+                       TextWrapping="Wrap"/>
+        </Border>
 
         <!-- Buttons -->
         <Grid Grid.Row="3">
@@ -290,7 +234,7 @@
 
             <Button Grid.Column="3" x:Name="AcceptButton"
                     Content="Accept &amp; Continue" Width="150" Height="34"
-                    IsEnabled="False"
+                    IsEnabled="True"
                     IsDefault="True"
                     Click="Accept_Click"
                     Style="{StaticResource Win11Button}"/>

@@ -1,5 +1,4 @@
-// PackItPro/Services/PayloadHasher.cs - v1.0
-// Streamed SHA-256 hashing for large payloads without loading entire file into memory.
+// PackItPro/Services/PayloadHasher.cs
 using System;
 using System.IO;
 using System.Security.Cryptography;

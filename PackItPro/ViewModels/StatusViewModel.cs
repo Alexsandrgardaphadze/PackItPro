@@ -1,12 +1,4 @@
-﻿// ViewModels/StatusViewModel.cs - v2.1 PHASE 1 FIX
-// Changes vs v2.0:
-//   - SetStatusReady no longer resets ProgressPercentage to 0.
-//     Previously the finally block in PackagingCommandHandler called SetStatusReady()
-//     immediately after success, making the progress bar flash from 100% to 0%.
-//   - Added SetStatusSuccess(message) — call this on success to keep the bar at 100%
-//     with a "Done" state. SetStatusReady() resets to 0 only when the user adds new
-//     files or explicitly starts a new operation.
-//   - Added ElapsedSeconds to surface timing info to the UI (opt-in).
+﻿// PackItPro/ViewModels/StatusViewModel.cs
 using System;
 using System.ComponentModel;
 

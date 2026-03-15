@@ -1,7 +1,4 @@
 ﻿// PackItPro/Services/CredentialStore.cs
-// Encrypts the VirusTotal API key using Windows DPAPI.
-// DPAPI binds encryption to the current Windows user account — only the same
-// user on the same machine can decrypt. No password, no key management needed.
 using System;
 using System.IO;
 using System.Security.Cryptography;

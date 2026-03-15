@@ -1,25 +1,4 @@
-﻿// PackItPro/Services/ManifestGenerator.cs - v2.6
-// Changes vs v2.5:
-//   [1] Detection scan increased from 4 KB to 512 KB.
-//       The old 4 KB limit only covered the PE MZ/COFF headers — installer
-//       signatures (NSIS, Inno, Squirrel) live in the resource section which
-//       starts well beyond that. 512 KB reliably covers all common installer
-//       types without being slow at packaging time.
-//
-//   [2] NSIS detection fixed.
-//       Old check tested bytes [4..7] of the raw header for EF BE AD DE — that
-//       magic marks the NSIS first-header block, which sits AFTER the PE code
-//       section (never in the first 8 bytes). New check scans for the ASCII
-//       string "Nullsoft" which is always embedded in the NSIS resource section.
-//
-//   [3] Detection priority order made explicit and documented:
-//       WiX Burn → NSIS → Inno Setup → Squirrel → generic exe
-//       WiX is checked first because .wixburn lives in the PE section table
-//       (always in the first 512 bytes) and is unambiguous.
-//
-//   [4] Scan helper split into ScanHeader() (reads the bytes once) and
-//       ContainsAscii() (searches without allocating a string). The bytes
-//       are read once and reused for all checks.
+﻿// PackItPro/Services/ManifestGenerator.cs
 using System;
 using System.Collections.Generic;
 using System.IO;

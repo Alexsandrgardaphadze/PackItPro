@@ -1,4 +1,4 @@
-﻿// Views/InputDialog.cs - v2.0 OPTIMIZED
+﻿// PackItPro/Views/InputDialog.cs
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;

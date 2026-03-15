@@ -1,15 +1,4 @@
-﻿<!-- Views/FileListPanel.xaml - v5.1
-     Fixes vs v5.0:
-       - Delete (✕) button now always visible — was clipped at default window width
-         because all columns had fixed widths that summed past the panel's 3* share.
-       - Notes column stretches to fill all remaining space instead of a fixed 160px.
-         SizeChanged in code-behind recalculates: NotesWidth = listViewWidth - 470px
-         (470 = 35+200+75+110+32 fixed cols + ~18px scrollbar).
-       - HorizontalScrollBarVisibility changed Disabled → Hidden to avoid the WPF
-         measure loop that fires on every resize when content sits exactly at boundary.
-       - VirtualizingPanel.VirtualizationMode="Recycling" added — reuses row containers
-         instead of creating new ones on scroll, eliminating the resize RAM spike.
--->
+﻿<!-- Views/FileListPanel.xaml -->
 <UserControl x:Class="PackItPro.Views.FileListPanel"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"

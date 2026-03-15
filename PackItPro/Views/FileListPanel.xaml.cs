@@ -1,18 +1,4 @@
-﻿// Views/FileListPanel.xaml.cs - v2.2
-// Added: FileListView_SizeChanged — keeps NotesColumn.Width = available space minus
-//        the sum of all fixed columns, so the Notes column always fills the gap between
-//        Status and the Delete button regardless of window width.
-//
-// Fixed columns and their widths (must match XAML exactly):
-//   Icon     35
-//   FileName 200
-//   Size     75
-//   Status   110
-//   Delete   32
-//   ──────────── = 452px + ~18px scrollbar allowance = 470px reserved
-//
-// Notes gets: FileListView.ActualWidth - 470, clamped to a minimum of 60px so the
-// column header stays visible even at the minimum window width (900px).
+﻿// PackItPro/Views/FileListPanel.xaml.cs
 using PackItPro.ViewModels;
 using System;
 using System.Linq;

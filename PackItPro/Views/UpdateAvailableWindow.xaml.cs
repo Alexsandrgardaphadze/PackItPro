@@ -1,4 +1,4 @@
-﻿// PackItPro/Views/UpdateAvailableWindow.xaml.cs - v1.0
+﻿// PackItPro/Views/UpdateAvailableWindow.xaml.cs
 using PackItPro.Services;
 using System;
 using System.Diagnostics;

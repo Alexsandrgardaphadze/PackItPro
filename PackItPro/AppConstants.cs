@@ -1,7 +1,4 @@
 ﻿// PackItPro/AppConstants.cs
-// Single source of truth for all magic strings, file names, and limits.
-// Reference this instead of scattering literals across files — if a name
-// ever changes, it changes here and the compiler catches every callsite.
 using System;
 using System.Collections.Generic;
 namespace PackItPro

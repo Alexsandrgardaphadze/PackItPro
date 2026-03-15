@@ -1,11 +1,5 @@
-﻿// Views/ConfirmDialog.xaml.cs
-// Styled YesNo dialog. Replaces all MessageBox.Show(..., YesNo) calls in the app.
-// Usage:
-//   bool confirmed = ConfirmDialog.Show(
-//       owner : this,
-//       title  : "Delete API Key",
-//       message: "Are you sure? Scanning will be disabled.",
-//       kind   : ConfirmDialog.Kind.Danger);   // or .Warning / .Info
+﻿// PackItPro/Views/ConfirmDialog.xaml.cs
+
 using System.Windows;
 
 namespace PackItPro.Views

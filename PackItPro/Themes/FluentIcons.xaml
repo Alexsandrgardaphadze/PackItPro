@@ -1,8 +1,4 @@
 ﻿<!-- Themes/FluentIcons.xaml
-     Fluent System Icons geometry paths — 20px regular/filled sets.
-     Source: microsoft/fluentui-system-icons (MIT licence)
-     Usage: <Path Data="{StaticResource Icon.Package}" Fill="..." Width="16" Height="16" Stretch="Uniform"/>
-     
      IMPORTANT: This file must exist on disk for App.xaml to load successfully.
      If this file is missing, App.xaml's MergedDictionaries chain aborts and ALL
      resources (colors, styles, converters) become unavailable app-wide.

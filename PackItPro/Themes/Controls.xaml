@@ -1,13 +1,4 @@
-﻿<!-- Themes/Controls.xaml - v3.0 UI IMPROVEMENTS
-     Changes vs v2.0:
-       - ADDED: ComprehensiveComboBoxStyle — full custom ControlTemplate that
-         actually works (v2 dropdown was never clickable because it lacked
-         PART_Popup and PART_ToggleButton named parts that ComboBox requires).
-       - ADDED: StyledTextBoxStyle — matches the combobox look exactly
-         (rounded, dark, focus ring in AppPrimaryColor).
-       - UPDATED: MenuItemStyle hover state in Styles.xaml (see that file).
-       - All other styles unchanged.
--->
+﻿<!-- Themes/Controls.xaml-->
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:po="http://schemas.microsoft.com/winfx/2006/xaml/presentation/options">

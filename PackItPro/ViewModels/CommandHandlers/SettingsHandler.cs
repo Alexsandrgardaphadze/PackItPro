@@ -1,9 +1,4 @@
-﻿// PackItPro/ViewModels/CommandHandlers/SettingsHandler.cs - v2.0 CUSTOM DIALOGS
-// Changes vs v1.x:
-//   - MessageBox.Show(..., YesNo) → ConfirmDialog.Show(...)
-//   - MessageBox.Show(..., OK)    → AlertDialog.Show(...)
-//   - ExecutePackItProSettings    → PackItProSettingsWindow (real editable UI)
-//   - ExecuteViewCache            → CacheViewWindow (stats + Open in Notepad)
+﻿// PackItPro/ViewModels/CommandHandlers/SettingsHandler.cs
 using PackItPro.Models;
 using PackItPro.Services;
 using PackItPro.Views;

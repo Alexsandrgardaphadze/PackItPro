@@ -1,8 +1,4 @@
 ﻿// PackItPro/ViewModels/CommandHandlers/FileOperationsHandler.cs
-// v2.3 — Memory leak fix: PropertyChanged subscription is now a named method
-//         so it can be properly unsubscribed in Dispose().
-//         The anonymous lambda in v2.1/v2.2 was never removed, keeping
-//         FileOperationsHandler alive as long as FileListViewModel lived.
 using PackItPro.Views;
 using System;
 using System.IO;

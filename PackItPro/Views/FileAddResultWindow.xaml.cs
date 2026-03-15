@@ -1,6 +1,4 @@
-﻿// Views/FileAddResultWindow.xaml.cs
-// Replaces the MessageBox in FileListPanel.xaml.cs UserControl_Drop.
-// Call Show() from code-behind; it is modal and returns immediately on OK.
+﻿// PackItPro/Views/FileAddResultWindow.xaml.cs
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
