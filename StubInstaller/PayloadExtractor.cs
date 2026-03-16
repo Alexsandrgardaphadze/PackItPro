@@ -1,18 +1,4 @@
-﻿// StubInstaller/PayloadExtractor.cs - v3.0
-// Changes vs v2.0:
-//   [1] Streaming extraction — payload is never loaded into RAM as byte[].
-//       v2.0 allocated new byte[payloadSize] (up to 2 GB on the LOH) then wrapped
-//       it in a MemoryStream for ZIP extraction. On machines with 4 GB RAM and a
-//       large package this caused an OutOfMemoryException before a single file was
-//       extracted. v3.0 seeks the FileStream to the payload offset and passes it
-//       directly to ZipArchive — zero payload allocation.
-//   [2] LogDebug now delegates to StubLogger.Log instead of writing to a separate
-//       PackItPro_Extraction.log in %TEMP%. All output goes to the single install
-//       log so diagnosis is not split across two files.
-//   [3] Console.WriteLine removed — produces no output in the WinForms stub and
-//       cluttered console mode with duplicate lines already in StubLogger.
-//   [4] ExtractPayloadToTempDirectory(byte[]) kept as an internal compatibility
-//       shim (calls the streaming overload) but marked Obsolete.
+﻿// StubInstaller/PayloadExtractor.cs
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -79,18 +65,12 @@ namespace StubInstaller
                     hashingStream = new HashingReadStream(payloadStream, sha);
                 }
 
-                // Validate ZIP header before opening the archive
-                var headerBuf = new byte[4];
-                int headerRead = hashingStream.Read(headerBuf, 0, 4);
-                if (headerRead == 4 &&
-                    !(headerBuf[0] == 0x50 && headerBuf[1] == 0x4B &&
-                      headerBuf[2] == 0x03 && headerBuf[3] == 0x04))
-                {
-                    Log($"WARNING: Unexpected ZIP header: {headerBuf[0]:X2} {headerBuf[1]:X2} {headerBuf[2]:X2} {headerBuf[3]:X2}");
-                }
-
-                // Rewind so ZipArchive sees the complete ZIP including its header
-                hashingStream.Seek(0, SeekOrigin.Begin);
+                // Pass the stream directly to ZipArchive at position 0.
+                // No header peek — ZipArchive throws a clear InvalidDataException
+                // if the magic bytes are wrong, which is caught and reported below.
+                // Any seek before ZipArchive opens the stream would require correct
+                // SubStream seek-translation which is non-trivial to get right, and
+                // the peek added no value that the archive itself doesn't provide.
 
                 string safeTempDir = Path.GetFullPath(tempPath + Path.DirectorySeparatorChar);
                 int extracted = 0;
@@ -285,52 +265,63 @@ namespace StubInstaller
     // ── Helper streams ────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Limits reads to <see cref="_remaining"/> bytes of an underlying stream.
+    /// Limits reads to a fixed-length window of an underlying stream.
     /// Used to prevent ZipArchive from reading past the payload into the footer.
     /// </summary>
     internal sealed class SubStream : Stream
     {
         private readonly Stream _inner;
-        private long _remaining;
+        private readonly long _startOffset;  // absolute position in _inner at construction
+        private readonly long _length;       // fixed total length of this window
+        private long _position;     // current logical position within the window
 
         internal SubStream(Stream inner, long length)
         {
             _inner = inner;
-            _remaining = length;
+            _startOffset = inner.Position;     // remember where the payload begins
+            _length = length;
+            _position = 0;
         }
 
         public override bool CanRead => true;
         public override bool CanSeek => _inner.CanSeek;
         public override bool CanWrite => false;
-        public override long Length => _remaining;
+        public override long Length => _length;
         public override long Position
         {
-            get => _inner.CanSeek ? _inner.Position : 0;
+            get => _position;
             set => Seek(value, SeekOrigin.Begin);
         }
 
         public override int Read(byte[] buffer, int offset, int count)
         {
-            if (_remaining <= 0) return 0;
-            int toRead = (int)Math.Min(count, _remaining);
+            long remaining = _length - _position;
+            if (remaining <= 0) return 0;
+            int toRead = (int)Math.Min(count, remaining);
             int read = _inner.Read(buffer, offset, toRead);
-            _remaining -= read;
+            _position += read;
             return read;
         }
 
         public override long Seek(long offset, SeekOrigin origin)
         {
             if (!_inner.CanSeek) throw new NotSupportedException();
-            // Translate to absolute position in the inner stream
-            long newPos = origin switch
+
+            // Resolve the new logical position within our window
+            long newLogical = origin switch
             {
-                SeekOrigin.Begin => _inner.Position - (Length - _remaining) + offset,
-                SeekOrigin.Current => _inner.Position + offset,
-                SeekOrigin.End => _inner.Position + (_remaining) + offset,
+                SeekOrigin.Begin => offset,
+                SeekOrigin.Current => _position + offset,
+                SeekOrigin.End => _length + offset,
                 _ => throw new ArgumentOutOfRangeException(nameof(origin))
             };
-            _inner.Seek(newPos, SeekOrigin.Begin);
-            return newPos;
+
+            newLogical = Math.Clamp(newLogical, 0, _length);
+
+            // Translate to absolute position in the underlying stream
+            _inner.Seek(_startOffset + newLogical, SeekOrigin.Begin);
+            _position = newLogical;
+            return _position;
         }
 
         public override void Flush() { }
@@ -380,9 +371,19 @@ namespace StubInstaller
         public override long Seek(long offset, SeekOrigin origin)
         {
             if (!_inner.CanSeek) throw new NotSupportedException();
-            long newPos = _inner.Seek(offset, origin);
+            // Resolve new logical position, then seek inner stream to match.
+            // We can't pass origin+offset blindly to _inner because _inner may
+            // itself be a SubStream with its own coordinate space.
+            long newPos = origin switch
+            {
+                SeekOrigin.Begin => offset,
+                SeekOrigin.Current => _position + offset,
+                SeekOrigin.End => (_length >= 0 ? _length : _inner.Length) + offset,
+                _ => throw new ArgumentOutOfRangeException(nameof(origin))
+            };
+            _inner.Seek(newPos, SeekOrigin.Begin);
             _position = newPos;
-            return newPos;
+            return _position;
         }
 
         public override void Flush() { }
