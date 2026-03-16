@@ -1,7 +1,7 @@
 ﻿// StubInstaller/ExitCodeClassifier.cs
 // Maps installer exit codes to well-known outcomes.
 // MSI reference: https://learn.microsoft.com/en-us/windows/win32/msi/error-codes
-namespace StubInstaller
+namespace StubInstaller.Core
 {
     internal enum ExitCodeResult
     {

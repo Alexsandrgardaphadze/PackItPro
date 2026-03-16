@@ -9,7 +9,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Text;
 
-namespace StubInstaller
+namespace StubInstaller.Infrastrucure
 {
     internal static class StubLogger
     {

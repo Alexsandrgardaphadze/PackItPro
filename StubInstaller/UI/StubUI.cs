@@ -1,10 +1,12 @@
 ﻿// StubInstaller/StubUI.cs
 // All user-visible WinForms dialogs in one place.
 // Reads Constants.DesktopLogPrefix directly so callers don't have to pass it.
+using StubInstaller.Core;
+using StubInstaller.Infrastrucure;
 using System.IO;
 using System.Windows.Forms;
 
-namespace StubInstaller
+namespace StubInstaller.UI
 {
     internal static class StubUI
     {

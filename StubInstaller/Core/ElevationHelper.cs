@@ -1,5 +1,7 @@
 ﻿// StubInstaller/ElevationHelper.cs
 // Admin detection and UAC elevation restart.
+using StubInstaller.Infrastrucure;
+using StubInstaller.UI;
 using System;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -7,7 +9,7 @@ using System.Linq;
 using System.Security.Principal;
 using System.Text;
 
-namespace StubInstaller
+namespace StubInstaller.Core
 {
     internal static class ElevationHelper
     {

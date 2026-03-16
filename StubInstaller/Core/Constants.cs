@@ -1,5 +1,5 @@
 ﻿// StubInstaller/Constants.cs
-namespace StubInstaller
+namespace StubInstaller.Core
 {
     internal static class Constants
     {

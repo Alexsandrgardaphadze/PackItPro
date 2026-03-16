@@ -7,7 +7,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
-namespace StubInstaller
+namespace StubInstaller.Core
 {
     internal static class PrerequisiteChecker
     {

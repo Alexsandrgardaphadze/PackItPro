@@ -1,6 +1,6 @@
 ﻿// StubInstaller/Util.cs
 // Small utilities that don't belong to any specific domain class.
-namespace StubInstaller
+namespace StubInstaller.Infrastrucure
 {
     internal static class Util
     {

@@ -1,4 +1,5 @@
 ﻿// StubInstaller/PayloadExtractor.cs
+using StubInstaller.Infrastrucure;
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -6,7 +7,7 @@ using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace StubInstaller
+namespace StubInstaller.Core
 {
     public static class PayloadExtractor
     {

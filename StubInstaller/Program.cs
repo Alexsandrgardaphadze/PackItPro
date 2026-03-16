@@ -1,11 +1,17 @@
-﻿using System;
+﻿using StubInstaller.Core;
+using StubInstaller.Infrastrucure;
+using StubInstaller.UI;
+using StubInstaller.ViewModels;
+using StubInstaller.Views;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
-using System.Windows.Forms;
+using System.Windows;
+using System.Windows.Threading;
 
 namespace StubInstaller
 {
@@ -13,7 +19,15 @@ namespace StubInstaller
     {
         private static bool _rebootRequired;
 
-        static async Task<int> Main(string[] args)
+        // Program.cs - v2.0
+        // Entry point is now [STAThread] to support WPF.
+        // Steps 1-4 (extract, manifest, prerequisites, elevation) still run headlessly
+        // before the window opens — no UI dependency in that path.
+        // Step 5 onwards is driven by MainInstallViewModel shown in MainInstallWindow.
+        // StubUI.ShowError is kept for fatal errors that occur before the window opens.
+
+        [STAThread]
+        static int Main(string[] args)
         {
             string? resumeTempDir = ArgParser.GetValue(args, Constants.ArgTempDir);
             string? resumeLogPath = ArgParser.GetValue(args, Constants.ArgLogPath);
@@ -38,9 +52,16 @@ namespace StubInstaller
             {
                 LogBanner(isElevatedResume, resumeTempDir, resumeLogPath);
 
-                return isElevatedResume
-                    ? await RunFromStep5Async(resumeTempDir!)
-                    : await RunFreshAsync();
+                // Steps 1-4: run synchronously on the STA thread before the WPF app starts.
+                // These steps have no UI — they just extract, validate, and optionally re-launch
+                // elevated. If any step fails it calls StubUI.ShowError (WinForms fallback) and
+                // returns a non-zero exit code.
+                var preResult = RunPreInstallSteps(isElevatedResume, resumeTempDir, resumeLogPath);
+                if (preResult.ExitCode.HasValue)
+                    return preResult.ExitCode.Value; // early exit (error or elevation re-launch)
+
+                // Steps 5+: hand off to WPF.
+                return RunWpfInstaller(preResult.TempDir!, preResult.Manifest!);
             }
             catch (Exception ex)
             {
@@ -50,6 +71,140 @@ namespace StubInstaller
                     "Fatal Error");
                 return 1;
             }
+        }
+
+        // ── Pre-install result ────────────────────────────────────────────────
+
+        private sealed class PreInstallResult
+        {
+            /// <summary>Non-null means return this exit code immediately (error or elevation).</summary>
+            public int? ExitCode { get; init; }
+            public string? TempDir { get; init; }
+            public PackageManifest? Manifest { get; init; }
+
+            public static PreInstallResult Early(int code) => new() { ExitCode = code };
+            public static PreInstallResult Ready(string tempDir, PackageManifest manifest)
+                => new() { TempDir = tempDir, Manifest = manifest };
+        }
+
+        /// <summary>
+        /// Runs Steps 1-4 synchronously (extraction → manifest → prerequisites → elevation).
+        /// Returns Early(code) if something failed or elevation was triggered.
+        /// Returns Ready(tempDir, manifest) when the WPF installer should open.
+        /// </summary>
+        private static PreInstallResult RunPreInstallSteps(
+            bool isElevatedResume, string? resumeTempDir, string? resumeLogPath)
+        {
+            // Elevated resume: skip steps 1-4, manifest already on disk
+            if (isElevatedResume)
+            {
+                var manifest = LoadManifestAsync(resumeTempDir!).GetAwaiter().GetResult();
+                if (manifest == null) return PreInstallResult.Early(1);
+                return PreInstallResult.Ready(resumeTempDir!, manifest);
+            }
+
+            // STEPS 1+2 — Extract payload
+            StubLogger.Log("");
+            StubLogger.Log("STEP 1+2: Extracting and decompressing payload (streaming)...");
+            string tempDir;
+            try
+            {
+                tempDir = PayloadExtractor.ExtractAndDecompressPayload();
+                MigrateLogToTempDir(tempDir);
+                StubLogger.Log($"✅ Extracted to: {tempDir}");
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("PAYLOAD INTEGRITY CHECK FAILED"))
+            {
+                StubLogger.LogError("FATAL: Payload integrity verification failed", ex);
+                StubUI.ShowError(
+                    "Package integrity check failed!\n\nThe payload may have been corrupted or tampered with.\n\n" +
+                    $"Error: {ex.Message}\n\nInstallation cannot proceed.", "Integrity Verification Failed");
+                return PreInstallResult.Early(1);
+            }
+            catch (Exception ex)
+            {
+                StubLogger.LogError("FATAL: Failed to extract payload", ex);
+                StubUI.ShowError($"Failed to extract the package payload.\n\nError: {ex.Message}", "Extraction Failed");
+                return PreInstallResult.Early(1);
+            }
+
+            // STEP 3 — Load manifest
+            StubLogger.Log("");
+            StubLogger.Log("STEP 3: Loading package manifest...");
+            var mf = LoadManifestAsync(tempDir).GetAwaiter().GetResult();
+            if (mf == null) return PreInstallResult.Early(1);
+
+            // STEP 3.5 — Prerequisites
+            StubLogger.Log("");
+            StubLogger.Log("STEP 3.5: Checking prerequisites...");
+            var prereq = PrerequisiteChecker.Check(mf, tempDir, StubLogger.Log);
+            if (!prereq.Passed)
+            {
+                StubLogger.LogError("PREREQUISITES FAILED", null);
+                foreach (var f in prereq.Failures) StubLogger.Log($"  ✗ {f}");
+                StubUI.ShowError(prereq.UserMessage, "Requirements Not Met");
+                return PreInstallResult.Early(1);
+            }
+            StubLogger.Log("✅ Prerequisites met.");
+
+            // STEP 4 — Elevation
+            StubLogger.Log("");
+            StubLogger.Log("STEP 4: Checking administrator rights...");
+            if (mf.RequiresAdmin && !ElevationHelper.IsRunningAsAdmin())
+            {
+                StubLogger.Log("Admin rights required — relaunching elevated...");
+                ElevationHelper.RestartElevated(tempDir, StubLogger.LogPath);
+                return PreInstallResult.Early(0); // current process exits, elevated one takes over
+            }
+            StubLogger.Log($"✅ Running as admin: {ElevationHelper.IsRunningAsAdmin()}");
+
+            return PreInstallResult.Ready(tempDir, mf);
+        }
+
+        /// <summary>
+        /// Starts the WPF Application and MainInstallWindow.
+        /// Blocks until the window is closed and returns the exit code.
+        /// </summary>
+        private static int RunWpfInstaller(string tempDir, PackageManifest manifest)
+        {
+            StubLogger.Log("");
+            StubLogger.Log("STEP 5+: Launching WPF installer window...");
+
+            var app = new Application
+            {
+                ShutdownMode = ShutdownMode.OnMainWindowClose
+            };
+
+            int exitCode = 0;
+
+            app.Startup += (_, _) =>
+            {
+                var vm = new MainInstallViewModel(manifest, tempDir, Dispatcher.CurrentDispatcher);
+                var window = new MainInstallWindow(vm);
+
+                // When the window closes, capture the result
+                window.Closed += (_, _) =>
+                {
+                    exitCode = vm.InstallSucceeded ? 0 : 1;
+                    StubLogger.Log($"Window closed. Success={vm.InstallSucceeded}");
+
+                    // Background cleanup if manifest says so
+                    if (manifest.Cleanup)
+                    {
+                        _ = Task.Run(async () =>
+                            await Cleanup.CleanupTempDirectoryAsync(
+                                tempDir, true,
+                                StubLogger.Log,
+                                msg => StubLogger.LogError(msg, null)));
+                    }
+                };
+
+                app.MainWindow = window;
+                window.Show();
+            };
+
+            app.Run();
+            return exitCode;
         }
 
         // ── STEPS 1–4: Fresh (non-elevated) run ──────────────────────────────

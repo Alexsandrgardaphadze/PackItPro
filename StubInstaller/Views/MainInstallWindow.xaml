@@ -1,0 +1,554 @@
+﻿<!-- StubInstaller/Views/MainInstallWindow.xaml -->
+<Window x:Class="StubInstaller.Views.MainInstallWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:StubInstaller.ViewModels"
+        Title="PackItPro Installer"
+        Width="620" Height="600"
+        MinWidth="520" MinHeight="480"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="CanResize"
+        Background="#0f0f1e"
+        UseLayoutRounding="True"
+        TextOptions.TextFormattingMode="Display">
+
+    <Window.Resources>
+        <!-- Inline colors so the stub has zero dependency on PackItPro theme files -->
+        <SolidColorBrush x:Key="BgDeep"       Color="#0f0f1e"/>
+        <SolidColorBrush x:Key="BgPanel"      Color="#1a1a2e"/>
+        <SolidColorBrush x:Key="BgCard"       Color="#16213e"/>
+        <SolidColorBrush x:Key="BgHover"      Color="#1f1f33"/>
+        <SolidColorBrush x:Key="Accent"       Color="#4f46e5"/>
+        <SolidColorBrush x:Key="AccentHover"  Color="#6366f1"/>
+        <SolidColorBrush x:Key="TextPrimary"  Color="#f1f5f9"/>
+        <SolidColorBrush x:Key="TextSecond"   Color="#cbd5e1"/>
+        <SolidColorBrush x:Key="TextTertiary" Color="#94a3b8"/>
+        <SolidColorBrush x:Key="Border"       Color="#334155"/>
+        <SolidColorBrush x:Key="Divider"      Color="#1e293b"/>
+        <SolidColorBrush x:Key="Green"        Color="#10b981"/>
+        <SolidColorBrush x:Key="Amber"        Color="#f59e0b"/>
+        <SolidColorBrush x:Key="Red"          Color="#ef4444"/>
+        <SolidColorBrush x:Key="Blue"         Color="#3b82f6"/>
+
+        <!-- Primary button -->
+        <Style x:Key="PrimaryButton" TargetType="Button">
+            <Setter Property="Background"   Value="{StaticResource Accent}"/>
+            <Setter Property="Foreground"   Value="{StaticResource TextPrimary}"/>
+            <Setter Property="FontFamily"   Value="Segoe UI"/>
+            <Setter Property="FontSize"     Value="13"/>
+            <Setter Property="FontWeight"   Value="SemiBold"/>
+            <Setter Property="Height"       Value="36"/>
+            <Setter Property="Padding"      Value="20,0"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor"       Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="8" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{StaticResource AccentHover}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.4"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Secondary button -->
+        <Style x:Key="SecondaryButton" TargetType="Button">
+            <Setter Property="Background"   Value="{StaticResource BgHover}"/>
+            <Setter Property="Foreground"   Value="{StaticResource TextSecond}"/>
+            <Setter Property="FontFamily"   Value="Segoe UI"/>
+            <Setter Property="FontSize"     Value="13"/>
+            <Setter Property="Height"       Value="36"/>
+            <Setter Property="Padding"      Value="16,0"/>
+            <Setter Property="BorderBrush"  Value="{StaticResource Border}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor"       Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{StaticResource Border}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.4"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Link button (Select All / Deselect All) -->
+        <Style x:Key="LinkButton" TargetType="Button">
+            <Setter Property="Background"     Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Foreground"     Value="{StaticResource Accent}"/>
+            <Setter Property="FontFamily"     Value="Segoe UI"/>
+            <Setter Property="FontSize"       Value="12"/>
+            <Setter Property="Cursor"         Value="Hand"/>
+            <Setter Property="Padding"        Value="0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <TextBlock Text="{TemplateBinding Content}"
+                                   Foreground="{TemplateBinding Foreground}"
+                                   FontFamily="{TemplateBinding FontFamily}"
+                                   FontSize="{TemplateBinding FontSize}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsMouseOver,
+                                            RelativeSource={RelativeSource AncestorType=Button}}"
+                                            Value="True">
+                                            <Setter Property="TextDecorations" Value="Underline"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Installer row CheckBox -->
+        <Style x:Key="RowCheckBox" TargetType="CheckBox">
+            <Setter Property="Foreground"  Value="{StaticResource TextPrimary}"/>
+            <Setter Property="FontFamily"  Value="Segoe UI"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        </Style>
+
+        <!-- ProgressBar -->
+        <Style x:Key="ProgressStyle" TargetType="ProgressBar">
+            <Setter Property="Height"          Value="6"/>
+            <Setter Property="Background"      Value="{StaticResource BgCard}"/>
+            <Setter Property="Foreground"      Value="{StaticResource Green}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ProgressBar">
+                        <Border CornerRadius="3"
+                                Background="{TemplateBinding Background}">
+                            <Border x:Name="PART_Indicator"
+                                    HorizontalAlignment="Left"
+                                    Background="{TemplateBinding Foreground}"
+                                    CornerRadius="3"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsIndeterminate" Value="True">
+                                <Setter TargetName="PART_Indicator"
+                                        Property="Width" Value="60"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <!-- header -->
+            <RowDefinition Height="*"/>
+            <!-- content (phases) -->
+            <RowDefinition Height="Auto"/>
+            <!-- footer buttons -->
+        </Grid.RowDefinitions>
+
+        <!-- ═══ HEADER ════════════════════════════════════════════════════════ -->
+        <Border Grid.Row="0"
+                Background="{StaticResource BgPanel}"
+                BorderBrush="{StaticResource Divider}"
+                BorderThickness="0,0,0,1"
+                Padding="20,16">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="{Binding PackageName}"
+                               FontSize="17" FontWeight="SemiBold"
+                               FontFamily="Segoe UI"
+                               Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock Text="{Binding StatusMessage}"
+                               FontSize="12" FontFamily="Segoe UI"
+                               Foreground="{StaticResource TextTertiary}"
+                               Margin="0,4,0,0"/>
+                </StackPanel>
+
+                <!-- Admin badge -->
+                <Border Grid.Column="1"
+                        VerticalAlignment="Center"
+                        CornerRadius="4" Padding="8,3"
+                        Visibility="{Binding RequiresAdmin,
+                            Converter={x:Static BooleanToVisibilityConverter.Default}}">
+                    <Border.Background>
+                        <SolidColorBrush Color="#f59e0b" Opacity="0.15"/>
+                    </Border.Background>
+                    <TextBlock Text="Requires Admin"
+                               FontSize="11" FontFamily="Segoe UI"
+                               FontWeight="SemiBold"
+                               Foreground="#f59e0b"/>
+                </Border>
+            </Grid>
+        </Border>
+
+        <!-- ═══ CONTENT ═══════════════════════════════════════════════════════ -->
+        <Grid Grid.Row="1" Margin="20,16,20,0">
+
+            <!-- ── SELECTION PHASE ─────────────────────────────────────────── -->
+            <Grid Visibility="{Binding IsSelectionPhase,
+                      Converter={x:Static BooleanToVisibilityConverter.Default}}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Toolbar: summary + Select All / Deselect All -->
+                <Grid Grid.Row="0" Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0"
+                               FontFamily="Segoe UI" FontSize="12"
+                               Foreground="{StaticResource TextTertiary}"
+                               VerticalAlignment="Center">
+                        <Run Text="{Binding SelectionSummary, Mode=OneWay}"/>
+                        <Run Text="{Binding SelectedSizeDisplay, Mode=OneWay}"
+                             Foreground="#4f46e5"/>
+                    </TextBlock>
+
+                    <Button Grid.Column="1" Content="Select All"
+                            Style="{StaticResource LinkButton}"
+                            Command="{Binding SelectAllCommand}"/>
+                    <Button Grid.Column="3" Content="Deselect All"
+                            Style="{StaticResource LinkButton}"
+                            Command="{Binding DeselectAllCommand}"/>
+                </Grid>
+
+                <!-- App list -->
+                <Border Grid.Row="1"
+                        Background="{StaticResource BgPanel}"
+                        BorderBrush="{StaticResource Border}"
+                        BorderThickness="1" CornerRadius="10">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  Padding="0,4">
+                        <ItemsControl ItemsSource="{Binding Items}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border x:Name="RowBorder"
+                                            Background="Transparent"
+                                            BorderBrush="{StaticResource Divider}"
+                                            BorderThickness="0,0,0,1"
+                                            Padding="14,10">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <!-- checkbox -->
+                                                <ColumnDefinition Width="*"/>
+                                                <!-- name + notes -->
+                                                <ColumnDefinition Width="Auto"/>
+                                                <!-- size + badge -->
+                                            </Grid.ColumnDefinitions>
+
+                                            <!-- Checkbox -->
+                                            <CheckBox Grid.Column="0"
+                                                      IsChecked="{Binding IsSelected}"
+                                                      Style="{StaticResource RowCheckBox}"
+                                                      VerticalAlignment="Center"
+                                                      Margin="0,0,12,0"/>
+
+                                            <!-- Name + notes -->
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding DisplayName}"
+                                                           FontSize="13" FontFamily="Segoe UI"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{StaticResource TextPrimary}"/>
+                                                <TextBlock Text="{Binding Notes}"
+                                                           FontSize="11" FontFamily="Segoe UI"
+                                                           FontStyle="Italic"
+                                                           Foreground="{StaticResource TextTertiary}"
+                                                           Margin="0,2,0,0"
+                                                           Visibility="{Binding Notes,
+                                                               Converter={x:Static ObjectNotNullToVisibilityConverter.Default}}"/>
+                                            </StackPanel>
+
+                                            <!-- Size + type badge -->
+                                            <StackPanel Grid.Column="2"
+                                                        Orientation="Horizontal"
+                                                        VerticalAlignment="Center"
+                                                        Margin="12,0,0,0">
+                                                <TextBlock Text="{Binding FileSizeDisplay}"
+                                                           FontSize="11" FontFamily="Consolas"
+                                                           Foreground="{StaticResource TextTertiary}"
+                                                           VerticalAlignment="Center"
+                                                           Margin="0,0,8,0"/>
+
+                                                <!-- Type badge — green if reliable, amber if extension-only -->
+                                                <Border CornerRadius="3" Padding="6,2"
+                                                        VerticalAlignment="Center">
+                                                    <Border.Style>
+                                                        <Style TargetType="Border">
+                                                            <Setter Property="Background" Value="#1a2a1a"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsDetectionReliable}" Value="False">
+                                                                    <Setter Property="Background" Value="#2a2010"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Border.Style>
+                                                    <TextBlock Text="{Binding TypeBadge}"
+                                                               FontSize="10" FontFamily="Consolas"
+                                                               FontWeight="SemiBold">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Foreground" Value="#10b981"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsDetectionReliable}" Value="False">
+                                                                        <Setter Property="Foreground" Value="#f59e0b"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                </Border>
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Style.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter Property="Background"
+                                                                Value="{StaticResource BgHover}"/>
+                                                    </Trigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Border>
+            </Grid>
+
+            <!-- ── INSTALLING PHASE ────────────────────────────────────────── -->
+            <Grid Visibility="{Binding IsInstallingPhase,
+                      Converter={x:Static BooleanToVisibilityConverter.Default}}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Overall progress bar -->
+                <StackPanel Grid.Row="0" Margin="0,0,0,16">
+                    <DockPanel Margin="0,0,0,6">
+                        <TextBlock DockPanel.Dock="Right"
+                                   Text="{Binding OverallPercent, StringFormat={}{0}%}"
+                                   FontSize="12" FontFamily="Consolas"
+                                   Foreground="{StaticResource TextTertiary}"/>
+                        <TextBlock Text="Overall progress"
+                                   FontSize="12" FontFamily="Segoe UI"
+                                   Foreground="{StaticResource TextSecond}"/>
+                    </DockPanel>
+                    <ProgressBar Value="{Binding OverallPercent}"
+                                 Maximum="100"
+                                 Style="{StaticResource ProgressStyle}"/>
+                </StackPanel>
+
+                <!-- Per-app status list -->
+                <Border Grid.Row="1"
+                        Background="{StaticResource BgPanel}"
+                        BorderBrush="{StaticResource Border}"
+                        BorderThickness="1" CornerRadius="10">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,4">
+                        <ItemsControl ItemsSource="{Binding Items}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Padding="14,10"
+                                            BorderBrush="{StaticResource Divider}"
+                                            BorderThickness="0,0,0,1">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding DisplayName}"
+                                                           FontSize="13" FontFamily="Segoe UI"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{StaticResource TextPrimary}"/>
+                                                <TextBlock Text="{Binding StatusDetail}"
+                                                           FontSize="11" FontFamily="Segoe UI"
+                                                           Foreground="{StaticResource TextTertiary}"
+                                                           Margin="0,2,0,0"
+                                                           Visibility="{Binding StatusDetail,
+                                                               Converter={x:Static ObjectNotNullToVisibilityConverter.Default}}"/>
+                                            </StackPanel>
+
+                                            <!-- Status badge -->
+                                            <Border Grid.Column="1"
+                                                    CornerRadius="4" Padding="8,3"
+                                                    VerticalAlignment="Center"
+                                                    Margin="10,0,0,0">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Background" Value="{StaticResource BgCard}"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Status}"
+                                                                         Value="{x:Static vm:InstallItemStatus.Installing}">
+                                                                <Setter Property="Background" Value="#0f2a4a"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Status}"
+                                                                         Value="{x:Static vm:InstallItemStatus.Done}">
+                                                                <Setter Property="Background" Value="#0f2a1a"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Status}"
+                                                                         Value="{x:Static vm:InstallItemStatus.Failed}">
+                                                                <Setter Property="Background" Value="#2a0f0f"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                                <TextBlock Text="{Binding StatusText}"
+                                                           FontSize="11" FontFamily="Segoe UI"
+                                                           FontWeight="SemiBold">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Foreground"
+                                                                    Value="{StaticResource TextTertiary}"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding Status}"
+                                                                             Value="{x:Static vm:InstallItemStatus.Installing}">
+                                                                    <Setter Property="Foreground" Value="{StaticResource Blue}"/>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding Status}"
+                                                                             Value="{x:Static vm:InstallItemStatus.Done}">
+                                                                    <Setter Property="Foreground" Value="{StaticResource Green}"/>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding Status}"
+                                                                             Value="{x:Static vm:InstallItemStatus.Failed}">
+                                                                    <Setter Property="Foreground" Value="{StaticResource Red}"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                            </Border>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Border>
+            </Grid>
+
+            <!-- ── COMPLETE PHASE ──────────────────────────────────────────── -->
+            <Grid Visibility="{Binding IsCompletePhase,
+                      Converter={x:Static BooleanToVisibilityConverter.Default}}">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <TextBlock HorizontalAlignment="Center"
+                               FontSize="40" Margin="0,0,0,16">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Text" Value="✅"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding InstallSucceeded}" Value="False">
+                                        <Setter Property="Text" Value="⚠️"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                    <TextBlock Text="{Binding StatusMessage}"
+                               FontSize="15" FontFamily="Segoe UI"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource TextPrimary}"
+                               HorizontalAlignment="Center"
+                               TextAlignment="Center"
+                               TextWrapping="Wrap"/>
+                </StackPanel>
+            </Grid>
+        </Grid>
+
+        <!-- ═══ FOOTER BUTTONS ════════════════════════════════════════════════ -->
+        <Border Grid.Row="2"
+                Background="{StaticResource BgPanel}"
+                BorderBrush="{StaticResource Divider}"
+                BorderThickness="0,1,0,0"
+                Padding="20,12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="8"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Retry Failed (shown only on completion with failures) -->
+                <Button Grid.Column="0"
+                        Content="Retry Failed"
+                        Style="{StaticResource SecondaryButton}"
+                        HorizontalAlignment="Left"
+                        Command="{Binding RetryFailedCommand}"/>
+
+                <!-- Cancel / Close -->
+                <Button Grid.Column="1" x:Name="CancelCloseButton"
+                        Style="{StaticResource SecondaryButton}"
+                        IsCancel="True"
+                        Click="CancelClose_Click">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+                            <Setter Property="Content" Value="Cancel"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsCompletePhase}" Value="True">
+                                    <Setter Property="Content" Value="Close"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+
+                <!-- Install -->
+                <Button Grid.Column="3"
+                        Content="Install"
+                        Style="{StaticResource PrimaryButton}"
+                        IsDefault="True"
+                        Command="{Binding InstallCommand}"
+                        Visibility="{Binding IsSelectionPhase,
+                            Converter={x:Static BooleanToVisibilityConverter.Default}}"/>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

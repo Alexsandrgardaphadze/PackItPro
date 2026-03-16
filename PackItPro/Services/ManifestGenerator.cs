@@ -1,6 +1,28 @@
-﻿// PackItPro/Services/ManifestGenerator.cs
+﻿// PackItPro/Services/ManifestGenerator.cs - v2.6
+// Changes vs v2.5:
+//   [1] Detection scan increased from 4 KB to 512 KB.
+//       The old 4 KB limit only covered the PE MZ/COFF headers — installer
+//       signatures (NSIS, Inno, Squirrel) live in the resource section which
+//       starts well beyond that. 512 KB reliably covers all common installer
+//       types without being slow at packaging time.
+//
+//   [2] NSIS detection fixed.
+//       Old check tested bytes [4..7] of the raw header for EF BE AD DE — that
+//       magic marks the NSIS first-header block, which sits AFTER the PE code
+//       section (never in the first 8 bytes). New check scans for the ASCII
+//       string "Nullsoft" which is always embedded in the NSIS resource section.
+//
+//   [3] Detection priority order made explicit and documented:
+//       WiX Burn → NSIS → Inno Setup → Squirrel → generic exe
+//       WiX is checked first because .wixburn lives in the PE section table
+//       (always in the first 512 bytes) and is unambiguous.
+//
+//   [4] Scan helper split into ScanHeader() (reads the bytes once) and
+//       ContainsAscii() (searches without allocating a string). The bytes
+//       are read once and reused for all checks.
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -45,6 +67,7 @@ namespace PackItPro.Services
                     return new ManifestFile
                     {
                         Name = Path.GetFileName(entry.Path),
+                        DisplayName = ResolveDisplayName(entry.Path),
                         Notes = string.IsNullOrWhiteSpace(entry.Notes) ? null : entry.Notes.Trim(),
                         InstallType = type,
                         DetectionSource = source,
@@ -207,6 +230,38 @@ namespace PackItPro.Services
             catch { }
             return 10;
         }
+
+        /// <summary>
+        /// Reads the Windows version resource of an exe/msi to get a human-readable name.
+        /// Priority: ProductName → FileDescription → filename-without-extension.
+        /// Returns null only if the file doesn't exist (caller uses null to mean "use Name").
+        /// Never throws — bad version resources are silently ignored.
+        /// </summary>
+        private static string? ResolveDisplayName(string filePath)
+        {
+            try
+            {
+                var vi = FileVersionInfo.GetVersionInfo(filePath);
+
+                string? name = null;
+                if (!string.IsNullOrWhiteSpace(vi.ProductName))
+                    name = vi.ProductName.Trim();
+                else if (!string.IsNullOrWhiteSpace(vi.FileDescription))
+                    name = vi.FileDescription.Trim();
+
+                // Fall back to filename without extension, but still store it so
+                // the stub always has a display name without needing its own fallback.
+                if (string.IsNullOrWhiteSpace(name))
+                    name = Path.GetFileNameWithoutExtension(filePath);
+
+                return name;
+            }
+            catch
+            {
+                // File locked, corrupt PE header, etc. — use filename.
+                return Path.GetFileNameWithoutExtension(filePath);
+            }
+        }
     }
 
     // ── Manifest models ───────────────────────────────────────────────────────
@@ -234,6 +289,16 @@ namespace PackItPro.Services
         /// <summary>Optional user note — visible in the manifest, passed to the stub.</summary>
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? Notes { get; set; }
+
+        /// <summary>
+        /// Human-readable display name for the stub UI.
+        /// Populated from FileVersionInfo.ProductName at packaging time.
+        /// Falls back to filename without extension if the exe has no version resource.
+        /// Null = stub falls back to Name. WhenWritingNull keeps the JSON clean for
+        /// packages built before this field existed.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? DisplayName { get; set; }
 
         /// <summary>
         /// How InstallType was determined:

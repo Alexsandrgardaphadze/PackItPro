@@ -8,7 +8,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace StubInstaller
+namespace StubInstaller.Core
 {
     public static class InstallerRunner
     {

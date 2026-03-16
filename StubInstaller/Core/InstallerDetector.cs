@@ -5,7 +5,7 @@
 //   - Added "burn" type: WiX Burn bootstrapper, silent flag is "/quiet /norestart"
 //   - Type strings must stay in sync with ManifestGenerator.DetectInstallType()
 
-namespace StubInstaller
+namespace StubInstaller.Core
 {
     public static class InstallerDetector
     {

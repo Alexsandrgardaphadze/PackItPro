@@ -99,5 +99,24 @@ namespace StubInstaller
         /// </summary>
         [JsonPropertyName("notes")]
         public string? Notes { get; set; }
+
+        /// <summary>
+        /// Human-readable display name for the stub UI, populated by PackItPro
+        /// from FileVersionInfo.ProductName at packaging time.
+        /// Null when packaging with an older PackItPro — stub falls back to
+        /// Name (the raw filename) in that case.
+        /// </summary>
+        [JsonPropertyName("displayName")]
+        public string? DisplayName { get; set; }
+
+        /// <summary>
+        /// Returns the best available display name: DisplayName if set,
+        /// otherwise filename without extension. Never null or empty.
+        /// </summary>
+        [System.Text.Json.Serialization.JsonIgnore]
+        public string ResolvedDisplayName =>
+            !string.IsNullOrWhiteSpace(DisplayName)
+                ? DisplayName
+                : System.IO.Path.GetFileNameWithoutExtension(Name);
     }
 }

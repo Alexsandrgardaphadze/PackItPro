@@ -3,7 +3,7 @@
 // Supports: --key value,  --key=value,  --key="value with spaces"
 using System;
 
-namespace StubInstaller
+namespace StubInstaller.Infrastrucure
 {
     internal static class ArgParser
     {
