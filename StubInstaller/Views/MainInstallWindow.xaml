@@ -13,6 +13,9 @@
         TextOptions.TextFormattingMode="Display">
 
     <Window.Resources>
+        <!-- Value converters -->
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+
         <!-- Inline colors so the stub has zero dependency on PackItPro theme files -->
         <SolidColorBrush x:Key="BgDeep"       Color="#0f0f1e"/>
         <SolidColorBrush x:Key="BgPanel"      Color="#1a1a2e"/>
@@ -192,6 +195,10 @@
                                FontSize="17" FontWeight="SemiBold"
                                FontFamily="Segoe UI"
                                Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock Text="{Binding TotalSizeDisplay}"
+                               FontSize="11" FontFamily="Segoe UI"
+                               Foreground="{StaticResource TextTertiary}"
+                               Margin="0,2,0,0"/>
                     <TextBlock Text="{Binding StatusMessage}"
                                FontSize="12" FontFamily="Segoe UI"
                                Foreground="{StaticResource TextTertiary}"
@@ -203,7 +210,7 @@
                         VerticalAlignment="Center"
                         CornerRadius="4" Padding="8,3"
                         Visibility="{Binding RequiresAdmin,
-                            Converter={x:Static BooleanToVisibilityConverter.Default}}">
+                            Converter={StaticResource BoolToVis}}">
                     <Border.Background>
                         <SolidColorBrush Color="#f59e0b" Opacity="0.15"/>
                     </Border.Background>
@@ -218,9 +225,69 @@
         <!-- ═══ CONTENT ═══════════════════════════════════════════════════════ -->
         <Grid Grid.Row="1" Margin="20,16,20,0">
 
+            <!-- ── DISCLAIMER PHASE ───────────────────────────────────────────── -->
+            <Grid Visibility="{Binding IsDisclaimerPhase,
+                      Converter={StaticResource BoolToVis}}">
+                <Border Background="{StaticResource BgPanel}"
+                        BorderBrush="{StaticResource Border}"
+                        BorderThickness="1" CornerRadius="10"
+                        Padding="24,20">
+                    <StackPanel>
+                        <TextBlock Text="Before you continue"
+                                   FontSize="15" FontFamily="Segoe UI" FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextPrimary}" Margin="0,0,0,12"/>
+
+                        <Border Background="{StaticResource BgCard}" CornerRadius="6"
+                                Padding="12,10" Margin="0,0,0,8">
+                            <StackPanel>
+                                <TextBlock Text="Third-party software"
+                                           FontSize="12" FontFamily="Segoe UI" FontWeight="SemiBold"
+                                           Foreground="{StaticResource TextPrimary}"/>
+                                <TextBlock FontSize="11" FontFamily="Segoe UI" TextWrapping="Wrap"
+                                           Foreground="{StaticResource TextSecond}" Margin="0,4,0,0"
+                                           Text="The apps in this package are third-party software. PackItPro and its authors are not affiliated with or responsible for any of them. Each app is subject to its own license and terms."/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="{StaticResource BgCard}" CornerRadius="6"
+                                Padding="12,10" Margin="0,0,0,8">
+                            <StackPanel>
+                                <TextBlock Text="Silent installation"
+                                           FontSize="12" FontFamily="Segoe UI" FontWeight="SemiBold"
+                                           Foreground="{StaticResource TextPrimary}"/>
+                                <TextBlock FontSize="11" FontFamily="Segoe UI" TextWrapping="Wrap"
+                                           Foreground="{StaticResource TextSecond}" Margin="0,4,0,0"
+                                           Text="Apps will be installed silently using standard flags for each installer type. Some apps may not support fully silent installation and may briefly show a window or prompt."/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="{StaticResource BgCard}" CornerRadius="6"
+                                Padding="12,10" Margin="0,0,0,16">
+                            <StackPanel>
+                                <TextBlock Text="No warranty"
+                                           FontSize="12" FontFamily="Segoe UI" FontWeight="SemiBold"
+                                           Foreground="{StaticResource TextPrimary}"/>
+                                <TextBlock FontSize="11" FontFamily="Segoe UI" TextWrapping="Wrap"
+                                           Foreground="{StaticResource TextSecond}" Margin="0,4,0,0"
+                                           Text="This package is provided as-is. The packager and PackItPro authors accept no liability for failed installations, data loss, or system changes caused by the bundled software."/>
+                            </StackPanel>
+                        </Border>
+
+                        <CheckBox IsChecked="{Binding DisclaimerAccepted}"
+                                  Foreground="{StaticResource TextPrimary}"
+                                  FontFamily="Segoe UI" FontSize="12"
+                                  FocusVisualStyle="{x:Null}">
+                            <TextBlock Text="I have read and accept these terms"
+                                       FontFamily="Segoe UI" FontSize="12"
+                                       Foreground="{StaticResource TextPrimary}"/>
+                        </CheckBox>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
             <!-- ── SELECTION PHASE ─────────────────────────────────────────── -->
             <Grid Visibility="{Binding IsSelectionPhase,
-                      Converter={x:Static BooleanToVisibilityConverter.Default}}">
+                      Converter={StaticResource BoolToVis}}">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
@@ -246,10 +313,12 @@
                     </TextBlock>
 
                     <Button Grid.Column="1" Content="Select All"
-                            Style="{StaticResource LinkButton}"
+                            Style="{StaticResource SecondaryButton}"
+                            Height="28" Padding="10,0" FontSize="11"
                             Command="{Binding SelectAllCommand}"/>
                     <Button Grid.Column="3" Content="Deselect All"
-                            Style="{StaticResource LinkButton}"
+                            Style="{StaticResource SecondaryButton}"
+                            Height="28" Padding="10,0" FontSize="11"
                             Command="{Binding DeselectAllCommand}"/>
                 </Grid>
 
@@ -268,7 +337,40 @@
                                             Background="Transparent"
                                             BorderBrush="{StaticResource Divider}"
                                             BorderThickness="0,0,0,1"
-                                            Padding="14,10">
+                                            Padding="14,10"
+                                            ToolTipService.InitialShowDelay="400">
+                                        <Border.ToolTip>
+                                            <ToolTip Background="#1a1a2e" BorderBrush="#334155"
+                                                     BorderThickness="1" Padding="10,8">
+                                                <StackPanel>
+                                                    <TextBlock FontFamily="Segoe UI" FontSize="12"
+                                                               FontWeight="SemiBold" Foreground="#f1f5f9"
+                                                               Text="{Binding DisplayName}"/>
+                                                    <TextBlock FontFamily="Consolas" FontSize="11"
+                                                               Foreground="#94a3b8" Margin="0,4,0,0">
+                                                        <Run Text="File: "/>
+                                                        <Run Text="{Binding FileName}" Foreground="#cbd5e1"/>
+                                                    </TextBlock>
+                                                    <TextBlock FontFamily="Consolas" FontSize="11"
+                                                               Foreground="#94a3b8" Margin="0,2,0,0">
+                                                        <Run Text="Type: "/>
+                                                        <Run Text="{Binding TypeBadge}" Foreground="#cbd5e1"/>
+                                                        <Run Text="  Detection: "/>
+                                                        <Run Text="{Binding DetectionSourceDisplay}" Foreground="#cbd5e1"/>
+                                                    </TextBlock>
+                                                    <TextBlock FontFamily="Consolas" FontSize="11"
+                                                               Foreground="#94a3b8" Margin="0,2,0,0">
+                                                        <Run Text="Size: "/>
+                                                        <Run Text="{Binding FileSizeDisplay}" Foreground="#cbd5e1"/>
+                                                    </TextBlock>
+                                                    <TextBlock FontFamily="Consolas" FontSize="11"
+                                                               Foreground="#94a3b8" Margin="0,2,0,0">
+                                                        <Run Text="VT: "/>
+                                                        <Run Text="{Binding VtStatusDisplay}" Foreground="#cbd5e1"/>
+                                                    </TextBlock>
+                                                </StackPanel>
+                                            </ToolTip>
+                                        </Border.ToolTip>
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto"/>
@@ -296,9 +398,21 @@
                                                            FontSize="11" FontFamily="Segoe UI"
                                                            FontStyle="Italic"
                                                            Foreground="{StaticResource TextTertiary}"
-                                                           Margin="0,2,0,0"
-                                                           Visibility="{Binding Notes,
-                                                               Converter={x:Static ObjectNotNullToVisibilityConverter.Default}}"/>
+                                                           Margin="0,2,0,0">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding Notes}" Value="{x:Null}">
+                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding Notes}" Value="">
+                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
                                             </StackPanel>
 
                                             <!-- Size + type badge -->
@@ -340,6 +454,52 @@
                                                         </TextBlock.Style>
                                                     </TextBlock>
                                                 </Border>
+                                                <!-- VT badge -->
+                                                <Border CornerRadius="3" Padding="5,2"
+                                                        VerticalAlignment="Center" Margin="4,0,0,0">
+                                                    <Border.Style>
+                                                        <Style TargetType="Border">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding VtStatus}" Value="Clean">
+                                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                                    <Setter Property="Background" Value="#0f2a1a"/>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding VtStatus}" Value="Infected">
+                                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                                    <Setter Property="Background" Value="#2a0f0f"/>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding VtStatus}" Value="Unscanned">
+                                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                                    <Setter Property="Background" Value="#1e293b"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Border.Style>
+                                                    <TextBlock FontSize="10" FontFamily="Consolas"
+                                                               FontWeight="SemiBold" VerticalAlignment="Center">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Text"       Value="VT: ?"/>
+                                                                <Setter Property="Foreground" Value="#94a3b8"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding VtStatus}" Value="Clean">
+                                                                        <Setter Property="Text"       Value="VT: ✓"/>
+                                                                        <Setter Property="Foreground" Value="#10b981"/>
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding VtStatus}" Value="Infected">
+                                                                        <Setter Property="Text"       Value="VT: ✗"/>
+                                                                        <Setter Property="Foreground" Value="#ef4444"/>
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding VtStatus}" Value="Unscanned">
+                                                                        <Setter Property="Text"       Value="VT: —"/>
+                                                                        <Setter Property="Foreground" Value="#64748b"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                </Border>
                                             </StackPanel>
                                         </Grid>
 
@@ -363,7 +523,7 @@
 
             <!-- ── INSTALLING PHASE ────────────────────────────────────────── -->
             <Grid Visibility="{Binding IsInstallingPhase,
-                      Converter={x:Static BooleanToVisibilityConverter.Default}}">
+                      Converter={StaticResource BoolToVis}}">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
@@ -373,14 +533,14 @@
                 <StackPanel Grid.Row="0" Margin="0,0,0,16">
                     <DockPanel Margin="0,0,0,6">
                         <TextBlock DockPanel.Dock="Right"
-                                   Text="{Binding OverallPercent, StringFormat={}{0}%}"
+                                   Text="{Binding OverallPercent, Mode=OneWay, StringFormat={}{0}%}"
                                    FontSize="12" FontFamily="Consolas"
                                    Foreground="{StaticResource TextTertiary}"/>
                         <TextBlock Text="Overall progress"
                                    FontSize="12" FontFamily="Segoe UI"
                                    Foreground="{StaticResource TextSecond}"/>
                     </DockPanel>
-                    <ProgressBar Value="{Binding OverallPercent}"
+                    <ProgressBar Value="{Binding OverallPercent, Mode=OneWay}"
                                  Maximum="100"
                                  Style="{StaticResource ProgressStyle}"/>
                 </StackPanel>
@@ -404,16 +564,46 @@
                                             </Grid.ColumnDefinitions>
 
                                             <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding DisplayName}"
-                                                           FontSize="13" FontFamily="Segoe UI"
-                                                           FontWeight="SemiBold"
-                                                           Foreground="{StaticResource TextPrimary}"/>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="⟳" FontSize="13"
+                                                               Foreground="{StaticResource Accent}"
+                                                               VerticalAlignment="Center"
+                                                               Margin="0,0,6,0">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsRunning}" Value="True">
+                                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                    <TextBlock Text="{Binding DisplayName}"
+                                                               FontSize="13" FontFamily="Segoe UI"
+                                                               FontWeight="SemiBold"
+                                                               VerticalAlignment="Center"
+                                                               Foreground="{StaticResource TextPrimary}"/>
+                                                </StackPanel>
                                                 <TextBlock Text="{Binding StatusDetail}"
                                                            FontSize="11" FontFamily="Segoe UI"
                                                            Foreground="{StaticResource TextTertiary}"
-                                                           Margin="0,2,0,0"
-                                                           Visibility="{Binding StatusDetail,
-                                                               Converter={x:Static ObjectNotNullToVisibilityConverter.Default}}"/>
+                                                           Margin="0,2,0,0">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding StatusDetail}" Value="{x:Null}">
+                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding StatusDetail}" Value="">
+                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
                                             </StackPanel>
 
                                             <!-- Status badge -->
@@ -426,15 +616,15 @@
                                                         <Setter Property="Background" Value="{StaticResource BgCard}"/>
                                                         <Style.Triggers>
                                                             <DataTrigger Binding="{Binding Status}"
-                                                                         Value="{x:Static vm:InstallItemStatus.Installing}">
+                                                                         Value="Installing">
                                                                 <Setter Property="Background" Value="#0f2a4a"/>
                                                             </DataTrigger>
                                                             <DataTrigger Binding="{Binding Status}"
-                                                                         Value="{x:Static vm:InstallItemStatus.Done}">
+                                                                         Value="Done">
                                                                 <Setter Property="Background" Value="#0f2a1a"/>
                                                             </DataTrigger>
                                                             <DataTrigger Binding="{Binding Status}"
-                                                                         Value="{x:Static vm:InstallItemStatus.Failed}">
+                                                                         Value="Failed">
                                                                 <Setter Property="Background" Value="#2a0f0f"/>
                                                             </DataTrigger>
                                                         </Style.Triggers>
@@ -449,15 +639,15 @@
                                                                     Value="{StaticResource TextTertiary}"/>
                                                             <Style.Triggers>
                                                                 <DataTrigger Binding="{Binding Status}"
-                                                                             Value="{x:Static vm:InstallItemStatus.Installing}">
+                                                                             Value="Installing">
                                                                     <Setter Property="Foreground" Value="{StaticResource Blue}"/>
                                                                 </DataTrigger>
                                                                 <DataTrigger Binding="{Binding Status}"
-                                                                             Value="{x:Static vm:InstallItemStatus.Done}">
+                                                                             Value="Done">
                                                                     <Setter Property="Foreground" Value="{StaticResource Green}"/>
                                                                 </DataTrigger>
                                                                 <DataTrigger Binding="{Binding Status}"
-                                                                             Value="{x:Static vm:InstallItemStatus.Failed}">
+                                                                             Value="Failed">
                                                                     <Setter Property="Foreground" Value="{StaticResource Red}"/>
                                                                 </DataTrigger>
                                                             </Style.Triggers>
@@ -476,7 +666,7 @@
 
             <!-- ── COMPLETE PHASE ──────────────────────────────────────────── -->
             <Grid Visibility="{Binding IsCompletePhase,
-                      Converter={x:Static BooleanToVisibilityConverter.Default}}">
+                      Converter={StaticResource BoolToVis}}">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                     <TextBlock HorizontalAlignment="Center"
                                FontSize="40" Margin="0,0,0,16">
@@ -498,6 +688,53 @@
                                HorizontalAlignment="Center"
                                TextAlignment="Center"
                                TextWrapping="Wrap"/>
+
+                    <!-- Reboot banner -->
+                    <Border CornerRadius="8" Padding="16,10" Margin="0,16,0,0"
+                            HorizontalAlignment="Center">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Setter Property="Background">
+                                    <Setter.Value>
+                                        <SolidColorBrush Color="#f59e0b" Opacity="0.12"/>
+                                    </Setter.Value>
+                                </Setter>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding RebootRequired}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="⚠️" FontSize="16" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <StackPanel>
+                                <TextBlock Text="Restart required"
+                                           FontSize="13" FontFamily="Segoe UI"
+                                           FontWeight="SemiBold" Foreground="#f59e0b"/>
+                                <TextBlock Text="One or more apps need a system restart to finish installing."
+                                           FontSize="11" FontFamily="Segoe UI"
+                                           Foreground="#fcd34d" TextWrapping="Wrap" MaxWidth="300"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Open Log — on failure -->
+                    <Button Content="Open Log File"
+                            Margin="0,16,0,0" HorizontalAlignment="Center"
+                            Command="{Binding OpenLogCommand}">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding InstallSucceeded}" Value="False">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
                 </StackPanel>
             </Grid>
         </Grid>
@@ -516,16 +753,25 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Retry Failed (shown only on completion with failures) -->
+                <!-- Retry Failed — collapsed except on complete phase -->
                 <Button Grid.Column="0"
                         Content="Retry Failed"
-                        Style="{StaticResource SecondaryButton}"
                         HorizontalAlignment="Left"
-                        Command="{Binding RetryFailedCommand}"/>
+                        Command="{Binding RetryFailedCommand}">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsCompletePhase}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
 
                 <!-- Cancel / Close -->
                 <Button Grid.Column="1" x:Name="CancelCloseButton"
-                        Style="{StaticResource SecondaryButton}"
                         IsCancel="True"
                         Click="CancelClose_Click">
                     <Button.Style>
@@ -540,14 +786,22 @@
                     </Button.Style>
                 </Button>
 
-                <!-- Install -->
+                <!-- Accept disclaimer -->
+                <Button Grid.Column="3" Content="Continue →"
+                        Style="{StaticResource PrimaryButton}"
+                        IsDefault="True"
+                        Command="{Binding AcceptDisclaimerCommand}"
+                        Visibility="{Binding IsDisclaimerPhase,
+                            Converter={StaticResource BoolToVis}}"/>
+
+                <!-- Install (label shows selected size) -->
                 <Button Grid.Column="3"
-                        Content="Install"
+                        Content="{Binding InstallButtonLabel}"
                         Style="{StaticResource PrimaryButton}"
                         IsDefault="True"
                         Command="{Binding InstallCommand}"
                         Visibility="{Binding IsSelectionPhase,
-                            Converter={x:Static BooleanToVisibilityConverter.Default}}"/>
+                            Converter={StaticResource BoolToVis}}"/>
             </Grid>
         </Border>
     </Grid>

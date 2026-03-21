@@ -23,6 +23,7 @@ namespace StubInstaller.ViewModels
 {
     public enum InstallPhase
     {
+        Disclaimer,  // user must accept terms before the app list
         Selection,   // user is reviewing the app list
         Installing,  // install is running
         Complete,    // all done (success or partial)
@@ -42,7 +43,7 @@ namespace StubInstaller.ViewModels
 
         // ── Phase ─────────────────────────────────────────────────────────────
 
-        private InstallPhase _phase = InstallPhase.Selection;
+        private InstallPhase _phase = InstallPhase.Disclaimer;
         public InstallPhase Phase
         {
             get => _phase;
@@ -50,18 +51,43 @@ namespace StubInstaller.ViewModels
             {
                 if (SetField(ref _phase, value))
                 {
+                    OnPropertyChanged(nameof(IsDisclaimerPhase));
                     OnPropertyChanged(nameof(IsSelectionPhase));
                     OnPropertyChanged(nameof(IsInstallingPhase));
                     OnPropertyChanged(nameof(IsCompletePhase));
+                    OnPropertyChanged(nameof(InstallButtonLabel));
                     CommandManager.InvalidateRequerySuggested();
                 }
             }
         }
 
+        public bool IsDisclaimerPhase => Phase == InstallPhase.Disclaimer;
         public bool IsSelectionPhase => Phase == InstallPhase.Selection;
         public bool IsInstallingPhase => Phase == InstallPhase.Installing;
         public bool IsCompletePhase => Phase == InstallPhase.Complete
                                       || Phase == InstallPhase.Failed;
+
+        // ── Disclaimer ───────────────────────────────────────────────────────────
+
+        private bool _disclaimerAccepted;
+        public bool DisclaimerAccepted
+        {
+            get => _disclaimerAccepted;
+            set
+            {
+                if (SetField(ref _disclaimerAccepted, value))
+                    CommandManager.InvalidateRequerySuggested();
+            }
+        }
+
+        // ── Reboot ───────────────────────────────────────────────────────────────
+
+        private bool _rebootRequired;
+        public bool RebootRequired
+        {
+            get => _rebootRequired;
+            private set => SetField(ref _rebootRequired, value);
+        }
 
         // ── Progress ──────────────────────────────────────────────────────────
 
@@ -72,7 +98,7 @@ namespace StubInstaller.ViewModels
             private set => SetField(ref _overallPercent, value);
         }
 
-        private string _statusMessage = "Review the apps below and click Install.";
+        private string _statusMessage = "Please review and accept the terms below.";
         public string StatusMessage
         {
             get => _statusMessage;
@@ -92,6 +118,16 @@ namespace StubInstaller.ViewModels
         public bool RequiresAdmin => _manifest.RequiresAdmin;
         public int TotalAppCount => Items.Count;
 
+        /// <summary>Total size of ALL items regardless of selection. Shown in header.</summary>
+        public string TotalSizeDisplay
+        {
+            get
+            {
+                long bytes = Items.Where(i => i.FileSizeBytes > 0).Sum(i => i.FileSizeBytes);
+                return bytes > 0 ? $"{TotalAppCount} app{(TotalAppCount != 1 ? "s" : "")} · {FormatBytes(bytes)}" : $"{TotalAppCount} app{(TotalAppCount != 1 ? "s" : "")}";
+            }
+        }
+
         private int _selectedCount;
         public int SelectedCount
         {
@@ -102,6 +138,7 @@ namespace StubInstaller.ViewModels
                 {
                     OnPropertyChanged(nameof(SelectionSummary));
                     OnPropertyChanged(nameof(SelectedSizeDisplay));
+                    OnPropertyChanged(nameof(InstallButtonLabel));
                 }
             }
         }
@@ -119,13 +156,27 @@ namespace StubInstaller.ViewModels
             }
         }
 
+        /// <summary>Install button label — shows selected size when known.</summary>
+        public string InstallButtonLabel
+        {
+            get
+            {
+                long bytes = Items
+                    .Where(i => i.IsSelected && i.FileSizeBytes > 0)
+                    .Sum(i => i.FileSizeBytes);
+                return bytes > 0 ? $"Install  ({FormatBytes(bytes)})" : "Install";
+            }
+        }
+
         // ── Commands ──────────────────────────────────────────────────────────
 
+        public ICommand AcceptDisclaimerCommand { get; }
         public ICommand InstallCommand { get; }
         public ICommand CancelCommand { get; }
         public ICommand SelectAllCommand { get; }
         public ICommand DeselectAllCommand { get; }
         public ICommand RetryFailedCommand { get; }
+        public ICommand OpenLogCommand { get; }
 
         // ── Constructor ───────────────────────────────────────────────────────
 
@@ -149,6 +200,9 @@ namespace StubInstaller.ViewModels
 
             RecalculateTotals();
 
+            AcceptDisclaimerCommand = new RelayCommand(
+                _ => { Phase = InstallPhase.Selection; },
+                _ => DisclaimerAccepted);
             InstallCommand = new RelayCommand(_ => _ = BeginInstallAsync(),
                                                   _ => Phase == InstallPhase.Selection && SelectedCount > 0);
             CancelCommand = new RelayCommand(_ => _cts?.Cancel(),
@@ -160,6 +214,16 @@ namespace StubInstaller.ViewModels
             RetryFailedCommand = new RelayCommand(_ => _ = RetryFailedAsync(),
                                                   _ => Phase == InstallPhase.Complete
                                                     && Items.Any(i => i.Status == InstallItemStatus.Failed));
+            OpenLogCommand = new RelayCommand(_ =>
+            {
+                var path = Infrastrucure.StubLogger.LogPath;
+                if (!string.IsNullOrEmpty(path) && System.IO.File.Exists(path))
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = path,
+                        UseShellExecute = true
+                    });
+            }, _ => !string.IsNullOrEmpty(Infrastrucure.StubLogger.LogPath));
         }
 
         // ── Install flow ──────────────────────────────────────────────────────
@@ -200,11 +264,14 @@ namespace StubInstaller.ViewModels
 
                     var result = ExitCodeClassifier.Classify(exitCode);
                     bool success = ExitCodeClassifier.IsSuccess(result);
+                    bool reboot = result is ExitCodeResult.SuccessRebootRequired
+                                         or ExitCodeResult.SuccessRebootInitiated;
 
                     Dispatch(() =>
                     {
                         item.Status = success ? InstallItemStatus.Done : InstallItemStatus.Failed;
                         item.StatusDetail = ExitCodeClassifier.Describe(exitCode);
+                        if (reboot) RebootRequired = true;
                     });
 
                     done++;
@@ -239,7 +306,9 @@ namespace StubInstaller.ViewModels
                     Phase = InstallPhase.Complete;
                     StatusMessage = anyFailed
                         ? "Completed with errors — see details below."
-                        : "All apps installed successfully.";
+                        : RebootRequired
+                            ? "All apps installed. A restart is required to complete setup."
+                            : "All apps installed successfully.";
                 });
             }
         }

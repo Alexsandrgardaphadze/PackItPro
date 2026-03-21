@@ -12,6 +12,7 @@
     <UseWindowsForms>true</UseWindowsForms>
     <UseWPF>true</UseWPF>
 
+	<StartupObject>StubInstaller.Program</StartupObject>
     <!-- Single-file publishing configuration -->
     <!-- Note: For development, we'll build normally. For release, we'll publish. -->
     <!-- This enables building a self-contained single EXE for PackItPro -->
@@ -35,5 +36,5 @@
   <ItemGroup>
     <EmbeddedResource Include="placeholder.zip" />
   </ItemGroup>
-
+	
 </Project>

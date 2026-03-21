@@ -231,10 +231,26 @@ namespace PackItPro.Services
             return 10;
         }
 
+        // Windows system component names embedded in redistributable installers.
+        // These are internal Microsoft product names that are meaningless to end users
+        // — fall through to FileDescription or filename when we see them.
+        private static readonly HashSet<string> _windowsSystemNames = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "Microsoft® Windows® Operating System",
+            "Microsoft Windows Operating System",
+            "Windows® Internet Explorer",
+            "Windows Internet Explorer",
+            "Internet Explorer",
+            "Microsoft® Visual C++",
+            "Microsoft Visual C++",
+            "Microsoft® .NET Framework",
+            "Microsoft .NET Framework",
+            "Microsoft® Windows® Operating System Setup",
+        };
+
         /// <summary>
         /// Reads the Windows version resource of an exe/msi to get a human-readable name.
-        /// Priority: ProductName → FileDescription → filename-without-extension.
-        /// Returns null only if the file doesn't exist (caller uses null to mean "use Name").
+        /// Priority: ProductName (if not a Windows system component) → FileDescription → filename.
         /// Never throws — bad version resources are silently ignored.
         /// </summary>
         private static string? ResolveDisplayName(string filePath)
@@ -243,14 +259,21 @@ namespace PackItPro.Services
             {
                 var vi = FileVersionInfo.GetVersionInfo(filePath);
 
+                // Try ProductName first, but reject generic Windows system component strings —
+                // redistributables like dxwebsetup.exe and vcredist embed the OS component
+                // name ("Windows® Internet Explorer") rather than the actual product name.
                 string? name = null;
-                if (!string.IsNullOrWhiteSpace(vi.ProductName))
+                if (!string.IsNullOrWhiteSpace(vi.ProductName)
+                    && !_windowsSystemNames.Contains(vi.ProductName.Trim()))
+                {
                     name = vi.ProductName.Trim();
-                else if (!string.IsNullOrWhiteSpace(vi.FileDescription))
+                }
+
+                // FileDescription is usually more specific for system redistributables
+                if (string.IsNullOrWhiteSpace(name) && !string.IsNullOrWhiteSpace(vi.FileDescription))
                     name = vi.FileDescription.Trim();
 
-                // Fall back to filename without extension, but still store it so
-                // the stub always has a display name without needing its own fallback.
+                // Final fallback: filename without extension — always meaningful
                 if (string.IsNullOrWhiteSpace(name))
                     name = Path.GetFileNameWithoutExtension(filePath);
 

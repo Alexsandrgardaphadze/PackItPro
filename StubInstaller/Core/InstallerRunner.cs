@@ -88,11 +88,20 @@ namespace StubInstaller.Core
                 logInfo("      --silent takes effect. This is an upstream limitation, not a PackItPro bug.");
             }
 
+            // Per-file elevation: if this installer needs admin and we're not already elevated,
+            // use UseShellExecute=true + Verb=runas to trigger a UAC prompt.
+            // Note: elevated launch requires UseShellExecute=true which disables stdout/stderr capture.
+            bool needsElevation = file.RequiresAdmin && !IsRunningAsAdmin();
+            if (needsElevation)
+                logInfo("  ⚠️  Per-file elevation required — launching via runas.");
+
             try
             {
                 string ext = Path.GetExtension(filePath).ToLowerInvariant();
-                return ext is ".msi" or ".msp"
-                    ? await RunMsiAsync(filePath, silentArgs, tempDir, timeoutMs, logInfo, logError)
+                if (ext is ".msi" or ".msp")
+                    return await RunMsiAsync(filePath, silentArgs, tempDir, timeoutMs, logInfo, logError);
+                return needsElevation
+                    ? await RunExeElevatedAsync(filePath, silentArgs, timeoutMs, logInfo, logError)
                     : await RunExeAsync(filePath, silentArgs, timeoutMs, logInfo, logError);
             }
             catch (OperationCanceledException)
@@ -347,6 +356,48 @@ namespace StubInstaller.Core
             }
 
             return exitCode;
+        }
+
+        // ── Elevated exe runner ───────────────────────────────────────────────
+
+        /// <summary>
+        /// Runs an exe elevated via "runas". UseShellExecute=true is required,
+        /// which means stdout/stderr cannot be captured.
+        /// </summary>
+        private static async Task<int> RunExeElevatedAsync(
+            string filePath,
+            string[] silentArgs,
+            int timeoutMs,
+            Action<string> logInfo,
+            Action<string> logError)
+        {
+            string arguments = string.Join(" ", silentArgs);
+            logInfo("  Command line (elevated):");
+            logInfo($"    \"{filePath}\" {arguments}");
+
+            var psi = new ProcessStartInfo
+            {
+                FileName = filePath,
+                Arguments = arguments,
+                UseShellExecute = true,
+                Verb = "runas",
+                CreateNoWindow = false,
+            };
+
+            return await RunProcessWithoutCaptureAsync(psi, timeoutMs, logInfo, logError);
+        }
+
+        // ── Elevation check ───────────────────────────────────────────────────
+
+        private static bool IsRunningAsAdmin()
+        {
+            try
+            {
+                using var id = System.Security.Principal.WindowsIdentity.GetCurrent();
+                return new System.Security.Principal.WindowsPrincipal(id)
+                    .IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
+            }
+            catch { return false; }
         }
 
         // ── Utilities ─────────────────────────────────────────────────────────

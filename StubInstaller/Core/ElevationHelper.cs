@@ -1,13 +1,13 @@
-﻿// StubInstaller/ElevationHelper.cs
+﻿// StubInstaller/Core/ElevationHelper.cs
 // Admin detection and UAC elevation restart.
 using StubInstaller.Infrastrucure;
-using StubInstaller.UI;
 using System;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
 using System.Security.Principal;
 using System.Text;
+using WinForms = System.Windows.Forms;
 
 namespace StubInstaller.Core
 {
@@ -29,7 +29,11 @@ namespace StubInstaller.Core
             string? exePath = Environment.ProcessPath;
             if (string.IsNullOrEmpty(exePath))
             {
-                StubUI.ShowError("Cannot determine the executable path needed for elevation.", "Elevation Error");
+                WinForms.MessageBox.Show(
+                    "Cannot determine the executable path needed for elevation.",
+                    "PackItPro — Elevation Error",
+                    WinForms.MessageBoxButtons.OK,
+                    WinForms.MessageBoxIcon.Error);
                 Environment.Exit(1);
                 return;
             }
@@ -50,9 +54,11 @@ namespace StubInstaller.Core
             }
             catch (Win32Exception)
             {
-                StubUI.ShowError(
+                WinForms.MessageBox.Show(
                     "Administrator rights are required but were denied.\n\nInstallation cancelled.",
-                    "UAC Denied");
+                    "PackItPro — UAC Denied",
+                    WinForms.MessageBoxButtons.OK,
+                    WinForms.MessageBoxIcon.Error);
                 Environment.Exit(1);
             }
         }
@@ -61,8 +67,8 @@ namespace StubInstaller.Core
 
         private static string BuildElevatedArgs(string tempDir, string? logPath)
         {
-            // Start from the original command line, drop any stale --temp-dir / --log-path,
-            // then append the fresh values.
+            // Rebuild the command line, dropping any stale --temp-dir / --log-path
+            // from a previous run, then appending the fresh values.
             var sb = new StringBuilder();
 
             foreach (var a in Environment.GetCommandLineArgs().Skip(1))

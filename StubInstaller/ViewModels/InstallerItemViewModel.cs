@@ -74,6 +74,28 @@ namespace StubInstaller.ViewModels
         public bool IsDetectionReliable =>
             DetectionSource is "header" or "manifest";
 
+        /// <summary>Human-readable detection source for the tooltip.</summary>
+        public string DetectionSourceDisplay => DetectionSource switch
+        {
+            "header" => "Header scan ✅",
+            "manifest" => "User-specified ✅",
+            _ => "Extension only ⚠️",
+        };
+
+        /// <summary>
+        /// VirusTotal scan result from the manifest ("Clean", "Infected", "Unscanned").
+        /// Shown as a badge on each row and in the tooltip.
+        /// </summary>
+        public string VtStatus { get; }
+
+        /// <summary>Human-readable VT status for the tooltip.</summary>
+        public string VtStatusDisplay => VtStatus switch
+        {
+            "Clean" => "Clean (no detections)",
+            "Infected" => "⚠️ Detections found!",
+            _ => "Not scanned",
+        };
+
         // ── Mutable UI state ─────────────────────────────────────────────────
 
         private bool _isSelected = true;
@@ -153,6 +175,13 @@ namespace StubInstaller.ViewModels
             FileSizeBytes = File.Exists(fullPath)
                 ? new FileInfo(fullPath).Length
                 : -1;
+
+            VtStatus = file.ScanResult switch
+            {
+                "clean" => "Clean",
+                "infected" => "Infected",
+                _ => "Unscanned",
+            };
         }
 
         // ── Helpers ───────────────────────────────────────────────────────────

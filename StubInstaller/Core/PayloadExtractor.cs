@@ -53,30 +53,55 @@ namespace StubInstaller.Core
 
                 fs.Seek(payloadOffset, SeekOrigin.Begin);
 
-                // Wrap the payload region in a length-limited stream so ZipArchive
-                // cannot read past the end of the payload into the footer
-                using var payloadStream = new SubStream(fs, payloadSize);
-
-                // Verify hash while streaming if v2.3 footer
-                Stream hashingStream = payloadStream;
-                SHA256? sha = null;
+                // ── STEP A: Verify hash with a sequential read BEFORE extraction ────────
+                // ResourceInjector hashes the ZIP bytes sequentially (offset 0 → end).
+                // ZipArchive does NOT read sequentially — it seeks to the Central Directory
+                // at the end of the ZIP first, then jumps to individual entries.
+                // Hashing inside a HashingReadStream during extraction therefore produces
+                // a different byte order than ResourceInjector, causing guaranteed mismatch.
+                // Fix: do one sequential read pass over the raw payload bytes first,
+                // then seek back to offset 0 and let ZipArchive read however it wants.
                 if (expectedHash != null)
                 {
-                    sha = SHA256.Create();
-                    hashingStream = new HashingReadStream(payloadStream, sha);
+                    Log("Verifying payload hash (sequential pass)...");
+                    fs.Seek(payloadOffset, SeekOrigin.Begin);
+
+                    using var sha = SHA256.Create();
+                    var hashBuffer = new byte[81920];
+                    long remaining = payloadSize;
+                    int bytesRead;
+
+                    while (remaining > 0 &&
+                           (bytesRead = fs.Read(hashBuffer, 0, (int)Math.Min(hashBuffer.Length, remaining))) > 0)
+                    {
+                        sha.TransformBlock(hashBuffer, 0, bytesRead, null, 0);
+                        remaining -= bytesRead;
+                    }
+                    sha.TransformFinalBlock(hashBuffer, 0, 0);
+                    byte[] actualHash = sha.Hash!;
+
+                    if (!CryptographicOperations.FixedTimeEquals(expectedHash, actualHash))
+                    {
+                        throw new InvalidOperationException(
+                            "PAYLOAD INTEGRITY CHECK FAILED!\n\n" +
+                            "The ZIP payload has been modified or corrupted.\n\n" +
+                            $"Expected: {Convert.ToBase64String(expectedHash)}\n" +
+                            $"Actual:   {Convert.ToBase64String(actualHash)}\n\n" +
+                            "Possible causes: file tampered, disk corruption, antivirus modification.\n" +
+                            "Installation cannot proceed.");
+                    }
+                    Log("Payload hash verified.");
                 }
 
-                // Pass the stream directly to ZipArchive at position 0.
-                // No header peek — ZipArchive throws a clear InvalidDataException
-                // if the magic bytes are wrong, which is caught and reported below.
-                // Any seek before ZipArchive opens the stream would require correct
-                // SubStream seek-translation which is non-trivial to get right, and
-                // the peek added no value that the archive itself doesn't provide.
+                // ── STEP B: Extract — seek back to payload start ──────────────────────
+                // ZipArchive is free to seek in any order now that hash is confirmed.
+                fs.Seek(payloadOffset, SeekOrigin.Begin);
+                using var payloadStream = new SubStream(fs, payloadSize);
 
                 string safeTempDir = Path.GetFullPath(tempPath + Path.DirectorySeparatorChar);
                 int extracted = 0;
 
-                using (var archive = new ZipArchive(hashingStream, ZipArchiveMode.Read, leaveOpen: true))
+                using (var archive = new ZipArchive(payloadStream, ZipArchiveMode.Read, leaveOpen: true))
                 {
                     Log($"ZIP entries: {archive.Entries.Count}");
                     foreach (var entry in archive.Entries)
@@ -99,26 +124,6 @@ namespace StubInstaller.Core
                         Log($"  [{extracted}/{archive.Entries.Count}] {entry.FullName} ({Util.FormatBytes(entry.Length)})");
                     }
                 }
-
-                // Verify hash after extraction if v2.3
-                if (sha != null && expectedHash != null)
-                {
-                    sha.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
-                    byte[] actualHash = sha.Hash!;
-                    if (!CryptographicOperations.FixedTimeEquals(expectedHash, actualHash))
-                    {
-                        throw new InvalidOperationException(
-                            "PAYLOAD INTEGRITY CHECK FAILED!\n\n" +
-                            "The ZIP payload has been modified or corrupted.\n\n" +
-                            $"Expected: {Convert.ToBase64String(expectedHash)}\n" +
-                            $"Actual:   {Convert.ToBase64String(actualHash)}\n\n" +
-                            "Possible causes: file tampered, disk corruption, antivirus modification.\n" +
-                            "Installation cannot proceed.");
-                    }
-                    Log("Payload integrity verified.");
-                }
-
-                sha?.Dispose();
                 Log($"Extracted {extracted} file(s) to: {tempPath}");
                 return tempPath;
             }
@@ -322,68 +327,6 @@ namespace StubInstaller.Core
             // Translate to absolute position in the underlying stream
             _inner.Seek(_startOffset + newLogical, SeekOrigin.Begin);
             _position = newLogical;
-            return _position;
-        }
-
-        public override void Flush() { }
-        public override void SetLength(long value) => throw new NotSupportedException();
-        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
-    }
-
-    /// <summary>
-    /// Wraps a readable stream and feeds all bytes through a <see cref="SHA256"/>
-    /// transform as they are read, allowing hash-while-extract without buffering.
-    /// </summary>
-    internal sealed class HashingReadStream : Stream
-    {
-        private readonly Stream _inner;
-        private readonly SHA256 _sha;
-        private readonly long _length;
-        private long _position;
-
-        internal HashingReadStream(Stream inner, SHA256 sha)
-        {
-            _inner = inner;
-            _sha = sha;
-            _length = inner.CanSeek ? inner.Length : -1;
-        }
-
-        public override bool CanRead => true;
-        public override bool CanSeek => _inner.CanSeek;
-        public override bool CanWrite => false;
-        public override long Length => _length >= 0 ? _length : throw new NotSupportedException();
-        public override long Position
-        {
-            get => _position;
-            set => Seek(value, SeekOrigin.Begin);
-        }
-
-        public override int Read(byte[] buffer, int offset, int count)
-        {
-            int read = _inner.Read(buffer, offset, count);
-            if (read > 0)
-            {
-                _sha.TransformBlock(buffer, offset, read, null, 0);
-                _position += read;
-            }
-            return read;
-        }
-
-        public override long Seek(long offset, SeekOrigin origin)
-        {
-            if (!_inner.CanSeek) throw new NotSupportedException();
-            // Resolve new logical position, then seek inner stream to match.
-            // We can't pass origin+offset blindly to _inner because _inner may
-            // itself be a SubStream with its own coordinate space.
-            long newPos = origin switch
-            {
-                SeekOrigin.Begin => offset,
-                SeekOrigin.Current => _position + offset,
-                SeekOrigin.End => (_length >= 0 ? _length : _inner.Length) + offset,
-                _ => throw new ArgumentOutOfRangeException(nameof(origin))
-            };
-            _inner.Seek(newPos, SeekOrigin.Begin);
-            _position = newPos;
             return _position;
         }
 

@@ -110,6 +110,14 @@ namespace StubInstaller
         public string? DisplayName { get; set; }
 
         /// <summary>
+        /// VirusTotal scan result recorded by PackItPro at packaging time.
+        /// "clean" = no detections, "infected" = detections found, null = not scanned.
+        /// Displayed in the stub UI — does not block installation.
+        /// </summary>
+        [JsonPropertyName("scanResult")]
+        public string? ScanResult { get; set; }
+
+        /// <summary>
         /// Returns the best available display name: DisplayName if set,
         /// otherwise filename without extension. Never null or empty.
         /// </summary>
