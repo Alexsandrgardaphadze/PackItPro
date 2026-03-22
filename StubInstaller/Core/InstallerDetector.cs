@@ -1,9 +1,6 @@
-﻿// StubInstaller/InstallerDetector.cs - v1.5 DETECTION FIX
-// Changes vs v1.4:
-//   - Added "squirrel" type: silent flag is "--silent" (not /S)
-//     Used by UniGetUI, GitHub Desktop, Slack, Discord, Teams, etc.
-//   - Added "burn" type: WiX Burn bootstrapper, silent flag is "/quiet /norestart"
-//   - Type strings must stay in sync with ManifestGenerator.DetectInstallType()
+﻿// StubInstaller/InstallerDetector.cs
+
+using System;
 
 namespace StubInstaller.Core
 {
@@ -22,23 +19,20 @@ namespace StubInstaller.Core
                 "msp" => new[] { "/quiet", "/norestart" },
                 "inno" => new[] { "/SP-", "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" },
                 "nsis" => new[] { "/S" },
-
-                // Squirrel / Electron installers (UniGetUI, GitHub Desktop, Discord, Slack...)
-                // These use "--silent", not "/S"
                 "squirrel" => new[] { "--silent" },
-
-                // WiX Burn bootstrapper
                 "burn" => new[] { "/quiet", "/norestart" },
+                "office-c2r" => new[] { "/quiet" },
+                "dxcab" => new[] { "/Q", "/T:{tempdir}" }, // handled specially by InstallerRunner
 
-                // Generic EXE: try /S (most universal single flag)
+                "jdk" => new[] { "/s" },
+                "edgewebview2" => new[] { "--silent", "--system-level" },
+                "vcredist" => new[] { "/ai", "/gm2" },
+                "vcredist-ms" => new[] { "/install", "/quiet", "/norestart" },
+                "dxweb" => new[] { "/Q" },
                 "exe" => new[] { "/S" },
-
-                // Store / patch formats — no standard silent CLI flag
                 "appx" => Array.Empty<string>(),
                 "msix" => Array.Empty<string>(),
                 "file" => Array.Empty<string>(),
-
-                // Unknown type — attempt /S, may or may not work
                 _ => new[] { "/S" },
             };
         }

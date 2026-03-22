@@ -15,8 +15,6 @@ namespace StubInstaller
 {
     internal partial class Program
     {
-        private static bool _rebootRequired;
-
         [STAThread]
         static int Main(string[] args)
         {

@@ -1,6 +1,4 @@
 ﻿// StubInstaller/Program.Dialogs.cs
-// Pre-WPF error dialogs — used only for fatal failures before the window opens.
-// After the WPF window is running, errors are surfaced through the ViewModel.
 using StubInstaller.Core;
 using StubInstaller.Infrastrucure;
 using System.IO;

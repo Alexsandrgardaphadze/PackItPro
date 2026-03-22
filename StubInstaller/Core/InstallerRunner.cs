@@ -1,7 +1,7 @@
 ﻿// StubInstaller/InstallerRunner.cs
-// Async installer orchestration with output capture, MSI verbose logging, and timeout handling.
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -23,6 +23,7 @@ namespace StubInstaller.Core
         public const string TypeAppx = "appx";
         public const string TypeMsix = "msix";
         public const string TypeFile = "file";
+        public const string TypeDxCab = "dxcab";       // DirectX June 2010 CAB self-extractor
 
         /// <summary>
         /// Runs all installers in order. Returns true if all succeeded
@@ -98,6 +99,8 @@ namespace StubInstaller.Core
             try
             {
                 string ext = Path.GetExtension(filePath).ToLowerInvariant();
+                if (file.InstallType == TypeDxCab)
+                    return await RunDxCabAsync(filePath, tempDir, timeoutMs, logInfo, logError);
                 if (ext is ".msi" or ".msp")
                     return await RunMsiAsync(filePath, silentArgs, tempDir, timeoutMs, logInfo, logError);
                 return needsElevation
@@ -108,6 +111,23 @@ namespace StubInstaller.Core
             {
                 logError($"TIMEOUT: {file.Name} did not complete within {file.TimeoutMinutes} minutes.");
                 return -1;
+            }
+            catch (Win32Exception ex) when (
+                ex.Message.Contains("requires elevation", StringComparison.OrdinalIgnoreCase) ||
+                ex.NativeErrorCode == 740)  // ERROR_ELEVATION_REQUIRED
+            {
+                // Installer has a UAC manifest requesting admin rights but we didn't
+                // know at packaging time. Retry automatically via runas.
+                logInfo($"  ↑ Elevation required (Win32 740) — retrying via runas...");
+                try
+                {
+                    return await RunExeElevatedAsync(filePath, silentArgs, timeoutMs, logInfo, logError);
+                }
+                catch (Exception retryEx)
+                {
+                    logError($"Elevation retry failed for {file.Name}: {retryEx.Message}");
+                    return -1;
+                }
             }
             catch (Exception ex)
             {
@@ -177,6 +197,66 @@ namespace StubInstaller.Core
 
         // ── Private runners ───────────────────────────────────────────────────
 
+        /// <summary>
+        /// Handles the DirectX June 2010 redistributable two-step install:
+        ///   1. Extract the CAB self-extractor silently to a temp subdirectory.
+        ///   2. Run DXSETUP.exe /silent from the extracted directory.
+        /// This is the only correct way to silent-install the DX June 2010 redist.
+        /// Per Chocolatey package and Microsoft documentation.
+        /// </summary>
+        private static async Task<int> RunDxCabAsync(
+            string filePath,
+            string tempDir,
+            int timeoutMs,
+            Action<string> logInfo,
+            Action<string> logError)
+        {
+            string extractDir = Path.Combine(tempDir, "dx_extracted");
+            Directory.CreateDirectory(extractDir);
+
+            // Step 1: Extract the CAB silently
+            logInfo("  DX CAB Step 1: extracting to temp dir...");
+            logInfo($"  Command line:\r\n    \"{filePath}\" /Q /T:\"{extractDir}\"");
+
+            var extractPsi = new ProcessStartInfo
+            {
+                FileName = filePath,
+                Arguments = $"/Q /T:\"{extractDir}\"",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                WorkingDirectory = tempDir,
+            };
+
+            int extractCode = await RunProcessWithoutCaptureAsync(extractPsi, timeoutMs, logInfo, logError);
+            if (extractCode != 0)
+            {
+                logError($"DX CAB extraction failed with code {extractCode}");
+                return extractCode;
+            }
+
+            // Step 2: Run DXSETUP.exe /silent from extracted directory
+            string dxSetup = Path.Combine(extractDir, "DXSETUP.exe");
+            if (!File.Exists(dxSetup))
+            {
+                logError($"DXSETUP.exe not found after extraction at: {dxSetup}");
+                return -1;
+            }
+
+            logInfo("  DX CAB Step 2: running DXSETUP.exe /silent...");
+            logInfo($"  Command line:\r\n    \"{dxSetup}\" /silent");
+
+            var dxPsi = new ProcessStartInfo
+            {
+                FileName = dxSetup,
+                Arguments = "/silent",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                WorkingDirectory = extractDir,
+            };
+
+            return await RunProcessWithoutCaptureAsync(dxPsi, timeoutMs, logInfo, logError);
+        }
+
         private static async Task<int> RunMsiAsync(
             string filePath,
             string[] silentArgs,
@@ -208,14 +288,38 @@ namespace StubInstaller.Core
 
             // msiexec routes output through Windows Installer logging, not console streams,
             // so stdout/stderr redirect is not useful here — /L*v handles it.
-            var psi = new ProcessStartInfo
+            // MSI always needs admin rights (Windows Installer service requires elevation).
+            // If the stub is already running as admin the process inherits the token silently.
+            // If not, we must use UseShellExecute=true + Verb=runas to trigger UAC — this
+            // also means we cannot capture stdout/stderr, but /L*v covers MSI logging anyway.
+            bool msiNeedsElevation = !IsRunningAsAdmin();
+            if (msiNeedsElevation)
+                logInfo("  ↑ MSI requires elevation — launching msiexec via runas.");
+
+            ProcessStartInfo psi;
+            if (msiNeedsElevation)
             {
-                FileName = "msiexec.exe",
-                Arguments = arguments,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                WorkingDirectory = workingDir,
-            };
+                psi = new ProcessStartInfo
+                {
+                    FileName = "msiexec.exe",
+                    Arguments = arguments,
+                    UseShellExecute = true,
+                    Verb = "runas",
+                    CreateNoWindow = false,
+                    WorkingDirectory = workingDir,
+                };
+            }
+            else
+            {
+                psi = new ProcessStartInfo
+                {
+                    FileName = "msiexec.exe",
+                    Arguments = arguments,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    WorkingDirectory = workingDir,
+                };
+            }
 
             int exitCode = await RunProcessWithoutCaptureAsync(psi, timeoutMs, logInfo, logError);
 
@@ -405,6 +509,7 @@ namespace StubInstaller.Core
         private static string DescribeSource(string source) => source switch
         {
             "header" => "header signature ✅",
+            "content" => "content scan ✅",
             "manifest" => "user-specified ✅",
             _ => "extension only ⚠️",
         };

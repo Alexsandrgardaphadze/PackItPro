@@ -43,24 +43,18 @@ namespace PackItPro.ViewModels.CommandHandlers
             PackCommand = new AsyncRelayCommand(ExecutePackAsync, CanExecutePack);
             TestPackageCommand = new RelayCommand(ExecuteTestPackage, CanTestPackage);
 
-            _fileList.PropertyChanged += OnFileListPropertyChanged;
-            _status.PropertyChanged += OnStatusPropertyChanged;
-            _settings.PropertyChanged += OnSettingsPropertyChanged;
-        }
-
-        private void OnFileListPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
-        {
-            if (e.PropertyName == nameof(_fileList.HasFiles)) RaiseCanExecuteChanged();
-        }
-
-        private void OnStatusPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
-        {
-            if (e.PropertyName == nameof(_status.IsBusy)) RaiseCanExecuteChanged();
-        }
-
-        private void OnSettingsPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
-        {
-            if (e.PropertyName == nameof(_settings.OutputLocation)) RaiseCanExecuteChanged();
+            _fileList.PropertyChanged += (s, e) =>
+            {
+                if (e.PropertyName == nameof(_fileList.HasFiles)) RaiseCanExecuteChanged();
+            };
+            _status.PropertyChanged += (s, e) =>
+            {
+                if (e.PropertyName == nameof(_status.IsBusy)) RaiseCanExecuteChanged();
+            };
+            _settings.PropertyChanged += (s, e) =>
+            {
+                if (e.PropertyName == nameof(_settings.OutputLocation)) RaiseCanExecuteChanged();
+            };
         }
 
         // ── Can Execute ───────────────────────────────────────────────────────
@@ -87,9 +81,9 @@ namespace PackItPro.ViewModels.CommandHandlers
                     return;
                 }
 
-                // Show disclaimer before every package. The "Do not show again" checkbox
-                // was removed — the disclaimer is a lightweight safety acknowledgement and
-                // should always be shown. DisclaimerAccepted is no longer persisted.
+                // Show disclaimer on first pack. Once accepted with "do not show again"
+                // ticked, it is saved to settings.json and suppressed on future packs.
+                // Disclaimer shows on every pack (DisclaimerAccepted intentionally ignored)
                 {
                     int pendingCount = _fileList.Items.Count(f => f.Status == FileStatusEnum.Pending);
                     int scannedCount = _fileList.CleanCount + _fileList.InfectedCount + _fileList.FailedCount;
@@ -97,7 +91,7 @@ namespace PackItPro.ViewModels.CommandHandlers
 
                     bool accepted = DisclaimerWindow.Show(
                         Application.Current?.MainWindow,
-                        out bool _,                  // suppressFuture ignored — always show
+                        out bool _,
                         fileCount: _fileList.Count,
                         scannedCount: scannedCount,
                         infectedCount: _fileList.InfectedCount,
@@ -130,12 +124,23 @@ namespace PackItPro.ViewModels.CommandHandlers
                     _log.Debug($"Pack {report.percentage}%: {report.message}");
                 });
 
+                // Build FileEntry list — carries Notes and VT scan result per file.
+                // Status→string mapping: Clean/Trusted→"clean", Infected→"infected", others→null
+                var fileEntries = _fileList.Items
+                    .Select(f => new ManifestGenerator.FileEntry(
+                        Path: f.FilePath,
+                        Notes: string.IsNullOrWhiteSpace(f.Notes) ? null : f.Notes.Trim(),
+                        ScanResult: f.Status switch
+                        {
+                            FileStatusEnum.Clean => "clean",
+                            FileStatusEnum.Trusted => "clean",    // trusted = confirmed safe
+                            FileStatusEnum.Infected => "infected",
+                            _ => null,                             // Pending/ScanFailed/Skipped
+                        }))
+                    .ToList();
+
                 string outputPath = await Packager.CreatePackageAsync(
-                    filePaths: _fileList.Items
-                        .Select(f => new ManifestGenerator.FileEntry(
-                            f.FilePath,
-                            string.IsNullOrWhiteSpace(f.Notes) ? null : f.Notes))
-                        .ToList(),
+                    filePaths: fileEntries,
                     outputDirectory: Path.GetDirectoryName(saveDialog.FileName) ?? _settings.OutputLocation,
                     packageName: Path.GetFileNameWithoutExtension(saveDialog.FileName),
                     requiresAdmin: _settings.RequiresAdmin,
@@ -294,9 +299,6 @@ namespace PackItPro.ViewModels.CommandHandlers
 
         public override void Dispose()
         {
-            _fileList.PropertyChanged -= OnFileListPropertyChanged;
-            _status.PropertyChanged -= OnStatusPropertyChanged;
-            _settings.PropertyChanged -= OnSettingsPropertyChanged;
             _packCts?.Cancel();
             _packCts?.Dispose();
             base.Dispose();

@@ -132,12 +132,76 @@
             </Setter>
         </Style>
 
-        <!-- Installer row CheckBox -->
+        <!-- Custom row CheckBox — matches PackItPro SettingCheckBoxStyle
+             16×16 rounded border, SVG checkmark, accent fill on check -->
         <Style x:Key="RowCheckBox" TargetType="CheckBox">
-            <Setter Property="Foreground"  Value="{StaticResource TextPrimary}"/>
-            <Setter Property="FontFamily"  Value="Segoe UI"/>
-            <Setter Property="VerticalContentAlignment" Value="Center"/>
-            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Cursor"             Value="Hand"/>
+            <Setter Property="VerticalAlignment"  Value="Center"/>
+            <Setter Property="FocusVisualStyle"   Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Grid VerticalAlignment="Center">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="20"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Border x:Name="CheckBorder"
+                                    Grid.Column="0"
+                                    Width="16" Height="16"
+                                    CornerRadius="4"
+                                    BorderThickness="1.5"
+                                    BorderBrush="{StaticResource Border}"
+                                    Background="Transparent"
+                                    VerticalAlignment="Center"
+                                    HorizontalAlignment="Center">
+                                <Viewbox x:Name="CheckMark"
+                                         Width="10" Height="10"
+                                         Visibility="Hidden">
+                                    <Canvas Width="20" Height="20">
+                                        <Path Data="M17.78 5.72a.75.75 0 0 0-1.06 0L8 14.44 3.28 9.72a.75.75 0 1 0-1.06 1.06l5.25 5.25a.75.75 0 0 0 1.06 0l9.25-9.25a.75.75 0 0 0 0-1.06z"
+                                              Fill="{StaticResource TextPrimary}"/>
+                                    </Canvas>
+                                </Viewbox>
+                            </Border>
+                            <ContentPresenter Grid.Column="1"
+                                              Margin="8,0,0,0"
+                                              VerticalAlignment="Center"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="CheckBorder" Property="Background"
+                                        Value="{StaticResource Accent}"/>
+                                <Setter TargetName="CheckBorder" Property="BorderBrush"
+                                        Value="{StaticResource Accent}"/>
+                                <Setter TargetName="CheckMark" Property="Visibility"
+                                        Value="Visible"/>
+                            </Trigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsMouseOver" Value="True"/>
+                                    <Condition Property="IsChecked" Value="False"/>
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="CheckBorder" Property="BorderBrush"
+                                        Value="{StaticResource AccentHover}"/>
+                            </MultiTrigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsMouseOver" Value="True"/>
+                                    <Condition Property="IsChecked" Value="True"/>
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="CheckBorder" Property="Background"
+                                        Value="{StaticResource AccentHover}"/>
+                                <Setter TargetName="CheckBorder" Property="BorderBrush"
+                                        Value="{StaticResource AccentHover}"/>
+                            </MultiTrigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.4"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <!-- ProgressBar -->
@@ -273,10 +337,70 @@
                             </StackPanel>
                         </Border>
 
+                        <!-- Custom checkbox matching PackItPro SettingCheckBoxStyle —
+                             inlined here since stub cannot reference PackItPro resource dictionaries -->
                         <CheckBox IsChecked="{Binding DisclaimerAccepted}"
-                                  Foreground="{StaticResource TextPrimary}"
-                                  FontFamily="Segoe UI" FontSize="12"
+                                  Cursor="Hand"
                                   FocusVisualStyle="{x:Null}">
+                            <CheckBox.Template>
+                                <ControlTemplate TargetType="CheckBox">
+                                    <Grid VerticalAlignment="Center">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="20"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Border x:Name="CheckBorder"
+                                                Grid.Column="0"
+                                                Width="16" Height="16"
+                                                CornerRadius="4"
+                                                BorderThickness="1.5"
+                                                BorderBrush="{StaticResource Border}"
+                                                Background="Transparent"
+                                                VerticalAlignment="Center"
+                                                HorizontalAlignment="Center">
+                                            <Viewbox x:Name="CheckMark"
+                                                     Width="10" Height="10"
+                                                     Visibility="Hidden">
+                                                <Canvas Width="20" Height="20">
+                                                    <Path Data="M17.78 5.72a.75.75 0 0 0-1.06 0L8 14.44 3.28 9.72a.75.75 0 1 0-1.06 1.06l5.25 5.25a.75.75 0 0 0 1.06 0l9.25-9.25a.75.75 0 0 0 0-1.06z"
+                                                          Fill="{StaticResource TextPrimary}"/>
+                                                </Canvas>
+                                            </Viewbox>
+                                        </Border>
+                                        <ContentPresenter Grid.Column="1"
+                                                          Margin="8,0,0,0"
+                                                          VerticalAlignment="Center"/>
+                                    </Grid>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsChecked" Value="True">
+                                            <Setter TargetName="CheckBorder" Property="Background"
+                                                    Value="{StaticResource Accent}"/>
+                                            <Setter TargetName="CheckBorder" Property="BorderBrush"
+                                                    Value="{StaticResource Accent}"/>
+                                            <Setter TargetName="CheckMark" Property="Visibility"
+                                                    Value="Visible"/>
+                                        </Trigger>
+                                        <MultiTrigger>
+                                            <MultiTrigger.Conditions>
+                                                <Condition Property="IsMouseOver" Value="True"/>
+                                                <Condition Property="IsChecked" Value="False"/>
+                                            </MultiTrigger.Conditions>
+                                            <Setter TargetName="CheckBorder" Property="BorderBrush"
+                                                    Value="{StaticResource AccentHover}"/>
+                                        </MultiTrigger>
+                                        <MultiTrigger>
+                                            <MultiTrigger.Conditions>
+                                                <Condition Property="IsMouseOver" Value="True"/>
+                                                <Condition Property="IsChecked" Value="True"/>
+                                            </MultiTrigger.Conditions>
+                                            <Setter TargetName="CheckBorder" Property="Background"
+                                                    Value="{StaticResource AccentHover}"/>
+                                            <Setter TargetName="CheckBorder" Property="BorderBrush"
+                                                    Value="{StaticResource AccentHover}"/>
+                                        </MultiTrigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </CheckBox.Template>
                             <TextBlock Text="I have read and accept these terms"
                                        FontFamily="Segoe UI" FontSize="12"
                                        Foreground="{StaticResource TextPrimary}"/>
@@ -345,28 +469,28 @@
                                                 <StackPanel>
                                                     <TextBlock FontFamily="Segoe UI" FontSize="12"
                                                                FontWeight="SemiBold" Foreground="#f1f5f9"
-                                                               Text="{Binding DisplayName}"/>
+                                                               Text="{Binding DisplayName, Mode=OneWay}"/>
                                                     <TextBlock FontFamily="Consolas" FontSize="11"
                                                                Foreground="#94a3b8" Margin="0,4,0,0">
                                                         <Run Text="File: "/>
-                                                        <Run Text="{Binding FileName}" Foreground="#cbd5e1"/>
+                                                        <Run Text="{Binding FileName, Mode=OneWay}" Foreground="#cbd5e1"/>
                                                     </TextBlock>
                                                     <TextBlock FontFamily="Consolas" FontSize="11"
                                                                Foreground="#94a3b8" Margin="0,2,0,0">
                                                         <Run Text="Type: "/>
-                                                        <Run Text="{Binding TypeBadge}" Foreground="#cbd5e1"/>
+                                                        <Run Text="{Binding TypeBadge, Mode=OneWay}" Foreground="#cbd5e1"/>
                                                         <Run Text="  Detection: "/>
-                                                        <Run Text="{Binding DetectionSourceDisplay}" Foreground="#cbd5e1"/>
+                                                        <Run Text="{Binding DetectionSourceDisplay, Mode=OneWay}" Foreground="#cbd5e1"/>
                                                     </TextBlock>
                                                     <TextBlock FontFamily="Consolas" FontSize="11"
                                                                Foreground="#94a3b8" Margin="0,2,0,0">
                                                         <Run Text="Size: "/>
-                                                        <Run Text="{Binding FileSizeDisplay}" Foreground="#cbd5e1"/>
+                                                        <Run Text="{Binding FileSizeDisplay, Mode=OneWay}" Foreground="#cbd5e1"/>
                                                     </TextBlock>
                                                     <TextBlock FontFamily="Consolas" FontSize="11"
                                                                Foreground="#94a3b8" Margin="0,2,0,0">
                                                         <Run Text="VT: "/>
-                                                        <Run Text="{Binding VtStatusDisplay}" Foreground="#cbd5e1"/>
+                                                        <Run Text="{Binding VtStatusDisplay, Mode=OneWay}" Foreground="#cbd5e1"/>
                                                     </TextBlock>
                                                 </StackPanel>
                                             </ToolTip>
@@ -564,28 +688,21 @@
                                             </Grid.ColumnDefinitions>
 
                                             <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                                <StackPanel Orientation="Horizontal">
-                                                    <TextBlock Text="⟳" FontSize="13"
-                                                               Foreground="{StaticResource Accent}"
-                                                               VerticalAlignment="Center"
-                                                               Margin="0,0,6,0">
-                                                        <TextBlock.Style>
-                                                            <Style TargetType="TextBlock">
-                                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                                                <Style.Triggers>
-                                                                    <DataTrigger Binding="{Binding IsRunning}" Value="True">
-                                                                        <Setter Property="Visibility" Value="Visible"/>
-                                                                    </DataTrigger>
-                                                                </Style.Triggers>
-                                                            </Style>
-                                                        </TextBlock.Style>
-                                                    </TextBlock>
-                                                    <TextBlock Text="{Binding DisplayName}"
-                                                               FontSize="13" FontFamily="Segoe UI"
-                                                               FontWeight="SemiBold"
-                                                               VerticalAlignment="Center"
-                                                               Foreground="{StaticResource TextPrimary}"/>
-                                                </StackPanel>
+                                                <TextBlock Text="{Binding DisplayName}"
+                                                           FontSize="13" FontFamily="Segoe UI"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{StaticResource TextPrimary}">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsRunning}" Value="True">
+                                                                    <Setter Property="Foreground" Value="{StaticResource Accent}"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
                                                 <TextBlock Text="{Binding StatusDetail}"
                                                            FontSize="11" FontFamily="Segoe UI"
                                                            Foreground="{StaticResource TextTertiary}"
@@ -787,7 +904,7 @@
                 </Button>
 
                 <!-- Accept disclaimer -->
-                <Button Grid.Column="3" Content="Continue →"
+                <Button Grid.Column="3" Content="Continue"
                         Style="{StaticResource PrimaryButton}"
                         IsDefault="True"
                         Command="{Binding AcceptDisclaimerCommand}"

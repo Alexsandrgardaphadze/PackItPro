@@ -67,22 +67,10 @@ namespace PackItPro.ViewModels
             set { SettingsModel.IncludeWingetUpdateScript = value; OnPropertyChanged(); }
         }
 
-        public bool UseLZMACompression
-        {
-            get => SettingsModel.UseLZMACompression;
-            set { SettingsModel.UseLZMACompression = value; OnPropertyChanged(); }
-        }
-
         public bool RequiresAdmin
         {
             get => SettingsModel.RequiresAdmin;
             set { SettingsModel.RequiresAdmin = value; OnPropertyChanged(); }
-        }
-
-        public bool VerifyIntegrity
-        {
-            get => SettingsModel.VerifyIntegrity;
-            set { SettingsModel.VerifyIntegrity = value; OnPropertyChanged(); }
         }
 
         public bool ScanWithVirusTotal
@@ -130,15 +118,10 @@ namespace PackItPro.ViewModels
                         SettingsModel.AutoRemoveInfectedFiles = loadedSettings.AutoRemoveInfectedFiles;
                         SettingsModel.MinimumDetectionsToFlag = loadedSettings.MinimumDetectionsToFlag;
                         SettingsModel.IncludeWingetUpdateScript = loadedSettings.IncludeWingetUpdateScript;
-                        SettingsModel.UseLZMACompression = loadedSettings.UseLZMACompression;
                         SettingsModel.RequiresAdmin = loadedSettings.RequiresAdmin;
-                        SettingsModel.VerifyIntegrity = loadedSettings.VerifyIntegrity;
                         SettingsModel.ScanWithVirusTotal = loadedSettings.ScanWithVirusTotal;
                         SettingsModel.CompressionLevel = loadedSettings.CompressionLevel;
-                        SettingsModel.CompressionMethod = loadedSettings.CompressionMethod;
-                        SettingsModel.MaxFilesInList = loadedSettings.MaxFilesInList;
-                        SettingsModel.DisclaimerAccepted = loadedSettings.DisclaimerAccepted;
-                        SettingsModel.ScanOnAdd = loadedSettings.ScanOnAdd;
+                        SettingsModel.ScanOnAdd = loadedSettings.ScanOnAdd;   // NEW
 
                         if (loadedSettings.TrustedEngines?.Count > 0)
                             SettingsModel.TrustedEngines = loadedSettings.TrustedEngines;

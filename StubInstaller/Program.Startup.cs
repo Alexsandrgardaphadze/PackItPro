@@ -1,10 +1,10 @@
 ﻿// StubInstaller/Program.Startup.cs
-// Steps 1-4 (pre-install checks) and the WPF window launch.
 using StubInstaller.Core;
 using StubInstaller.Infrastrucure;
 using StubInstaller.ViewModels;
 using StubInstaller.Views;
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Threading;
 using WpfApp = System.Windows.Application;
@@ -75,11 +75,25 @@ namespace StubInstaller
             StubLogger.Log("✅ Prerequisites met.");
 
             // STEP 4 — Elevation
+            // Trigger a global elevation restart if EITHER:
+            //   (a) the package-level RequiresAdmin flag is set, OR
+            //   (b) at least one individual installer needs admin rights.
+            //
+            // Running the stub itself as admin means every child process it spawns
+            // with UseShellExecute=false inherits the elevated token — no per-installer
+            // UAC prompts are needed. Per-file runas was the old approach; it required
+            // a separate UAC click per installer which is unacceptable for silent install.
             StubLogger.Log("");
             StubLogger.Log("STEP 4: Checking administrator rights...");
-            if (mf.RequiresAdmin && !ElevationHelper.IsRunningAsAdmin())
+            bool anyFileNeedsAdmin = mf.Files.Any(f => f.RequiresAdmin);
+            bool needsGlobalElevation = (mf.RequiresAdmin || anyFileNeedsAdmin)
+                                        && !ElevationHelper.IsRunningAsAdmin();
+            if (needsGlobalElevation)
             {
-                StubLogger.Log("Admin rights required — relaunching elevated...");
+                string reason = mf.RequiresAdmin
+                    ? "package-level RequiresAdmin flag"
+                    : $"{mf.Files.Count(f => f.RequiresAdmin)} installer(s) require admin rights";
+                StubLogger.Log($"Admin rights required ({reason}) — relaunching elevated...");
                 ElevationHelper.RestartElevated(tempDir, StubLogger.LogPath);
                 return PreInstallResult.Early(0);
             }

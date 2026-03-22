@@ -4,8 +4,8 @@ namespace StubInstaller.Core
     internal static class Constants
     {
         // ── Stub version — update with every release ──────────────────────────
-        internal const string StubVersion = "1.3.5";
-        internal const string StubBuildDate = "2026-02-27";
+        internal const string StubVersion = "1.4.0";
+        internal const string StubBuildDate = "22-03-2026";
 
         // ── Command-line arguments ────────────────────────────────────────────
         internal const string ArgTempDir = "--temp-dir";

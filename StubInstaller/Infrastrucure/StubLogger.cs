@@ -1,9 +1,4 @@
 ﻿// StubInstaller/StubLogger.cs
-// Changes vs previous:
-//   [1] All file writes now use UTF-8 with BOM.
-//       The log contains emoji (✅ ⚠️) that are multi-byte in UTF-8. Without a
-//       BOM, Notepad and many Windows tools assume ANSI/CP1252 and display the
-//       emoji as "??" garbage. UTF-8 BOM tells every Windows tool to decode correctly.
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -96,13 +91,51 @@ namespace StubInstaller.Infrastrucure
                 return null;
             try
             {
-                string desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                string desktop = ResolveUserDesktop();
+                if (string.IsNullOrEmpty(desktop)) return null;
                 string destName = $"{prefix}{DateTime.Now:yyyyMMdd_HHmmss}.log";
                 string destPath = Path.Combine(desktop, destName);
                 File.Copy(LogPath, destPath, overwrite: true);
                 return destPath;
             }
             catch { return null; }
+        }
+
+        /// <summary>
+        /// Resolves the logged-in user's Desktop folder correctly even when the
+        /// process is running elevated. When elevated, SpecialFolder.Desktop
+        /// returns the administrator account's desktop (typically
+        /// C:\Windows\System32\config\systemprofile\Desktop), not the actual
+        /// user's desktop. We use the USERPROFILE environment variable instead,
+        /// which is inherited from the non-elevated parent shell and always points
+        /// to the real user's profile. Falls back to Public Desktop if unavailable.
+        /// </summary>
+        private static string ResolveUserDesktop()
+        {
+            // USERPROFILE is inherited from the interactive shell even when elevated
+            string? userProfile = Environment.GetEnvironmentVariable("USERPROFILE");
+            if (!string.IsNullOrEmpty(userProfile))
+            {
+                string candidate = Path.Combine(userProfile, "Desktop");
+                if (Directory.Exists(candidate)) return candidate;
+            }
+
+            // Fallback 1: HOMEDRIVE + HOMEPATH
+            string? homeDrive = Environment.GetEnvironmentVariable("HOMEDRIVE");
+            string? homePath = Environment.GetEnvironmentVariable("HOMEPATH");
+            if (!string.IsNullOrEmpty(homeDrive) && !string.IsNullOrEmpty(homePath))
+            {
+                string candidate = Path.Combine(homeDrive + homePath, "Desktop");
+                if (Directory.Exists(candidate)) return candidate;
+            }
+
+            // Fallback 2: Public Desktop (visible to all users)
+            string publicDesktop = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory));
+            if (Directory.Exists(publicDesktop)) return publicDesktop;
+
+            // Last resort: SpecialFolder.Desktop (may be wrong when elevated but better than nothing)
+            return Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
         }
     }
 }

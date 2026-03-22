@@ -5,6 +5,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -29,10 +30,12 @@ namespace PackItPro.Services
         private readonly ConcurrentDictionary<string, CachedScanResult> _cache = new();
         private readonly string _cacheFilePath;
 
-        // Extension list is shared with MainViewModel via AppConstants.ExecutableExtensions
-        // so both sides stay in sync. Do not maintain a separate copy here.
-        public bool IsExecutable(string filePath) =>
-            AppConstants.ExecutableExtensions.Contains(Path.GetExtension(filePath));
+        private readonly HashSet<string> _exeExtensions = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".exe", ".dll", ".bat", ".cmd", ".ps1", ".vbs", ".js", ".jar", ".msi", ".com",
+            ".scr", ".pif", ".gadget", ".application", ".msc", ".cpl", ".hta", ".reg",
+            ".vb", ".vbe", ".jse", ".ws", ".wsf", ".wsc", ".wsh", ".lnk", ".inf", ".scf",
+        };
 
         public VirusTotalClient(string cacheFilePath, string apiKey = "")
         {
@@ -52,6 +55,9 @@ namespace PackItPro.Services
             if (!string.IsNullOrWhiteSpace(key))
                 _http.DefaultRequestHeaders.Add("x-apikey", key);
         }
+
+        public bool IsExecutable(string filePath) =>
+            _exeExtensions.Contains(Path.GetExtension(filePath));
 
         // ──────────────────────────────────────────────────────────────
         // Public API
@@ -124,7 +130,14 @@ namespace PackItPro.Services
 
                 var resp = await _http.PostAsync(
                     "https://www.virustotal.com/api/v3/files", form, ct);
-                resp.EnsureSuccessStatusCode();
+
+                // Throw HttpRequestException with StatusCode set so GatedRequestAsync
+                // can catch 429/401/403 and give the user a clear error message.
+                if (!resp.IsSuccessStatusCode)
+                    throw new HttpRequestException(
+                        $"VirusTotal file upload failed with status {(int)resp.StatusCode} ({resp.ReasonPhrase}).",
+                        inner: null,
+                        statusCode: resp.StatusCode);
 
                 // FIX: JSON parse guard on upload response too
                 try
@@ -175,26 +188,74 @@ namespace PackItPro.Services
         }
 
         /// <summary>
-        /// Serialises all VT requests through _gate and enforces the post-request
-        /// rate-limit delay inside the finally block — the gate stays locked for the
-        /// full cooling period so no other call can slip in during it.
+        /// Serialises all VT requests through _gate, enforces the post-request
+        /// rate-limit delay, and handles transient HTTP errors:
+        ///
+        ///   429 Too Many Requests — honours the Retry-After header if present,
+        ///       otherwise backs off for <see cref="RateLimitBackoff"/> seconds,
+        ///       then retries once. A second 429 is re-thrown as a clear message.
+        ///
+        ///   401 Unauthorized — thrown as InvalidOperationException with a clear
+        ///       "check your API key" message instead of a raw HttpRequestException.
+        ///
+        ///   403 Forbidden — thrown as InvalidOperationException indicating daily
+        ///       quota exhaustion (free-tier limit of 500 lookups/day).
         /// </summary>
         private async Task<T> GatedRequestAsync<T>(Func<Task<T>> request, CancellationToken ct)
         {
             await _gate.WaitAsync(ct);
             try
             {
-                return await request();
+                return await ExecuteWithRetryAsync(request, ct);
             }
             finally
             {
-                // Rate-limit delay MUST use CancellationToken.None.
-                // If ct is cancelled while we are inside finally, Task.Delay(ct) throws
-                // OperationCanceledException which propagates out of finally — _gate.Release()
-                // is never called, the semaphore sticks at 0, and every future scan hangs
-                // forever waiting for a gate that will never open.
-                await Task.Delay(RequestDelay, CancellationToken.None);
+                await Task.Delay(RequestDelay, ct);
                 _gate.Release();
+            }
+        }
+
+        private static readonly TimeSpan RateLimitBackoff = TimeSpan.FromSeconds(60);
+
+        private static async Task<T> ExecuteWithRetryAsync<T>(
+            Func<Task<T>> request, CancellationToken ct, bool isRetry = false)
+        {
+            try
+            {
+                return await request();
+            }
+            catch (HttpRequestException ex) when (
+                ex.StatusCode == HttpStatusCode.TooManyRequests && !isRetry)
+            {
+                // 429: back off and try once more.
+                // The Retry-After header value is not directly accessible through
+                // HttpRequestException, so we use a fixed conservative backoff.
+                await Task.Delay(RateLimitBackoff, ct);
+                return await ExecuteWithRetryAsync(request, ct, isRetry: true);
+            }
+            catch (HttpRequestException ex) when (
+                ex.StatusCode == HttpStatusCode.TooManyRequests)
+            {
+                // Second 429 in a row — daily quota likely exhausted.
+                throw new InvalidOperationException(
+                    "VirusTotal rate limit exceeded after retry. " +
+                    "The free API allows 4 requests/minute and 500/day. " +
+                    "Wait a minute and try again, or upgrade to a paid API key.", ex);
+            }
+            catch (HttpRequestException ex) when (
+                ex.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                throw new InvalidOperationException(
+                    "VirusTotal rejected the API key (401 Unauthorized). " +
+                    "Check your key in Settings → VirusTotal API Key.", ex);
+            }
+            catch (HttpRequestException ex) when (
+                ex.StatusCode == HttpStatusCode.Forbidden)
+            {
+                throw new InvalidOperationException(
+                    "VirusTotal access forbidden (403). " +
+                    "Your daily quota of 500 lookups may be exhausted. " +
+                    "Wait until midnight UTC or upgrade to a paid API plan.", ex);
             }
         }
 

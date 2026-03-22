@@ -1,25 +1,4 @@
-﻿// PackItPro/Services/ManifestGenerator.cs - v2.6
-// Changes vs v2.5:
-//   [1] Detection scan increased from 4 KB to 512 KB.
-//       The old 4 KB limit only covered the PE MZ/COFF headers — installer
-//       signatures (NSIS, Inno, Squirrel) live in the resource section which
-//       starts well beyond that. 512 KB reliably covers all common installer
-//       types without being slow at packaging time.
-//
-//   [2] NSIS detection fixed.
-//       Old check tested bytes [4..7] of the raw header for EF BE AD DE — that
-//       magic marks the NSIS first-header block, which sits AFTER the PE code
-//       section (never in the first 8 bytes). New check scans for the ASCII
-//       string "Nullsoft" which is always embedded in the NSIS resource section.
-//
-//   [3] Detection priority order made explicit and documented:
-//       WiX Burn → NSIS → Inno Setup → Squirrel → generic exe
-//       WiX is checked first because .wixburn lives in the PE section table
-//       (always in the first 512 bytes) and is unambiguous.
-//
-//   [4] Scan helper split into ScanHeader() (reads the bytes once) and
-//       ContainsAscii() (searches without allocating a string). The bytes
-//       are read once and reused for all checks.
+﻿// PackItPro/Services/ManifestGenerator.cs
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -48,7 +27,7 @@ namespace PackItPro.Services
         /// A file path paired with an optional user note.
         /// Notes are written into the manifest JSON and visible to the stub.
         /// </summary>
-        public record FileEntry(string Path, string? Notes = null);
+        public record FileEntry(string Path, string? Notes = null, string? ScanResult = null);
 
         /// <summary>
         /// Primary overload — preserves per-file Notes in the manifest.
@@ -64,15 +43,23 @@ namespace PackItPro.Services
                 .Select((entry, index) =>
                 {
                     var (type, source) = DetectInstallTypeWithSource(entry.Path);
+
+                    // Office Click-to-Run: auto-inject a warning note so the user knows
+                    // Office installs in the background long after the stub exits.
+                    string? resolvedNotes = type == "office-c2r" && string.IsNullOrWhiteSpace(entry.Notes)
+                        ? "WARNING: Office installs in the background after this exits. Allow 10-30 min after stub closes."
+                        : (string.IsNullOrWhiteSpace(entry.Notes) ? null : entry.Notes.Trim());
+
                     return new ManifestFile
                     {
                         Name = Path.GetFileName(entry.Path),
                         DisplayName = ResolveDisplayName(entry.Path),
-                        Notes = string.IsNullOrWhiteSpace(entry.Notes) ? null : entry.Notes.Trim(),
+                        Notes = resolvedNotes,
+                        ScanResult = string.IsNullOrWhiteSpace(entry.ScanResult) ? null : entry.ScanResult.ToLowerInvariant(),
                         InstallType = type,
                         DetectionSource = source,
                         SilentArgs = GetDefaultSilentArgs(type),
-                        RequiresAdmin = false,
+                        RequiresAdmin = DetectRequiresAdmin(entry.Path),
                         InstallOrder = index,
                         TimeoutMinutes = GetDefaultTimeout(entry.Path),
                     };
@@ -131,35 +118,139 @@ namespace PackItPro.Services
 
         // ── EXE detection ─────────────────────────────────────────────────────
 
+        // How many bytes to read from the END of an exe for Inno tail scan.
+        // Inno stores its "Inno Setup Setup Data" signature near the end of the binary.
+        private const int TailScanSize = 512 * 1024;
+
+        // Inno Setup embeds an "rDlPt" PE resource name in its .rsrc section.
+        // For large installers (>20MB) the .rsrc section can be beyond 512KB.
+        // We scan up to 4MB to reliably find it.
+        private const int InnoScanSize = 4 * 1024 * 1024;
+
         private static (string Type, string Source) DetectExeType(string filePath)
         {
+            // Pass 1: FileVersionInfo uses the Windows VerQueryValue API which correctly
+            // reads UTF-16LE PE version resources regardless of encoding or language.
+            // Catches: JDK, WebView2, VCRedist, Office C2R, Squirrel, WiX Burn, NSIS.
+            // Inno Setup does NOT embed its framework name in version resources — it is
+            // caught by the byte/tail scan in Pass 2.
+            try
+            {
+                var vi = FileVersionInfo.GetVersionInfo(filePath);
+                string prod = (vi.ProductName ?? "").Trim();
+                string desc = (vi.FileDescription ?? "").Trim();
+                string comp = (vi.CompanyName ?? "").Trim();
+                string orig = (vi.OriginalFilename ?? "").Trim();
+                string all = (prod + " " + desc + " " + comp + " " + orig).ToUpperInvariant();
+
+                // WiX Burn: .wixburn PE section (fastest, most unambiguous)
+                var hdr512 = ReadHeader(filePath, 512);
+                if (!hdr512.IsEmpty && ContainsAscii(hdr512.Span, ".wixburn"))
+                    return ("burn", "header");
+
+                if (all.Contains("NULLSOFT"))
+                    return ("nsis", "header");
+
+                if (all.Contains("JAVA(TM) SE DEVELOPMENT KIT") ||
+                    all.Contains("JAVA SE DEVELOPMENT KIT") ||
+                    all.Contains("JDKINSTALLER") ||
+                    (all.Contains("JDK") && all.Contains("ORACLE")))
+                    return ("jdk", "header");
+
+                if (all.Contains("WEBVIEW2") || all.Contains("EDGEWEBVIEW") ||
+                    all.Contains("MICROSOFT EDGE WEBVIEW"))
+                    return ("edgewebview2", "header");
+
+                if (all.Contains("VISUAL C++") || all.Contains("VCREDIST") ||
+                    (all.Contains("MICROSOFT") && all.Contains("VISUAL C")))
+                {
+                    // Official Microsoft vc_redist: CompanyName="Microsoft Corporation"
+                    // AIO repack (abbodi1406): different company, needs /ai /gm2 not /install
+                    bool isMs = comp.IndexOf("Microsoft", System.StringComparison.OrdinalIgnoreCase) >= 0;
+                    return isMs ? ("vcredist-ms", "header") : ("vcredist", "header");
+                }
+
+                if (all.Contains("OFFICECLICK") || all.Contains("C2RSETUP") ||
+                    all.Contains("CLICK-TO-RUN") || all.Contains("CLICKTORUN"))
+                    return ("office-c2r", "header");
+
+                if (all.Contains("SQUIRREL"))
+                    return ("squirrel", "header");
+
+                // DirectX June 2010 CAB self-extractor
+                // FileDescription = "Win32 Cabinet Self-Extractor", ProductName = "Microsoft DirectX"
+                // Two different DirectX files:
+                // dxwebsetup.exe = web downloader (just needs /Q)
+                // directx_Jun2010_redist.exe = CAB extractor (needs extract + DXSETUP.exe)
+                if (all.Contains("DIRECTX") || all.Contains("D3DX"))
+                {
+                    if (desc.ToUpperInvariant().Contains("SETUP") && !desc.ToUpperInvariant().Contains("CABINET"))
+                        return ("dxweb", "header");
+                    return ("dxcab", "header");
+                }
+
+                if (all.Contains("WIX BURN") || all.Contains("WIXBURN"))
+                    return ("burn", "header");
+            }
+            catch { /* version resource unavailable -- fall through */ }
+
+            // Pass 2: Byte scan -- catches Inno Setup and NSIS variants that don't
+            // include their framework name in PE version resources.
             ReadOnlyMemory<byte> header = ReadHeader(filePath, ScanSize);
             if (header.IsEmpty) return ("exe", "extension");
 
             var span = header.Span;
 
-            // Priority order matters — check most unambiguous signatures first.
-
-            // WiX Burn: ".wixburn" is a PE section name, always in the first 512 bytes
             if (ContainsAscii(span, ".wixburn"))
                 return ("burn", "header");
 
-            // NSIS: "Nullsoft" is embedded in the installer resource section
-            // (previously checked EF BE AD DE at fixed offset [4] — incorrect)
-            if (ContainsAscii(span, "Nullsoft"))
+            if (ContainsAsciiOrUtf16(span, "Nullsoft"))
                 return ("nsis", "header");
 
-            // Inno Setup: multiple possible strings; check the most specific first
-            if (ContainsAscii(span, "Inno Setup Setup Data") ||
-                ContainsAscii(span, "InnoSetupVersion") ||
-                ContainsAscii(span, "Inno Setup"))
+            if (ContainsAsciiOrUtf16(span, "Inno Setup Setup Data") ||
+                ContainsAsciiOrUtf16(span, "InnoSetupVersion") ||
+                ContainsAsciiOrUtf16(span, "Inno Setup"))
                 return ("inno", "header");
 
-            // Squirrel/Electron: version resource usually contains these strings
-            if (ContainsAscii(span, "Squirrel.Windows") ||
-                ContainsAscii(span, "SquirrelSetup") ||
-                ContainsAscii(span, "Squirrel"))
+            // Extended Inno scan: "rDlPt" is a PE resource name that Inno embeds
+            // in the .rsrc section. For large installers (Git=58MB, VSCode=103MB)
+            // the .rsrc section starts beyond the first 512KB. Scan up to 4MB.
+            var innoExtended = ReadHeader(filePath, InnoScanSize);
+            if (!innoExtended.IsEmpty && ContainsAscii(innoExtended.Span, "rDlPt"))
+                return ("inno", "header");
+
+            // Inno tail scan: checks last 512KB for uncompressed header strings.
+            var tail = ReadTail(filePath, TailScanSize);
+            if (!tail.IsEmpty)
+            {
+                var tailSpan = tail.Span;
+                if (ContainsAsciiOrUtf16(tailSpan, "Inno Setup Setup Data") ||
+                    ContainsAsciiOrUtf16(tailSpan, "InnoSetupVersion") ||
+                    ContainsAscii(tailSpan, "ISetupDel") ||
+                    ContainsAscii(tailSpan, "JRSoft"))
+                    return ("inno", "content");
+            }
+
+            // Byte-scan fallbacks for Pass-1 types
+            if (ContainsAsciiOrUtf16(span, "Squirrel.Windows") ||
+                ContainsAsciiOrUtf16(span, "SquirrelSetup"))
                 return ("squirrel", "header");
+
+            if (ContainsAsciiOrUtf16(span, "OfficeClickToRun") ||
+                ContainsAsciiOrUtf16(span, "C2RSetup"))
+                return ("office-c2r", "header");
+
+            if (ContainsAscii(span, "IFTW") ||
+                ContainsAsciiOrUtf16(span, "JDKInstaller"))
+                return ("jdk", "header");
+
+            if (ContainsAsciiOrUtf16(span, "MicrosoftEdgeWebView2") ||
+                ContainsAsciiOrUtf16(span, "EdgeWebView"))
+                return ("edgewebview2", "header");
+
+            if (ContainsAsciiOrUtf16(span, "Visual C++ Redistributable") ||
+                ContainsAsciiOrUtf16(span, "VisualCppRedist"))
+                return ("vcredist", "header");
 
             return ("exe", "extension");
         }
@@ -192,6 +283,35 @@ namespace PackItPro.Services
         }
 
         /// <summary>
+        /// Reads up to <paramref name="maxBytes"/> from the END of the file.
+        /// Used to detect Inno Setup signatures stored in the file tail.
+        /// Returns empty on any I/O error or if file is too small.
+        /// </summary>
+        private static ReadOnlyMemory<byte> ReadTail(string filePath, int maxBytes)
+        {
+            try
+            {
+                using var fs = File.OpenRead(filePath);
+                if (fs.Length < 16) return ReadOnlyMemory<byte>.Empty;
+
+                long startPos = Math.Max(0, fs.Length - maxBytes);
+                int length = (int)(fs.Length - startPos);
+                fs.Seek(startPos, SeekOrigin.Begin);
+
+                var buf = new byte[length];
+                int read = 0;
+                while (read < length)
+                {
+                    int n = fs.Read(buf, read, length - read);
+                    if (n == 0) break;
+                    read += n;
+                }
+                return buf.AsMemory(0, read);
+            }
+            catch { return ReadOnlyMemory<byte>.Empty; }
+        }
+
+        /// <summary>
         /// Returns true if <paramref name="needle"/> (ASCII) appears anywhere in
         /// <paramref name="data"/>. Does not allocate a string.
         /// </summary>
@@ -206,6 +326,39 @@ namespace PackItPro.Services
             return data.IndexOf(needleBytes) >= 0;
         }
 
+        /// <summary>
+        /// Returns true if <paramref name="needle"/> encoded as UTF-16LE appears
+        /// anywhere in <paramref name="data"/>. PE version info resources store all
+        /// strings as UTF-16LE — installer signatures like "Inno Setup",
+        /// "MicrosoftEdgeWebView2", and "Java(TM) SE Development Kit" are only
+        /// reliably findable this way.
+        /// </summary>
+        private static bool ContainsUtf16LE(ReadOnlySpan<byte> data, string needle)
+        {
+            if (needle.Length == 0) return false;
+            int byteLen = needle.Length * 2;
+            if (data.Length < byteLen) return false;
+
+            // Encode needle as UTF-16LE without BOM — max needle is ~40 chars, stack-safe
+            Span<byte> needleBytes = stackalloc byte[byteLen];
+            for (int i = 0; i < needle.Length; i++)
+            {
+                char ch = needle[i];
+                needleBytes[i * 2] = (byte)(ch & 0xFF);
+                needleBytes[i * 2 + 1] = (byte)(ch >> 8);
+            }
+
+            return data.IndexOf(needleBytes) >= 0;
+        }
+
+        /// <summary>
+        /// Returns true if <paramref name="needle"/> appears in <paramref name="data"/>
+        /// as either ASCII or UTF-16LE. Catches the same string regardless of how it was
+        /// stored in the PE resource table.
+        /// </summary>
+        private static bool ContainsAsciiOrUtf16(ReadOnlySpan<byte> data, string needle) =>
+            ContainsAscii(data, needle) || ContainsUtf16LE(data, needle);
+
         // ── Silent args ───────────────────────────────────────────────────────
 
         internal static string[]? GetDefaultSilentArgs(string installType) => installType switch
@@ -216,11 +369,99 @@ namespace PackItPro.Services
             "nsis" => new[] { "/S" },
             "squirrel" => new[] { "--silent" },
             "burn" => new[] { "/quiet", "/norestart" },
+
+            // Office Click-to-Run: no silent flag — the bootstrapper manages its own UI.
+            // It exits 0 immediately; the background download/install continues on its own.
+            // PackItPro surfaces a warning at packaging time; the stub just runs it as-is.
+            "office-c2r" => new[] { "/quiet" },
+
+            // DirectX June 2010 CAB self-extractor: two-step (extract + DXSETUP.exe).
+            "dxcab" => new[] { "/Q", "/T:{tempdir}" },
+            // DirectX web setup: /Q for quiet. Downloads from internet, exits fast.
+            "dxweb" => new[] { "/Q" },
+
+            // JDK installer: /s (lowercase) is the correct silent flag, not /S.
+            // Requires admin. Spawns msiexec internally for the actual installation.
+            "jdk" => new[] { "/s" },
+
+            // Edge WebView2 bootstrapper: --silent --system-level installs machine-wide.
+            // Without --system-level it installs per-user and may not require admin.
+            "edgewebview2" => new[] { "--silent", "--system-level" },
+
+            // Visual C++ Redistributable: /install runs full install (not repair/uninstall).
+            // /S does not work — the vcredist family uses WiX-based args.
+            "vcredist" => new[] { "/ai", "/gm2" },       // AIO repack silent install
+            "vcredist-ms" => new[] { "/install", "/quiet", "/norestart" }, // official MS vc_redist.exe
+
             _ => null,   // exe/appx/msix/file: stub tries /S at runtime
         };
 
-        private static int GetDefaultTimeout(string filePath)
+        /// <summary>
+        /// Detects whether an EXE requests administrator rights via its embedded
+        /// UAC application manifest. Reads the PE resource section and searches
+        /// for requestedExecutionLevel strings.
+        ///
+        /// Catches: requireAdministrator (most installers), highestAvailable
+        /// (some installers that run elevated when the user is an admin).
+        /// Returns false for asInvoker, or if no manifest is found.
+        /// Never throws — returns false on any read error.
+        /// </summary>
+        private static bool DetectRequiresAdmin(string filePath)
         {
+            try
+            {
+                // Read the full file up to ScanSize — UAC manifests are in the
+                // resource section which can be anywhere in the first 512 KB.
+                // For large installers also scan the header region separately.
+                ReadOnlyMemory<byte> data = ReadHeader(filePath, ScanSize);
+                if (data.IsEmpty) return false;
+
+                var span = data.Span;
+
+                // The embedded manifest XML contains one of these strings.
+                // Check for the most common patterns first.
+                if (ContainsAscii(span, "requireAdministrator"))
+                    return true;
+
+                // "highestAvailable" = elevated if running as admin, normal otherwise.
+                // Treat as requiring admin since most installers use it this way.
+                if (ContainsAscii(span, "highestAvailable"))
+                    return true;
+
+                // Some manifests use the full attribute form
+                if (ContainsAscii(span, "level=\"requireAdministrator\""))
+                    return true;
+
+                if (ContainsAscii(span, "level=\"highestAvailable\""))
+                    return true;
+
+                return false;
+            }
+            catch { return false; }
+        }
+
+        private static int GetDefaultTimeout(string filePath) =>
+            GetDefaultTimeoutForType(DetectInstallType(filePath), filePath);
+
+        private static int GetDefaultTimeoutForType(string installType, string filePath)
+        {
+            // Office Click-to-Run: the bootstrapper exits quickly but triggers a background
+            // download that takes 10-30 minutes. We can't wait for the background process,
+            // so we give the bootstrapper itself a 5-minute timeout (enough to start it).
+            if (installType == "office-c2r") return 5;
+
+            if (installType == "dxcab") return 5;   // extraction only; DXSETUP runs separately
+            if (installType == "dxweb") return 5;   // web bootstrapper exits fast
+
+            // JDK: extracts and runs msiexec internally, can take 5-15 minutes.
+            if (installType == "jdk") return 30;
+
+            // VCRedist: usually fast (< 2 min), but /install on first-time can take longer.
+            if (installType == "vcredist") return 10;
+
+            // EdgeWebView2: downloads and installs, can take several minutes.
+            if (installType == "edgewebview2") return 15;
+
             try
             {
                 double mb = new FileInfo(filePath).Length / (1024.0 * 1024.0);
@@ -291,44 +532,76 @@ namespace PackItPro.Services
 
     public class PackageManifest
     {
+        [JsonPropertyName("packageName")]
         public string PackageName { get; set; } = "MySoftwareBundle";
+
+        [JsonPropertyName("version")]
         public string Version { get; set; } = "1.0";
+
+        [JsonPropertyName("files")]
         public List<ManifestFile> Files { get; set; } = new();
+
+        [JsonPropertyName("cleanup")]
         public bool Cleanup { get; set; } = true;
+
+        [JsonPropertyName("autoUpdateScript")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? AutoUpdateScript { get; set; }
+
+        [JsonPropertyName("sha256Checksum")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? SHA256Checksum { get; set; }
+
+        [JsonPropertyName("requiresAdmin")]
         public bool RequiresAdmin { get; set; } = false;
     }
 
     public class ManifestFile
     {
+        // JsonPropertyName attributes ensure the JSON keys match the stub's Manifest.cs
+        // exactly, even if this class is serialized with default (PascalCase) settings.
+        [JsonPropertyName("name")]
         public string Name { get; set; } = "";
+
+        [JsonPropertyName("installType")]
         public string InstallType { get; set; } = "exe";
+
+        [JsonPropertyName("silentArgs")]
         public string[]? SilentArgs { get; set; }
+
+        [JsonPropertyName("requiresAdmin")]
         public bool RequiresAdmin { get; set; } = false;
+
+        [JsonPropertyName("installOrder")]
         public int InstallOrder { get; set; } = 0;
+
+        [JsonPropertyName("timeoutMinutes")]
         public int TimeoutMinutes { get; set; } = 10;
 
+        [JsonPropertyName("detectionSource")]
+        public string DetectionSource { get; set; } = "extension";
+
         /// <summary>Optional user note — visible in the manifest, passed to the stub.</summary>
+        [JsonPropertyName("notes")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? Notes { get; set; }
 
         /// <summary>
         /// Human-readable display name for the stub UI.
         /// Populated from FileVersionInfo.ProductName at packaging time.
-        /// Falls back to filename without extension if the exe has no version resource.
-        /// Null = stub falls back to Name. WhenWritingNull keeps the JSON clean for
-        /// packages built before this field existed.
+        /// Null = stub falls back to filename. WhenWritingNull keeps JSON clean.
         /// </summary>
+        [JsonPropertyName("displayName")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? DisplayName { get; set; }
 
         /// <summary>
-        /// How InstallType was determined:
-        ///   "extension" — inferred from file extension only (lower confidence)
-        ///   "header"    — confirmed by binary signature scan (high confidence)
-        ///   "manifest"  — user-specified in the PackItPro UI (authoritative)
+        /// VirusTotal scan result recorded by PackItPro at packaging time.
+        /// "clean" = no detections, "infected" = detections found, null = not scanned.
+        /// Displayed in the stub UI — does not block installation.
         /// </summary>
-        public string DetectionSource { get; set; } = "extension";
+        [JsonPropertyName("scanResult")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? ScanResult { get; set; }
     }
 }
