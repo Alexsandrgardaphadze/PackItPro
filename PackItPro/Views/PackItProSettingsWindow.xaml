@@ -100,19 +100,6 @@
                             <ColumnDefinition Width="180"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Verify integrity"
-                                   FontSize="13" Foreground="{StaticResource AppTextSecondaryColor}"
-                                   FontFamily="Segoe UI" VerticalAlignment="Center"
-                                   ToolTip="Re-hash files after packaging to verify the output is intact"/>
-                        <CheckBox Grid.Column="1" x:Name="VerifyIntegrityBox"
-                                  VerticalAlignment="Center" Margin="2,0,0,0"/>
-                    </Grid>
-
-                    <Grid Margin="0,0,0,6">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="180"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0" VerticalAlignment="Center">
                             <TextBlock Text="Scan on add"
                                        FontSize="13" Foreground="{StaticResource AppTextSecondaryColor}"
@@ -280,7 +267,6 @@
             <Button Content="Cancel"
                     Width="90" Height="34"
                     Margin="0,0,10,0"
-                    IsCancel="True"
                     Click="CancelButton_Click">
                 <Button.Style>
                     <Style TargetType="Button">

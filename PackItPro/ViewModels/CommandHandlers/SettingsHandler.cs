@@ -286,7 +286,6 @@ namespace PackItPro.ViewModels.CommandHandlers
             // Apply editable fields back to ViewModel
             _settings.OutputFileName = window.OutputFileName;
             _settings.SettingsModel.MinimumDetectionsToFlag = window.MinDetections;
-            _settings.SettingsModel.VerifyIntegrity = window.VerifyIntegrity;
             _settings.SettingsModel.MaxFilesInList = window.MaxFiles;
             _settings.SettingsModel.ScanOnAdd = window.ScanOnAdd;
 

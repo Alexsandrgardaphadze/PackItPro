@@ -1,5 +1,109 @@
 ﻿# PackItPro — Changelog
 
+## v0.7.4
+
+### StubInstaller: v1.3.5 → v1.4.0
+
+#### New Features
+- **Per-file VT scan results in stub UI:** `VT: ✓` / `VT: ✗` / `VT: —` badge shown on every
+  row in the selection phase. `PackagingCommandHandler` now maps `FileStatusEnum` to
+  `"clean"` / `"infected"` / `null` and passes it through `ManifestGenerator.FileEntry`.
+  `ManifestGenerator.ManifestFile` gains a `ScanResult` field written to `packitmeta.json`.
+- **Per-file `RequiresAdmin` detection:** `ManifestGenerator.DetectRequiresAdmin` scans the
+  first 512 KB of every EXE for `requireAdministrator` / `highestAvailable` in the embedded
+  PE application manifest XML. Files that need UAC are flagged in the manifest at packaging
+  time. The stub `InstallerRunner` reads the flag and routes those installers through
+  `UseShellExecute=true` + `Verb="runas"`.
+- **Auto-elevation retry on `Win32Exception` (error 740):** If an installer throws
+  `ERROR_ELEVATION_REQUIRED` at runtime (because the packager didn't detect the UAC manifest),
+  `InstallerRunner` now catches `Win32Exception` with `NativeErrorCode == 740` and
+  automatically retries via `RunExeElevatedAsync`. Fixes 7-Zip, dxwebsetup, JDK, Modrinth,
+  NetFxRepairTool, OBS, Steam, VCRedist, VLC on non-admin accounts.
+- **Inno Setup tail-scan detection:** Inno installers store their `"Inno Setup Setup Data"`
+  signature at the *end* of the binary, not the beginning. `ManifestGenerator` now reads the
+  last 512 KB as well as the first. Git, ShareX, VS Code Setup, and InnoSetup itself are now
+  correctly detected as `inno` (silent args `/SP- /VERYSILENT /SUPPRESSMSGBOXES /NORESTART`)
+  instead of falling through to the generic `/S` fallback. Detection source is `"content"`.
+- **Custom checkboxes throughout stub UI:** All checkboxes (disclaimer acceptance and
+  selection-list rows) now use the same `ControlTemplate` as PackItPro's
+  `SettingCheckBoxStyle`: 16×16 rounded border, SVG checkmark, accent fill on check,
+  hover highlight. Previously the row checkboxes used the default WPF chrome.
+- **Stub disclaimer phase:** `MainInstallViewModel` gains a `Disclaimer` phase shown before
+  the app list. Three clause cards (third-party software, silent installation, no warranty)
+  with an accept checkbox. Install cannot proceed until the user ticks the box.
+- **Reboot-required banner:** `InstallerRunner` sets `RebootRequired = true` on exit codes
+  3010 / 1641. The stub complete screen shows an amber warning card.
+
+#### Bug Fixes
+- **`ProgressBar` `OneWay` binding:** `OverallPercent` and all tooltip `<Run>` bindings now
+  use `Mode=OneWay`. Without this, WPF throws `InvalidOperationException` on window open
+  (read-only property + TwoWay default) and on first tooltip hover (`FileName`, `TypeBadge`,
+  etc.). Crash reproduced on every VM test; now fixed.
+- **`IsDisclaimerPhase` missing declaration:** `OnPropertyChanged(nameof(IsDisclaimerPhase))`
+  was called in the `Phase` setter but the computed property was never declared. Compile error.
+- **`FileHasher.ComputeFileListHash` added:** `Packager` called this method but it didn't
+  exist in `FileHasher`. Compile error. New method hashes an explicit file path list
+  (instead of a directory scan) with the same algorithm as `ComputeDirectoryHash`.
+- **`InstallerDetector` missing `using System`:** `Array.Empty<string>()` failed to compile
+  because the file had no `using` statements.
+- **`ManifestGenerator` local `ManifestFile` missing `ScanResult` and `JsonPropertyName`:**
+  The local model class in `ManifestGenerator.cs` didn't have the `ScanResult` property, so
+  VT results were never written to the manifest. All fields now have explicit
+  `[JsonPropertyName("camelCase")]` attributes matching `Manifest.cs`, making the two
+  independent of deserialisation case-sensitivity settings.
+- **`ManifestValidator.cs` Windows-1252 encoding:** Bullet (`0x95`) and em-dash (`0x97`)
+  bytes in string literals caused garbled error messages when compiled as UTF-8. File
+  rewritten as UTF-8; redundant `using PackItPro.Services` self-reference removed.
+- **`PackagingCommandHandler` discarded Notes and ScanResult:** Was still calling the
+  `List<string>` Packager overload. Now builds `List<ManifestGenerator.FileEntry>` with
+  `FilePath`, `Notes`, and `ScanResult` per file.
+- **`level="requireAdministrator"` string literal compile error:** Unescaped quotes inside
+  a string in `DetectRequiresAdmin` — `level="requireAdministrator"` was parsed as
+  identifier `level` followed by string `requireAdministrator`. Fixed to
+  `"level=\"requireAdministrator\""`.
+- **Dead `_rebootRequired` field removed:** `Program.cs` had a `private static bool
+  _rebootRequired` field and two dead methods (`LogCompletionBanner`, `BuildCompletionMessage`)
+  that referenced it. All called only from `RunFromStep5Async` which was deleted when the
+  WPF flow replaced the console install loop. Removed.
+- **`packageName` sanitised in `Packager`:** Characters invalid in Windows filenames are
+  replaced with `_` before the output path is constructed. Prevents `File.Move` throwing
+  `ArgumentException` on unusual package names.
+
+#### Integrity
+- **Payload hash verified before extraction:** `PayloadExtractor` does a sequential
+  forward-reading hash pass over the ZIP bytes before opening `ZipArchive`. The old approach
+  hashed inside `ZipArchive` extraction which reads the Central Directory first (non-sequential)
+  producing a different hash from what `ResourceInjector` wrote. Guaranteed mismatch on every
+  machine. Fixed with two-pass approach.
+
+### PackItPro
+
+#### New Features
+- **VirusTotal 429 / quota error handling:** `VirusTotalClient.GatedRequestAsync` now wraps
+  every HTTP call in `ExecuteWithRetryAsync`. On `429 Too Many Requests` it backs off 60
+  seconds and retries once. A second 429 throws a clear "daily quota may be exhausted" message.
+  `401 Unauthorized` gives "check your API key"; `403 Forbidden` gives "daily quota exhausted".
+  Previously all three produced a raw `HttpRequestException` with no actionable guidance.
+  File upload now uses explicit status checking instead of `EnsureSuccessStatusCode` so the
+  status code is always available to the retry wrapper.
+
+#### Removed (dead settings)
+- **`VerifyIntegrity` setting removed:** `AppSettings.VerifyIntegrity`, the corresponding
+  `SettingsViewModel` property, `SettingsHandler` write-back, and the settings window checkbox
+  are all removed. The setting was saved and displayed but never read by `Packager` or the stub.
+  The real integrity check is the payload SHA-256 in the EXE footer, which is always verified.
+- **`UseLZMACompression` alias removed:** `AppSettings.UseLZMACompression` was a backward-
+  compatibility alias for `CompressionMethod == Maximum` added before `CompressionMethodEnum`
+  existed. `Packager` uses `CompressionLevel` (int); this alias was never read. Removed from
+  `AppSettings` and `SettingsViewModel`.
+
+#### Validator
+- **`TimeoutMinutes` cap raised from 120 → 240:** Large enterprise installers (Office, game
+  engines) can legitimately exceed 2 hours. The old 120-minute hard cap was arbitrary; raised
+  to 240 minutes (4 hours).
+
+
+
 ## v0.7.3
 
 ### Fixes

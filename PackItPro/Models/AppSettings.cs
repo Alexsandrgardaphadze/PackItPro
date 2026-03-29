@@ -39,7 +39,7 @@ namespace PackItPro.Models
         }
 
         public bool RequiresAdmin { get; set; } = false;
-        public bool VerifyIntegrity { get; set; } = true;
+        public bool DisclaimerAccepted { get; set; } = false;
         public bool ScanWithVirusTotal { get; set; } = true;
         public int MaxFilesInList { get; set; } = 20;
 
@@ -51,22 +51,6 @@ namespace PackItPro.Models
         /// an immediate scan eating their API quota.
         /// </summary>
         public bool ScanOnAdd { get; set; } = false;
-
-        /// <summary>
-        /// True after the user has accepted the packaging disclaimer.
-        /// Once set, the disclaimer dialog is suppressed on subsequent packs.
-        /// Reset to false on major version upgrades if the disclaimer text changes.
-        /// NOTE: Set to true here so VM testing is not blocked by the dialog.
-        ///       Change back to false before shipping to end users.
-        /// </summary>
-        public bool DisclaimerAccepted { get; set; } = false;
-
-        // Kept for backward compatibility
-        public bool UseLZMACompression
-        {
-            get => CompressionMethod == CompressionMethodEnum.Maximum;
-            set => CompressionMethod = value ? CompressionMethodEnum.Maximum : CompressionMethodEnum.Fast;
-        }
 
         public List<string> TrustedEngines { get; set; } = new()
         {

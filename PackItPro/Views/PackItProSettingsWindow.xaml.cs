@@ -1,4 +1,4 @@
-﻿// PackItPro/Views/PackItProSettingsWindow.xaml.cs
+﻿// Views/PackItProSettingsWindow.xaml.cs
 using PackItPro.Models;
 using PackItPro.Services;
 using System;
@@ -18,7 +18,6 @@ namespace PackItPro.Views
 
         public string OutputFileName { get; private set; } = "";
         public int MinDetections { get; private set; }
-        public bool VerifyIntegrity { get; private set; }
         public int MaxFiles { get; private set; }
         public bool ScanOnAdd { get; private set; }
 
@@ -35,7 +34,6 @@ namespace PackItPro.Views
             OutputFileNameBox.Text = current.OutputFileName ?? "Package";
             MinDetectionsBox.Text = current.MinimumDetectionsToFlag.ToString();
             MaxFilesBox.Text = current.MaxFilesInList.ToString();
-            VerifyIntegrityBox.IsChecked = current.VerifyIntegrity;
             ScanOnAddBox.IsChecked = current.ScanOnAdd;
 
             LoadTrustEntries();
@@ -110,7 +108,6 @@ namespace PackItPro.Views
 
             OutputFileName = outputName;
             MinDetections = minDet;
-            VerifyIntegrity = VerifyIntegrityBox.IsChecked == true;
             MaxFiles = maxFiles;
             ScanOnAdd = ScanOnAddBox.IsChecked == true;
 

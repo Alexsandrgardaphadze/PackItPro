@@ -1,0 +1,11 @@
+﻿<!-- StubInstaller/App.xaml
+     Minimal WPF Application definition.
+     StartupUri is intentionally absent — Program.cs creates and shows
+     MainInstallWindow manually after the pre-install steps complete.
+     This file exists solely to satisfy the WPF build system and to provide
+     a place for application-level resources if needed in future. -->
+<Application x:Class="StubInstaller.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Application.Resources/>
+</Application>

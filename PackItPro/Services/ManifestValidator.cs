@@ -1,5 +1,4 @@
 // PackItPro/Services/ManifestValidator.cs
-using PackItPro.Services;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -99,8 +98,8 @@ namespace PackItPro.Services
             if (file.TimeoutMinutes <= 0)
                 errors.Add($"File '{file.Name}': TimeoutMinutes must be positive (got {file.TimeoutMinutes}).");
 
-            if (file.TimeoutMinutes > 120)
-                errors.Add($"File '{file.Name}': TimeoutMinutes too large ({file.TimeoutMinutes} > 120).");
+            if (file.TimeoutMinutes > 240)
+                errors.Add($"File '{file.Name}': TimeoutMinutes too large ({file.TimeoutMinutes} > 240). Max is 240 minutes (4 hours).");
 
             if (string.IsNullOrWhiteSpace(file.DetectionSource))
                 errors.Add($"File '{file.Name}': DetectionSource is required.");

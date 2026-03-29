@@ -85,6 +85,15 @@ namespace PackItPro.Services
         {
             log ??= NullLogService.Instance;
 
+            // Sanitise packageName — strip characters invalid in Windows filenames
+            // so the output path never throws an ArgumentException or IOException.
+            var invalidChars = Path.GetInvalidFileNameChars();
+            packageName = string.Concat(packageName
+                .Select(ch => invalidChars.Contains(ch) ? '_' : ch))
+                .Trim('_', ' ', '.');
+            if (string.IsNullOrWhiteSpace(packageName))
+                packageName = "Package";
+
             var tempDir = Path.Combine(Path.GetTempPath(), $"PackItPro_{Guid.NewGuid()}");
             string? zipPath = null;
             string? finalTemp = null;
@@ -156,13 +165,19 @@ namespace PackItPro.Services
                 log.Info("  Manifest written (checksum pending).");
 
                 // ============================================================
-                // STEP 3: HASH INSTALLER FILES ONLY
+                // STEP 3: HASH INSTALLER FILES
                 // SHA256 over hundreds of MB is CPU-bound — run on thread pool.
+                //
+                // NOTE ON INTEGRITY ARCHITECTURE:
+                // The primary integrity check is the payload-level SHA256 hash stored
+                // in the EXE footer by ResourceInjector (verified by PayloadExtractor
+                // before any extraction). The directory-level hash below (SHA256Checksum
+                // in the manifest JSON) is a secondary check for post-extraction
+                // verification. Both hashes are computed and stored.
                 // ============================================================
                 Report(progress, 25, "Step 3 of 6 — Computing integrity hash...");
                 log.Info("STEP 3: Hashing installer files...");
 
-                // Hash the source files directly (no tempDir copies exist any more)
                 string dirHash = await Task.Run(
                     () => Convert.ToBase64String(FileHasher.ComputeFileListHash(filePaths, manifestPath)), ct);
                 log.Info($"  Hash: {dirHash[..16]}...");
@@ -172,7 +187,7 @@ namespace PackItPro.Services
                 manifestObj.SHA256Checksum = dirHash;
                 manifestJson = JsonSerializer.Serialize(manifestObj, new JsonSerializerOptions { WriteIndented = true });
                 await File.WriteAllTextAsync(manifestPath, manifestJson, ct);
-                log.Info("  Manifest updated with checksum.");
+                log.Info("  Manifest updated with SHA256 checksum.");
 
                 // ============================================================
                 // STEP 4: CREATE ZIP ARCHIVE
