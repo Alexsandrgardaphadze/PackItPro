@@ -148,6 +148,30 @@ namespace PackItPro.Services
                 if (!hdr512.IsEmpty && ContainsAscii(hdr512.Span, ".wixburn"))
                     return ("burn", "header");
 
+                // Known installers with app-specific silent args
+                // ShareX: /NORUN prevents auto-launch (official docs)
+                if (prod.Equals("ShareX", StringComparison.OrdinalIgnoreCase) ||
+                    all.Contains("SHAREX"))
+                    return ("sharex", "header");
+
+                // Git for Windows: needs /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS /NOCANCEL
+                if (prod.Equals("Git", StringComparison.OrdinalIgnoreCase) &&
+                    comp.IndexOf("Git Development", StringComparison.OrdinalIgnoreCase) >= 0)
+                    return ("git-inno", "header");
+
+                // UniGetUI / WingetUI: /NoAutoStart /ALLUSERS prevents auto-launch
+                if (all.Contains("UNIGETUI") || all.Contains("WINGETUI"))
+                    return ("unigetui", "header");
+
+                // VS Code Inno installer: /MERGETASKS=!runcode prevents auto-launch
+                if (all.Contains("VISUAL STUDIO CODE") || all.Contains("VSCODE"))
+                    return ("vscode-inno", "header");
+
+                // .NET Framework Repair Tool: /q /n (Microsoft official docs)
+                if (all.Contains(".NET FRAMEWORK REPAIR") || all.Contains("FIXDOTNET") ||
+                    (all.Contains("NETFXREPAIRTOOL") || (all.Contains(".NET FRAMEWORK") && all.Contains("REPAIR"))))
+                    return ("netfxtool", "header");
+
                 if (all.Contains("NULLSOFT"))
                     return ("nsis", "header");
 
@@ -366,6 +390,14 @@ namespace PackItPro.Services
             "msi" => new[] { "/quiet", "/norestart" },
             "msp" => new[] { "/quiet", "/norestart" },
             "inno" => new[] { "/SP-", "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" },
+            "sharex" => new[] { "/VERYSILENT", "/NORUN" },
+            "git-inno" => new[] { "/VERYSILENT", "/NORESTART", "/NOCANCEL", "/SP-",
+                "/CLOSEAPPLICATIONS", "/RESTARTAPPLICATIONS" },
+            "unigetui" => new[] { "/SP", "/VERYSILENT", "/SUPPRESSMSGBOXES",
+                "/NORESTART", "/NoAutoStart", "/ALLUSERS", "/LANG=english" },
+            "vscode-inno" => new[] { "/SP-", "/VERYSILENT", "/SUPPRESSMSGBOXES",
+                "/NORESTART", "/MERGETASKS=!runcode" },
+            "netfxtool" => new[] { "/q", "/n" },
             "nsis" => new[] { "/S" },
             "squirrel" => new[] { "--silent" },
             "burn" => new[] { "/quiet", "/norestart" },
@@ -458,6 +490,8 @@ namespace PackItPro.Services
 
             // VCRedist: usually fast (< 2 min), but /install on first-time can take longer.
             if (installType == "vcredist") return 10;
+            if (installType is "sharex" or "git-inno" or "unigetui" or "vscode-inno") return 10;
+            if (installType == "netfxtool") return 15;
 
             // EdgeWebView2: downloads and installs, can take several minutes.
             if (installType == "edgewebview2") return 15;

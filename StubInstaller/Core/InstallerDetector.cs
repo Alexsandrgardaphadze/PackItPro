@@ -1,5 +1,4 @@
 ﻿// StubInstaller/InstallerDetector.cs
-
 using System;
 
 namespace StubInstaller.Core
@@ -18,6 +17,14 @@ namespace StubInstaller.Core
                 "msi" => new[] { "/quiet", "/norestart" },
                 "msp" => new[] { "/quiet", "/norestart" },
                 "inno" => new[] { "/SP-", "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" },
+                "sharex" => new[] { "/VERYSILENT", "/NORUN" },
+                "git-inno" => new[] { "/VERYSILENT", "/NORESTART", "/NOCANCEL", "/SP-",
+                                           "/CLOSEAPPLICATIONS", "/RESTARTAPPLICATIONS" },
+                "unigetui" => new[] { "/SP", "/VERYSILENT", "/SUPPRESSMSGBOXES",
+                                           "/NORESTART", "/NoAutoStart", "/ALLUSERS", "/LANG=english" },
+                "vscode-inno" => new[] { "/SP-", "/VERYSILENT", "/SUPPRESSMSGBOXES",
+                                           "/NORESTART", "/MERGETASKS=!runcode" },
+                "netfxtool" => new[] { "/q", "/n" },
                 "nsis" => new[] { "/S" },
                 "squirrel" => new[] { "--silent" },
                 "burn" => new[] { "/quiet", "/norestart" },
