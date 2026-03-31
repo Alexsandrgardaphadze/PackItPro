@@ -55,6 +55,7 @@ namespace PackItPro.ViewModels
         public SettingsViewModel Settings { get; }
         public SummaryViewModel Summary { get; }
         public StatusViewModel Status { get; }
+        public ShortcutListViewModel Shortcuts { get; }
 
         #endregion
 
@@ -129,6 +130,7 @@ namespace PackItPro.ViewModels
             Summary = new SummaryViewModel(FileList, Settings);
             Status = new StatusViewModel();
             Error = new ErrorViewModel();
+            Shortcuts = new ShortcutListViewModel();
 
             _logService.Info("MainViewModel constructed");
         }
@@ -181,7 +183,7 @@ namespace PackItPro.ViewModels
 
         private void InitializeHandlers()
         {
-            _packagingHandler = new PackagingCommandHandler(FileList, Settings, Status, Error, _logService);
+            _packagingHandler = new PackagingCommandHandler(FileList, Settings, Status, Error, _logService, Shortcuts);
 
             // FIX #2/#3: Pass _trustStore so the handler can skip trusted files
             //            before making any VirusTotal API call.

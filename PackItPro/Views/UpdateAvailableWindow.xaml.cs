@@ -7,6 +7,10 @@ using System.Windows;
 
 namespace PackItPro.Views
 {
+    /// <summary>
+    /// Shows release information and drives the download-and-install flow for
+    /// both <c>PackItPro.exe</c> and <c>StubInstaller.exe</c>.
+    /// </summary>
     public partial class UpdateAvailableWindow : Window
     {
         private readonly UpdateService _updateService;
@@ -14,22 +18,19 @@ namespace PackItPro.Views
         private CancellationTokenSource? _downloadCts;
         private bool _downloadStarted;
 
-        // ---- Factory --------------------------------------------------------
+        // ── Factory ───────────────────────────────────────────────────────────
 
         /// <summary>
-        /// Shows the update dialog and handles the full download+install flow.
-        /// Safe to call from any thread -- marshals to UI thread internally.
+        /// Shows the update dialog modally.
+        /// Safe to call from any thread — marshals to the UI thread internally.
         /// </summary>
         public static void Show(Window? owner, UpdateService updateService, UpdateCheckResult result)
         {
-            var win = new UpdateAvailableWindow(updateService, result)
-            {
-                Owner = owner
-            };
+            var win = new UpdateAvailableWindow(updateService, result) { Owner = owner };
             win.ShowDialog();
         }
 
-        // ---- Constructor ----------------------------------------------------
+        // ── Constructor ───────────────────────────────────────────────────────
 
         private UpdateAvailableWindow(UpdateService updateService, UpdateCheckResult result)
         {
@@ -39,8 +40,7 @@ namespace PackItPro.Views
 
             PopulateFields();
 
-            // Disable Install button if there is no direct download URL.
-            // User can still open the releases page via the hyperlink.
+            // Disable Install when no main asset is attached to the release.
             if (string.IsNullOrWhiteSpace(result.DownloadUrl))
             {
                 InstallButton.IsEnabled = false;
@@ -52,7 +52,7 @@ namespace PackItPro.Views
             Closing += OnWindowClosing;
         }
 
-        // ---- UI setup -------------------------------------------------------
+        // ── UI population ─────────────────────────────────────────────────────
 
         private void PopulateFields()
         {
@@ -60,29 +60,23 @@ namespace PackItPro.Views
             NewVersionText.Text = _result.LatestVersion ?? "unknown";
 
             if (_result.PublishedAt.HasValue)
-            {
-                SubtitleText.Text =
-                    $"Published {_result.PublishedAt.Value.ToLocalTime():dd MMM yyyy}";
-            }
+                SubtitleText.Text = $"Published {_result.PublishedAt.Value.ToLocalTime():dd MMM yyyy}";
 
             ReleaseNotesText.Text = string.IsNullOrWhiteSpace(_result.ReleaseNotes)
                 ? "No release notes provided."
                 : _result.ReleaseNotes.Trim();
         }
 
-        // ---- Button handlers ------------------------------------------------
+        // ── Button handlers ───────────────────────────────────────────────────
 
-        private void Later_Click(object sender, RoutedEventArgs e)
-        {
-            Close();
-        }
+        private void Later_Click(object sender, RoutedEventArgs e) => Close();
 
         private async void Install_Click(object sender, RoutedEventArgs e)
         {
             if (_downloadStarted) return;
             _downloadStarted = true;
 
-            // Lock the UI for the duration of the download
+            // Lock UI for the duration of the download
             InstallButton.IsEnabled = false;
             LaterButton.IsEnabled = false;
             ProgressArea.Visibility = Visibility.Visible;
@@ -97,36 +91,32 @@ namespace PackItPro.Views
                     DownloadProgress.IsIndeterminate = false;
                     DownloadProgress.Value = p.Percent;
                 }
-                ProgressBytes.Text = FormatBytes(p.BytesReceived) +
-                    (p.TotalBytes.HasValue ? $" / {FormatBytes(p.TotalBytes.Value)}" : "");
+                ProgressBytes.Text = FormatBytes(p.BytesReceived)
+                    + (p.TotalBytes.HasValue ? $" / {FormatBytes(p.TotalBytes.Value)}" : "");
             });
 
-            DownloadResult downloadResult;
+            DualDownloadResult downloadResult;
             try
             {
                 downloadResult = await _updateService.DownloadUpdateAsync(
-                    _result.DownloadUrl!,
-                    progress,
-                    _downloadCts.Token);
+                    _result, progress, _downloadCts.Token);
             }
             catch (OperationCanceledException)
             {
-                // User closed the window while downloading
+                // Window was closed while downloading — temp files already cleaned up
                 return;
             }
 
             if (!downloadResult.Success)
             {
                 ResetToIdle();
-                AlertDialog.Show(
-                    this,
-                    "Download Failed",
+                AlertDialog.Show(this, "Download Failed",
                     downloadResult.ErrorMessage ?? "Unknown error.",
                     kind: AlertDialog.Kind.Error);
                 return;
             }
 
-            // Download complete -- launch updater and exit
+            // ── Launch updater script then exit ───────────────────────────────
             ProgressLabel.Text = "Installing...";
             DownloadProgress.Value = 100;
 
@@ -134,34 +124,39 @@ namespace PackItPro.Views
             if (string.IsNullOrEmpty(currentExe))
             {
                 ResetToIdle();
-                AlertDialog.Show(
-                    this,
-                    "Install Failed",
+                AlertDialog.Show(this, "Install Failed",
                     "Could not determine the path of the running executable.\n\n" +
-                    "The update file has been downloaded but could not be applied automatically.\n\n" +
-                    $"Downloaded file:\n{downloadResult.TempFilePath}",
+                    "The update was downloaded but could not be applied automatically.\n\n" +
+                    $"Downloaded file:\n{downloadResult.MainTempPath}",
                     kind: AlertDialog.Kind.Error);
                 return;
             }
 
+            // Resolve the installed stub path (may be null if stub was not shipped yet)
+            string? currentStub = UpdaterLauncher.GetCurrentStubPath();
+
             try
             {
-                UpdaterLauncher.LaunchUpdaterScript(currentExe, downloadResult.TempFilePath!);
+                UpdaterLauncher.LaunchUpdaterScript(
+                    currentExePath: currentExe,
+                    tempMainPath: downloadResult.MainTempPath!,
+                    currentStubPath: currentStub,
+                    tempStubPath: downloadResult.StubTempPath);
             }
             catch (Exception ex)
             {
                 ResetToIdle();
-                AlertDialog.Show(
-                    this,
-                    "Install Failed",
+                AlertDialog.Show(this, "Install Failed",
                     "The update was downloaded but the installer script could not be launched.\n\n" +
-                    "You can apply the update manually by replacing PackItPro.exe with the file below.",
-                    detail: $"Script error: {ex.Message}\nDownloaded: {downloadResult.TempFilePath}",
+                    "You can apply the update manually by replacing the files below.",
+                    detail: $"Script error: {ex.Message}" +
+                            $"\nPackItPro:      {downloadResult.MainTempPath}" +
+                            $"\nStubInstaller:  {downloadResult.StubTempPath ?? "not downloaded"}",
                     kind: AlertDialog.Kind.Error);
                 return;
             }
 
-            // Script launched -- shut down so it can rename the file
+            // Script is running — shut down so it can rename the files
             Application.Current.Shutdown();
         }
 
@@ -176,19 +171,18 @@ namespace PackItPro.Views
                     UseShellExecute = true
                 });
             }
-            catch { /* ignore -- browser open is best-effort */ }
+            catch { /* browser open is best-effort */ }
         }
 
-        // ---- Window closing -------------------------------------------------
+        // ── Window closing ────────────────────────────────────────────────────
 
-        private void OnWindowClosing(object? sender,
-            System.ComponentModel.CancelEventArgs e)
+        private void OnWindowClosing(object? sender, System.ComponentModel.CancelEventArgs e)
         {
             _downloadCts?.Cancel();
             _downloadCts?.Dispose();
         }
 
-        // ---- Helpers --------------------------------------------------------
+        // ── Helpers ───────────────────────────────────────────────────────────
 
         private void ResetToIdle()
         {
