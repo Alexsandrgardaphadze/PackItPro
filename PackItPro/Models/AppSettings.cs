@@ -69,5 +69,8 @@ namespace PackItPro.Models
             "F-Secure",
             "Trend Micro",
         };
+
+        /// <summary>When true the light theme is active; false = dark (default).</summary>
+        public bool UseLightTheme { get; set; } = false;
     }
 }

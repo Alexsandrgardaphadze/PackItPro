@@ -95,6 +95,18 @@ namespace PackItPro.ViewModels
             set { SettingsModel.ScanOnAdd = value; OnPropertyChanged(); }
         }
 
+        public bool UseLightTheme
+        {
+            get => SettingsModel.UseLightTheme;
+            set
+            {
+                SettingsModel.UseLightTheme = value;
+                OnPropertyChanged();
+                ThemeService.Apply(value ? AppTheme.Light : AppTheme.Dark);
+                _ = SaveSettingsAsync();
+            }
+        }
+
         public SettingsViewModel(string settingsFilePath)
         {
             SettingsModel = new AppSettings();
@@ -122,6 +134,7 @@ namespace PackItPro.ViewModels
                         SettingsModel.ScanWithVirusTotal = loadedSettings.ScanWithVirusTotal;
                         SettingsModel.CompressionLevel = loadedSettings.CompressionLevel;
                         SettingsModel.ScanOnAdd = loadedSettings.ScanOnAdd;   // NEW
+                        SettingsModel.UseLightTheme = loadedSettings.UseLightTheme;
 
                         if (loadedSettings.TrustedEngines?.Count > 0)
                             SettingsModel.TrustedEngines = loadedSettings.TrustedEngines;

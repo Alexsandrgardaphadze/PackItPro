@@ -79,6 +79,8 @@
                     </MenuItem>
 
                     <MenuItem Header="Help" Style="{StaticResource MenuItemStyle}">
+                        <MenuItem Header="Toggle Theme"        Command="{Binding ToggleThemeCommand}"   Style="{StaticResource SubMenuItemStyle}"/>
+                        <Separator Background="{StaticResource AppBorderColor}"/>
                         <MenuItem Header="Documentation"      Command="{Binding DocumentationCommand}"  Style="{StaticResource SubMenuItemStyle}"/>
                         <MenuItem Header="GitHub Repository"  Command="{Binding GitHubCommand}"         Style="{StaticResource SubMenuItemStyle}"/>
                         <MenuItem Header="Report Issue"       Command="{Binding ReportIssueCommand}"    Style="{StaticResource SubMenuItemStyle}"/>
@@ -89,13 +91,30 @@
                     </MenuItem>
                 </Menu>
 
-                <!-- ── Right: version label ─────────────────────────────── -->
+                <!-- ── Right: version label + theme toggle ────────────────────── -->
                 <StackPanel DockPanel.Dock="Right"
                             Orientation="Horizontal"
                             VerticalAlignment="Center"
                             Margin="0,0,8,0">
 
                     <!-- Thin divider -->
+                    <Border Width="1" Background="{StaticResource AppDividerColor}"
+                            Margin="0,6,8,6" VerticalAlignment="Stretch"/>
+
+                    <!-- Theme Toggle Button -->
+                    <Button Command="{Binding ToggleThemeCommand}"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Padding="6,4"
+                            VerticalAlignment="Center"
+                            Margin="0,0,8,0"
+                            ToolTip="Toggle Light/Dark Theme"
+                            Foreground="{StaticResource AppTextTertiaryColor}"
+                            FontSize="14">
+                        <TextBlock Text="🌙/☀️" VerticalAlignment="Center"/>
+                    </Button>
+
+                    <!-- Another divider -->
                     <Border Width="1" Background="{StaticResource AppDividerColor}"
                             Margin="0,6,8,6" VerticalAlignment="Stretch"/>
 

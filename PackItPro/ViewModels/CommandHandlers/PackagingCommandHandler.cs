@@ -121,11 +121,11 @@ namespace PackItPro.ViewModels.CommandHandlers
                     _log.Debug($"Pack {report.percentage}%: {report.message}");
                 });
 
-                // Build FileEntry list — carries Notes and VT scan result per file.
+                // Build FileEntry list — carries CustomArgs and VT scan result per file.
                 var fileEntries = _fileList.Items
                     .Select(f => new ManifestGenerator.FileEntry(
                         Path: f.FilePath,
-                        Notes: string.IsNullOrWhiteSpace(f.Notes) ? null : f.Notes.Trim(),
+                        CustomArgs: string.IsNullOrWhiteSpace(f.CustomArgs) ? null : f.CustomArgs.Trim(),
                         ScanResult: f.Status switch
                         {
                             FileStatusEnum.Clean => "clean",

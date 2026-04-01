@@ -1,4 +1,8 @@
 ﻿// PackItPro/ViewModels/FileItemViewModel.cs
+// CHANGE: Notes -> CustomArgs
+// The "Notes" field was informational only. CustomArgs lets the user override
+// the auto-detected silent arguments per file. The stub uses these in preference
+// to the auto-detected ones when present.
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
@@ -48,7 +52,14 @@ namespace PackItPro.ViewModels
         private bool _isTrustedFalsePositive;
         private bool _flaggedByTrustedEngine;
         private string? _trustedEngineName;
-        private string _notes = "";          // NEW
+
+        /// <summary>
+        /// Optional custom silent install arguments entered by the user.
+        /// When non-empty, these are passed to the stub instead of the
+        /// auto-detected defaults (e.g. "/S /D=C:\MyApp" for NSIS).
+        /// Stored in the manifest's <c>customArgs</c> field.
+        /// </summary>
+        private string _customArgs = "";
 
         // ── Core properties ───────────────────────────────────────────────────
 
@@ -107,15 +118,24 @@ namespace PackItPro.ViewModels
         }
 
         /// <summary>
-        /// Optional free-text label for this file — install order hints, version notes, etc.
-        /// Written into packitmeta.json so the stub can display it during installation.
-        /// Editable inline in the file list Notes column.
+        /// User-supplied custom silent arguments for this installer.
+        /// Overrides auto-detected args when non-empty.
+        /// Example: "/S /D=%ProgramFiles%\MyApp" for NSIS.
+        /// Editable inline in the file list Args column.
         /// </summary>
-        public string Notes
+        public string CustomArgs
         {
-            get => _notes;
-            set { _notes = value ?? ""; OnPropertyChanged(); }
+            get => _customArgs;
+            set
+            {
+                _customArgs = value ?? "";
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(HasCustomArgs));
+            }
         }
+
+        /// <summary>True when the user has provided custom args for this file.</summary>
+        public bool HasCustomArgs => !string.IsNullOrWhiteSpace(_customArgs);
 
         // ── Trust / false-positive properties ────────────────────────────────
 
@@ -143,7 +163,7 @@ namespace PackItPro.ViewModels
             set { _trustedEngineName = value; OnPropertyChanged(); OnPropertyChanged(nameof(TrustTooltip)); }
         }
 
-        // ── Computed display properties ───────────────────────────────────────
+        // ── Computed display ──────────────────────────────────────────────────
 
         public string StatusDisplay
         {

@@ -111,6 +111,9 @@ namespace PackItPro.ViewModels
         // Application
         public ICommand ExitCommand => _applicationHandler?.ExitCommand ?? NullCommand;
 
+        /// <summary>Toggles between light and dark themes.</summary>
+        public ICommand ToggleThemeCommand { get; set; }
+
         #endregion
 
         public MainViewModel()
@@ -131,6 +134,13 @@ namespace PackItPro.ViewModels
             Status = new StatusViewModel();
             Error = new ErrorViewModel();
             Shortcuts = new ShortcutListViewModel();
+
+            // Initialize ToggleThemeCommand with reference to Settings
+            ToggleThemeCommand = new RelayCommand(_ =>
+            {
+                Services.ThemeService.Toggle();
+                Settings.UseLightTheme = !Settings.UseLightTheme;
+            });
 
             _logService.Info("MainViewModel constructed");
         }
@@ -153,6 +163,10 @@ namespace PackItPro.ViewModels
 
                 await Settings.LoadSettingsAsync();
                 _logService.Info("Settings loaded");
+
+                // Apply the saved theme preference
+                ThemeService.ApplyFromSettings(Settings.UseLightTheme);
+                _logService.Info($"Theme: {(Settings.UseLightTheme ? "Light" : "Dark")}");
 
                 _virusTotalClient = new VirusTotalClient(_cacheFilePath, Settings.VirusTotalApiKey);
                 await _virusTotalClient.LoadCacheAsync(_logService);
@@ -224,6 +238,7 @@ namespace PackItPro.ViewModels
             OnPropertyChanged(nameof(CheckUpdatesCommand));
             OnPropertyChanged(nameof(AboutCommand));
             OnPropertyChanged(nameof(ExitCommand));
+            OnPropertyChanged(nameof(ToggleThemeCommand));
             _logService.Info("All command bindings refreshed");
         }
 

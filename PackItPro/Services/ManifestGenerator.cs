@@ -23,10 +23,15 @@ namespace PackItPro.Services
         // ── Public API ────────────────────────────────────────────────────────
 
         /// <summary>
-        /// A file path paired with an optional user note and VirusTotal result.
+        /// A file path paired with optional user-supplied custom args, note, and VirusTotal result.
+        /// CustomArgs override the auto-detected silent arguments when non-empty.
         /// Notes are written into the manifest JSON and visible to the stub UI.
         /// </summary>
-        public record FileEntry(string Path, string? Notes = null, string? ScanResult = null);
+        public record FileEntry(
+            string Path,
+            string? CustomArgs = null,
+            string? Notes = null,
+            string? ScanResult = null);
 
         /// <summary>
         /// Primary overload — preserves per-file Notes, scan results, and shortcuts.
@@ -50,6 +55,12 @@ namespace PackItPro.Services
                         ? "WARNING: Office installs in the background after this exits. Allow 10-30 min after stub closes."
                         : (string.IsNullOrWhiteSpace(entry.Notes) ? null : entry.Notes.Trim());
 
+                    // If the user supplied custom args, use those verbatim (split on whitespace).
+                    // Otherwise fall back to auto-detection as before.
+                    string[]? silentArgs = !string.IsNullOrWhiteSpace(entry.CustomArgs)
+                        ? SplitArgs(entry.CustomArgs)
+                        : GetDefaultSilentArgs(type);
+
                     return new ManifestFile
                     {
                         Name = Path.GetFileName(entry.Path),
@@ -58,7 +69,8 @@ namespace PackItPro.Services
                         ScanResult = string.IsNullOrWhiteSpace(entry.ScanResult) ? null : entry.ScanResult.ToLowerInvariant(),
                         InstallType = type,
                         DetectionSource = source,
-                        SilentArgs = GetDefaultSilentArgs(type),
+                        SilentArgs = silentArgs,
+                        CustomArgs = string.IsNullOrWhiteSpace(entry.CustomArgs) ? null : entry.CustomArgs.Trim(),
                         RequiresAdmin = DetectRequiresAdmin(entry.Path),
                         InstallOrder = index,
                         TimeoutMinutes = GetDefaultTimeout(entry.Path),
@@ -144,6 +156,13 @@ namespace PackItPro.Services
 
         private static (string Type, string Source) DetectExeType(string filePath)
         {
+            // Pass 0: PE structure analysis via PeDetector.
+            // Catches Inno/NSIS/Burn from section headers and resource directories —
+            // more reliable than byte scanning for packed or large installers.
+            var peResult = PeDetector.TryDetect(filePath);
+            if (peResult.HasValue) return peResult.Value;
+
+            // Pass 1: FileVersionInfo (file metadata)
             try
             {
                 var vi = FileVersionInfo.GetVersionInfo(filePath);
@@ -410,6 +429,31 @@ namespace PackItPro.Services
             "Microsoft® Windows® Operating System Setup",
         };
 
+        // ── SplitArgs helper ──────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Splits a user-entered args string into an array the stub can pass to
+        /// Process.Start(). Respects double-quoted tokens.
+        /// Example: "/S /D=\"C:\\My App\""  →  ["/S", "/D=\"C:\\My App\""]
+        /// </summary>
+        private static string[] SplitArgs(string raw)
+        {
+            var args = new List<string>();
+            var current = new System.Text.StringBuilder();
+            bool inQuote = false;
+            foreach (char c in raw.Trim())
+            {
+                if (c == '"') { inQuote = !inQuote; current.Append(c); }
+                else if (c == ' ' && !inQuote)
+                {
+                    if (current.Length > 0) { args.Add(current.ToString()); current.Clear(); }
+                }
+                else current.Append(c);
+            }
+            if (current.Length > 0) args.Add(current.ToString());
+            return args.ToArray();
+        }
+
         /// <summary>
         /// Reads the Windows version resource of an exe/msi to get a human-readable name.
         /// Priority: ProductName (if not a Windows system component) → FileDescription → filename.
@@ -479,57 +523,61 @@ namespace PackItPro.Services
         public List<ManifestShortcut>? Shortcuts { get; set; }
     }
 
-    /// <summary>Describes a single installer file in the package.</summary>
-    public class ManifestFile
-    {
-        [JsonPropertyName("name")]
-        public string Name { get; set; } = "";
+        /// <summary>Describes a single installer file in the package.</summary>
+        public class ManifestFile
+        {
+            [JsonPropertyName("name")]
+            public string Name { get; set; } = "";
 
-        [JsonPropertyName("installType")]
-        public string InstallType { get; set; } = "exe";
+            [JsonPropertyName("installType")]
+            public string InstallType { get; set; } = "exe";
 
-        [JsonPropertyName("silentArgs")]
-        public string[]? SilentArgs { get; set; }
+            [JsonPropertyName("silentArgs")]
+            public string[]? SilentArgs { get; set; }
 
-        [JsonPropertyName("requiresAdmin")]
-        public bool RequiresAdmin { get; set; } = false;
+            [JsonPropertyName("customArgs")]
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+            public string? CustomArgs { get; set; }
 
-        [JsonPropertyName("installOrder")]
-        public int InstallOrder { get; set; } = 0;
+            [JsonPropertyName("requiresAdmin")]
+            public bool RequiresAdmin { get; set; } = false;
 
-        [JsonPropertyName("timeoutMinutes")]
-        public int TimeoutMinutes { get; set; } = 10;
+            [JsonPropertyName("installOrder")]
+            public int InstallOrder { get; set; } = 0;
 
-        /// <summary>
-        /// How the install type was determined:
-        /// "extension" — inferred from file extension (lower confidence),
-        /// "header"    — confirmed by PE binary signature (reliable),
-        /// "manifest"  — explicitly set by the user (authoritative).
-        /// </summary>
-        [JsonPropertyName("detectionSource")]
-        public string DetectionSource { get; set; } = "extension";
+            [JsonPropertyName("timeoutMinutes")]
+            public int TimeoutMinutes { get; set; } = 10;
 
-        /// <summary>Optional free-text note set in the PackItPro UI.</summary>
-        [JsonPropertyName("notes")]
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public string? Notes { get; set; }
+            /// <summary>
+            /// How the install type was determined:
+            /// "extension" — inferred from file extension (lower confidence),
+            /// "header"    — confirmed by PE binary signature (reliable),
+            /// "manifest"  — explicitly set by the user (authoritative).
+            /// </summary>
+            [JsonPropertyName("detectionSource")]
+            public string DetectionSource { get; set; } = "extension";
 
-        /// <summary>
-        /// Human-readable product name from FileVersionInfo.
-        /// Null means the stub falls back to the raw filename.
-        /// </summary>
-        [JsonPropertyName("displayName")]
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public string? DisplayName { get; set; }
+            /// <summary>Optional free-text note set in the PackItPro UI.</summary>
+            [JsonPropertyName("notes")]
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+            public string? Notes { get; set; }
 
-        /// <summary>
-        /// VirusTotal result recorded at packaging time.
-        /// "clean" | "infected" | null (not scanned).
-        /// </summary>
-        [JsonPropertyName("scanResult")]
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public string? ScanResult { get; set; }
-    }
+            /// <summary>
+            /// Human-readable product name from FileVersionInfo.
+            /// Null means the stub falls back to the raw filename.
+            /// </summary>
+            [JsonPropertyName("displayName")]
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+            public string? DisplayName { get; set; }
+
+            /// <summary>
+            /// VirusTotal result recorded at packaging time.
+            /// "clean" | "infected" | null (not scanned).
+            /// </summary>
+            [JsonPropertyName("scanResult")]
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+            public string? ScanResult { get; set; }
+        }
 
     /// <summary>
     /// Describes a Windows shortcut (.lnk) the stub creates after all

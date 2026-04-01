@@ -1,0 +1,88 @@
+﻿<!-- Themes/ColorsLight.xaml -->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ── Background ──────────────────────────────────────────────── -->
+    <SolidColorBrush x:Key="AppBackgroundColor"  Color="#f1f5f9"/>
+    <SolidColorBrush x:Key="AppPanelColor"       Color="#ffffff"/>
+    <SolidColorBrush x:Key="AppPanelHoverColor"  Color="#f8fafc"/>
+    <SolidColorBrush x:Key="AppCardColor"        Color="#f8fafc"/>
+
+    <!-- ── Accent (same hue, kept readable on light backgrounds) ────── -->
+    <SolidColorBrush x:Key="AppPrimaryColor"        Color="#4f46e5"/>
+    <SolidColorBrush x:Key="AppPrimaryHoverColor"   Color="#4338ca"/>
+    <SolidColorBrush x:Key="AppPrimaryPressedColor" Color="#3730a3"/>
+    <SolidColorBrush x:Key="AppSecondaryColor"      Color="#7c3aed"/>
+
+    <!-- ── Status ───────────────────────────────────────────────────── -->
+    <SolidColorBrush x:Key="AppStatusCleanColor"   Color="#059669"/>
+    <SolidColorBrush x:Key="AppStatusWarningColor" Color="#d97706"/>
+    <SolidColorBrush x:Key="AppStatusErrorColor"   Color="#dc2626"/>
+    <SolidColorBrush x:Key="AppStatusPendingColor" Color="#2563eb"/>
+    <SolidColorBrush x:Key="AppStatusInfoColor"    Color="#0891b2"/>
+
+    <!-- ── Text ─────────────────────────────────────────────────────── -->
+    <SolidColorBrush x:Key="AppTextColor"           Color="#0f172a"/>
+    <SolidColorBrush x:Key="AppTextSecondaryColor"  Color="#1e293b"/>
+    <SolidColorBrush x:Key="AppTextTertiaryColor"   Color="#475569"/>
+    <SolidColorBrush x:Key="AppTextQuaternaryColor" Color="#64748b"/>
+    <SolidColorBrush x:Key="AppTextDisabledColor"   Color="#94a3b8"/>
+
+    <!-- ── Borders ──────────────────────────────────────────────────── -->
+    <SolidColorBrush x:Key="AppBorderColor"      Color="#e2e8f0"/>
+    <SolidColorBrush x:Key="AppBorderLightColor" Color="#cbd5e1"/>
+    <SolidColorBrush x:Key="AppDividerColor"     Color="#f1f5f9"/>
+
+    <!-- ── Interactive ──────────────────────────────────────────────── -->
+    <SolidColorBrush x:Key="AppDropAreaHoverColor" Color="#6366f1"/>
+    <SolidColorBrush x:Key="AppHoverOverlayColor"  Color="#e0e7ff"/>
+
+    <!-- ── Glass ────────────────────────────────────────────────────── -->
+    <SolidColorBrush x:Key="AppGlassBackground" Color="#CCffffff"/>
+    <SolidColorBrush x:Key="AppGlassBorder"     Color="#33000000"/>
+
+    <!-- ── Gradients ────────────────────────────────────────────────── -->
+    <LinearGradientBrush x:Key="AppPrimaryGradient" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#4f46e5" Offset="0"/>
+        <GradientStop Color="#7c3aed" Offset="1"/>
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="AppSuccessGradient" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="#059669" Offset="0"/>
+        <GradientStop Color="#047857" Offset="1"/>
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="AppDangerGradient" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="#dc2626" Offset="0"/>
+        <GradientStop Color="#b91c1c" Offset="1"/>
+    </LinearGradientBrush>
+
+    <!-- ── Shadow Effects ───────────────────────────────────────────── -->
+    <!-- po:Freeze="True" makes each effect an immutable shared instance. -->
+    <DropShadowEffect x:Key="AppCardShadow"
+                      xmlns:po="http://schemas.microsoft.com/winfx/2006/xaml/presentation/options"
+                      po:Freeze="True"
+                      Color="Black"
+                      Opacity="0.08"
+                      BlurRadius="8"
+                      ShadowDepth="2"
+                      Direction="270"/>
+
+    <DropShadowEffect x:Key="AppButtonShadow"
+                      xmlns:po="http://schemas.microsoft.com/winfx/2006/xaml/presentation/options"
+                      po:Freeze="True"
+                      Color="Black"
+                      Opacity="0.06"
+                      BlurRadius="4"
+                      ShadowDepth="1"
+                      Direction="270"/>
+
+    <DropShadowEffect x:Key="AppGlowEffect"
+                      xmlns:po="http://schemas.microsoft.com/winfx/2006/xaml/presentation/options"
+                      po:Freeze="True"
+                      Color="#4f46e5"
+                      Opacity="0.3"
+                      BlurRadius="10"
+                      ShadowDepth="0"/>
+
+</ResourceDictionary>
