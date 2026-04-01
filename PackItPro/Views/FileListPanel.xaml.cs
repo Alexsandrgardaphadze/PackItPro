@@ -20,7 +20,7 @@ namespace PackItPro.Views
         private const double FixedColumnsWidth = 452 + 18; // 470
 
         // Minimum width for the Notes column — keeps the header legible.
-        private const double NotesMinWidth = 60;
+        private const double ArgsMinWidth = 60;
 
         // ── Drag-threshold state ──────────────────────────────────────────────
         private Point _dragStartPoint;
@@ -61,7 +61,7 @@ namespace PackItPro.Views
 
             double notesWidth = Math.Max(
                 FileListView.ActualWidth - FixedColumnsWidth,
-                NotesMinWidth);
+                ArgsMinWidth);
 
             NotesColumn.Width = notesWidth;
         }

@@ -24,7 +24,7 @@
             <Setter Property="Width" Value="24"/>
             <Setter Property="Height" Value="24"/>
             <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Foreground" Value="{StaticResource AppTextTertiaryColor}"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppTextTertiaryColor}"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Padding" Value="0"/>
@@ -44,11 +44,11 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="{StaticResource AppStatusErrorColor}"/>
+                                <Setter Property="Background" Value="{DynamicResource AppStatusErrorColor}"/>
                                 <Setter Property="Foreground" Value="White"/>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter Property="Background" Value="{StaticResource AppStatusErrorColor}"/>
+                                <Setter Property="Background" Value="{DynamicResource AppStatusErrorColor}"/>
                                 <Setter Property="Opacity" Value="0.8"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -61,13 +61,13 @@
         <Style x:Key="NotesTextBoxStyle" TargetType="TextBox">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Foreground" Value="{StaticResource AppTextSecondaryColor}"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppTextSecondaryColor}"/>
             <Setter Property="FontFamily" Value="Segoe UI"/>
             <Setter Property="FontSize" Value="11"/>
             <Setter Property="Padding" Value="4,2"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
-            <Setter Property="CaretBrush" Value="{StaticResource AppPrimaryColor}"/>
-            <Setter Property="SelectionBrush" Value="{StaticResource AppPrimaryColor}"/>
+            <Setter Property="CaretBrush" Value="{DynamicResource AppPrimaryColor}"/>
+            <Setter Property="SelectionBrush" Value="{DynamicResource AppPrimaryColor}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TextBox">
@@ -83,15 +83,15 @@
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="border" Property="BorderBrush"
-                                        Value="{StaticResource AppBorderColor}"/>
+                                        Value="{DynamicResource AppBorderColor}"/>
                                 <Setter TargetName="border" Property="Background"
-                                        Value="{StaticResource AppPanelHoverColor}"/>
+                                        Value="{DynamicResource AppPanelHoverColor}"/>
                             </Trigger>
                             <Trigger Property="IsFocused" Value="True">
                                 <Setter TargetName="border" Property="BorderBrush"
-                                        Value="{StaticResource AppPrimaryColor}"/>
+                                        Value="{DynamicResource AppPrimaryColor}"/>
                                 <Setter TargetName="border" Property="Background"
-                                        Value="{StaticResource AppPanelHoverColor}"/>
+                                        Value="{DynamicResource AppPanelHoverColor}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -102,9 +102,9 @@
 
     <Border x:Name="MainBorder"
             Margin="0,0,10,0"
-            BorderBrush="{StaticResource AppBorderColor}"
+            BorderBrush="{DynamicResource AppBorderColor}"
             BorderThickness="1" CornerRadius="12"
-            Background="{StaticResource AppPanelColor}"
+            Background="{DynamicResource AppPanelColor}"
             AllowDrop="True"
             Drop="UserControl_Drop"
             DragEnter="UserControl_DragEnter"
@@ -125,20 +125,20 @@
                   Visibility="{Binding HasFiles, Converter={StaticResource InverseBoolToVisibility}}">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="30">
                     <Border x:Name="EmptyStateIcon" Width="90" Height="90"
-                            Background="{StaticResource AppPanelHoverColor}" CornerRadius="45"
+                            Background="{DynamicResource AppPanelHoverColor}" CornerRadius="45"
                             HorizontalAlignment="Center" Margin="0,0,0,20">
                         <TextBlock Text="📦" FontSize="48"
                                    HorizontalAlignment="Center" VerticalAlignment="Center"
-                                   Foreground="{StaticResource AppPrimaryColor}"
+                                   Foreground="{DynamicResource AppPrimaryColor}"
                                    FontFamily="Segoe UI Emoji"/>
                     </Border>
 
                     <TextBlock Text="Drop Your Files Here" FontSize="20" FontWeight="SemiBold"
-                               Foreground="{StaticResource AppTextColor}"
+                               Foreground="{DynamicResource AppTextColor}"
                                HorizontalAlignment="Center" TextAlignment="Center"
                                FontFamily="Segoe UI" Margin="0,0,0,6"/>
 
-                    <TextBlock FontSize="13" Foreground="{StaticResource AppTextTertiaryColor}"
+                    <TextBlock FontSize="13" Foreground="{DynamicResource AppTextTertiaryColor}"
                                HorizontalAlignment="Center" TextAlignment="Center"
                                LineHeight="20" FontFamily="Segoe UI" Margin="0,0,0,18">
                         <Run Text="Drag and drop files or folders here"/>
@@ -182,7 +182,7 @@
                 <ListView.Resources>
                     <Style TargetType="GridViewColumnHeader">
                         <Setter Property="Background" Value="Transparent"/>
-                        <Setter Property="Foreground" Value="{StaticResource AppTextTertiaryColor}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource AppTextTertiaryColor}"/>
                         <Setter Property="FontSize" Value="11"/>
                         <Setter Property="FontWeight" Value="SemiBold"/>
                         <Setter Property="Padding" Value="8,8,8,6"/>
@@ -193,7 +193,7 @@
                                 <ControlTemplate TargetType="GridViewColumnHeader">
                                     <Border Background="{TemplateBinding Background}"
                                             BorderThickness="0,0,0,1"
-                                            BorderBrush="{StaticResource AppDividerColor}"
+                                            BorderBrush="{DynamicResource AppDividerColor}"
                                             Padding="{TemplateBinding Padding}">
                                         <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                                           VerticalAlignment="Center"/>
@@ -213,7 +213,7 @@
                                                     RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                   Style="{StaticResource ContextMenuItemStyle}"
                                   FontFamily="Segoe UI" FontSize="13"/>
-                        <Separator Background="{StaticResource AppBorderColor}"/>
+                        <Separator Background="{DynamicResource AppBorderColor}"/>
                         <MenuItem Header="🚫  Remove Trust"
                                   Command="{Binding PlacementTarget.Tag.RemoveTrustCommand,
                                             RelativeSource={RelativeSource AncestorType=ContextMenu}}"
@@ -235,7 +235,7 @@
                                     <TextBlock Text="{Binding FileTypeIcon}"
                                                FontSize="16" FontFamily="Segoe UI Emoji"
                                                HorizontalAlignment="Center"
-                                               Foreground="{StaticResource AppTextColor}"/>
+                                               Foreground="{DynamicResource AppTextColor}"/>
                                 </DataTemplate>
                             </GridViewColumn.CellTemplate>
                         </GridViewColumn>
@@ -247,7 +247,7 @@
                                 <DataTemplate>
                                     <TextBlock Text="{Binding FileName}" FontSize="12" FontFamily="Segoe UI"
                                                TextTrimming="CharacterEllipsis" ToolTip="{Binding FilePath}"
-                                               Foreground="{StaticResource AppTextColor}"/>
+                                               Foreground="{DynamicResource AppTextColor}"/>
                                 </DataTemplate>
                             </GridViewColumn.CellTemplate>
                         </GridViewColumn>
@@ -258,7 +258,7 @@
                             <GridViewColumn.CellTemplate>
                                 <DataTemplate>
                                     <TextBlock Text="{Binding Size}" FontSize="11" FontFamily="Consolas"
-                                               Foreground="{StaticResource AppTextSecondaryColor}"/>
+                                               Foreground="{DynamicResource AppTextSecondaryColor}"/>
                                 </DataTemplate>
                             </GridViewColumn.CellTemplate>
                         </GridViewColumn>
@@ -272,7 +272,7 @@
                                             CornerRadius="4" Padding="6,3" HorizontalAlignment="Left"
                                             ToolTip="{Binding TrustTooltip}">
                                         <TextBlock Text="{Binding StatusDisplay}" FontSize="10" FontWeight="SemiBold"
-                                                   Foreground="{StaticResource AppTextColor}" FontFamily="Segoe UI"
+                                                   Foreground="{DynamicResource AppTextColor}" FontFamily="Segoe UI"
                                                    TextTrimming="CharacterEllipsis"/>
                                     </Border>
                                 </DataTemplate>
@@ -280,32 +280,32 @@
                         </GridViewColumn>
 
                         <!-- Notes — stretches to fill remaining space; width managed in SizeChanged -->
-                        <GridViewColumn x:Name="NotesColumn" Header="Notes" Width="120"
+                        <GridViewColumn x:Name="NotesColumn" Header="Custom Args" Width="120"
                                         HeaderContainerStyle="{StaticResource GridViewColumnHeaderStyle}">
                             <GridViewColumn.CellTemplate>
                                 <DataTemplate>
                                     <Grid>
                                         <!-- Placeholder shown when Notes is empty -->
-                                        <TextBlock Text="Add a note…"
+                                        <TextBlock Text="Override args…"
                                                    FontSize="11" FontFamily="Segoe UI" FontStyle="Italic"
-                                                   Foreground="{StaticResource AppTextTertiaryColor}"
+                                                   Foreground="{DynamicResource AppTextTertiaryColor}"
                                                    VerticalAlignment="Center" Margin="5,0,0,0"
                                                    IsHitTestVisible="False">
                                             <TextBlock.Style>
                                                 <Style TargetType="TextBlock">
                                                     <Setter Property="Visibility" Value="Collapsed"/>
                                                     <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding Notes}" Value="">
+                                                        <DataTrigger Binding="{Binding CustomArgs}" Value="">
                                                             <Setter Property="Visibility" Value="Visible"/>
                                                         </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
                                             </TextBlock.Style>
                                         </TextBlock>
-                                        <TextBox Text="{Binding Notes, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                        <TextBox Text="{Binding CustomArgs, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
                                                  Style="{StaticResource NotesTextBoxStyle}"
                                                  MaxLength="120"
-                                                 ToolTip="{Binding Notes}"
+                                                 ToolTip="{Binding CustomArgs}"
                                                  SpellCheck.IsEnabled="False"/>
                                     </Grid>
                                 </DataTemplate>

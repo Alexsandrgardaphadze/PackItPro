@@ -85,4 +85,10 @@
                       BlurRadius="15"
                       ShadowDepth="0"/>
 
+    <!-- ── Semantic warning/error subtle backgrounds (used in DisclaimerWindow) ──── -->
+    <SolidColorBrush x:Key="AppWarningSubtleBg"     Color="#2a2010"/>
+    <SolidColorBrush x:Key="AppWarningSubtleBorder"  Color="#6b5a20"/>
+    <SolidColorBrush x:Key="AppErrorSubtleBg"        Color="#2a1010"/>
+    <SolidColorBrush x:Key="AppErrorSubtleBorder"    Color="#6b2020"/>
+
 </ResourceDictionary>

@@ -6,12 +6,12 @@
         SizeToContent="Height"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
-        Background="{StaticResource AppBackgroundColor}"
+        Background="{DynamicResource AppBackgroundColor}"
         ShowInTaskbar="False">
 
     <Grid Margin="12">
-        <Border Background="{StaticResource AppPanelColor}"
-                BorderBrush="{StaticResource AppBorderColor}"
+        <Border Background="{DynamicResource AppPanelColor}"
+                BorderBrush="{DynamicResource AppBorderColor}"
                 BorderThickness="1"
                 CornerRadius="10"
                 Padding="24,20">
@@ -36,7 +36,7 @@
                                Text="Success"
                                FontSize="15"
                                FontWeight="SemiBold"
-                               Foreground="{StaticResource AppTextColor}"
+                               Foreground="{DynamicResource AppTextColor}"
                                FontFamily="Segoe UI"
                                VerticalAlignment="Center"/>
                 </StackPanel>
@@ -45,7 +45,7 @@
                 <TextBlock x:Name="MessageText"
                            Text=""
                            FontSize="13"
-                           Foreground="{StaticResource AppTextSecondaryColor}"
+                           Foreground="{DynamicResource AppTextSecondaryColor}"
                            FontFamily="Segoe UI"
                            TextWrapping="Wrap"
                            LineHeight="20"
@@ -53,8 +53,8 @@
 
                 <!-- Optional detail box (shown only when Detail is non-empty) -->
                 <Border x:Name="DetailBox"
-                        Background="{StaticResource AppCardColor}"
-                        BorderBrush="{StaticResource AppBorderColor}"
+                        Background="{DynamicResource AppCardColor}"
+                        BorderBrush="{DynamicResource AppBorderColor}"
                         BorderThickness="1"
                         CornerRadius="6"
                         Padding="12"
@@ -66,7 +66,7 @@
                         <TextBlock x:Name="DetailText"
                                    FontFamily="Consolas"
                                    FontSize="12"
-                                   Foreground="{StaticResource AppTextSecondaryColor}"
+                                   Foreground="{DynamicResource AppTextSecondaryColor}"
                                    TextWrapping="Wrap"
                                    LineHeight="18"/>
                     </ScrollViewer>

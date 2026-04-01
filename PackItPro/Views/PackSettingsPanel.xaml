@@ -7,11 +7,11 @@
              mc:Ignorable="d"
              d:DesignHeight="450" d:DesignWidth="400">
 
-    <Border Background="{StaticResource AppPanelColor}" 
+    <Border Background="{DynamicResource AppPanelColor}" 
             CornerRadius="12" 
             Padding="20" 
             Margin="0,0,0,15"
-            BorderBrush="{StaticResource AppBorderColor}"
+            BorderBrush="{DynamicResource AppBorderColor}"
             BorderThickness="1">
 
         <!-- StackPanel holds all content; ScrollViewer removed (handled by parent) -->
@@ -31,7 +31,7 @@
                 <TextBlock Grid.Column="1"
                            Text="Package Settings" 
                            FontSize="16" 
-                           Foreground="{StaticResource AppTextColor}" 
+                           Foreground="{DynamicResource AppTextColor}" 
                            FontWeight="SemiBold"
                            FontFamily="Segoe UI"
                            VerticalAlignment="Center"/>
@@ -39,7 +39,7 @@
 
             <!-- Output File Name -->
             <TextBlock Text="Output File Name" 
-                       Foreground="{StaticResource AppTextSecondaryColor}"
+                       Foreground="{DynamicResource AppTextSecondaryColor}"
                        FontSize="12"
                        FontWeight="Medium"
                        FontFamily="Segoe UI"
@@ -56,14 +56,14 @@
 
             <!-- Divider -->
             <Border Height="1" 
-                    Background="{StaticResource AppDividerColor}" 
+                    Background="{DynamicResource AppDividerColor}" 
                     Margin="0,4,0,16"/>
 
             <!-- Security Section -->
             <TextBlock Text="Security Options" 
                        FontSize="13" 
                        FontWeight="SemiBold"
-                       Foreground="{StaticResource AppTextColor}" 
+                       Foreground="{DynamicResource AppTextColor}" 
                        FontFamily="Segoe UI"
                        Margin="0,0,0,12"/>
 
@@ -77,7 +77,7 @@
                           Content="Scan with VirusTotal" 
                           IsChecked="{Binding ScanWithVirusTotal, Mode=TwoWay}"
                           Style="{StaticResource SettingCheckBoxStyle}"
-                          Foreground="{StaticResource AppTextColor}"
+                          Foreground="{DynamicResource AppTextColor}"
                           FontFamily="Segoe UI"
                           ToolTip="Checks files against VirusTotal database for malware"/>
                 <Button Grid.Column="1" 
@@ -103,7 +103,7 @@
                           Content="Only scan executable files" 
                           IsChecked="{Binding OnlyScanExecutables, Mode=TwoWay}"
                           Style="{StaticResource SettingCheckBoxStyle}"
-                          Foreground="{StaticResource AppTextColor}"
+                          Foreground="{DynamicResource AppTextColor}"
                           FontFamily="Segoe UI"/>
                 <Button Grid.Column="1" 
                         Style="{StaticResource InfoButtonStyle}"
@@ -128,7 +128,7 @@
                           Content="Auto remove infected files" 
                           IsChecked="{Binding AutoRemoveInfectedFiles, Mode=TwoWay}"
                           Style="{StaticResource SettingCheckBoxStyle}"
-                          Foreground="{StaticResource AppTextColor}"
+                          Foreground="{DynamicResource AppTextColor}"
                           FontFamily="Segoe UI"/>
                 <Button Grid.Column="1" 
                         Style="{StaticResource InfoButtonStyle}"
@@ -145,14 +145,14 @@
 
             <!-- Divider -->
             <Border Height="1" 
-                    Background="{StaticResource AppDividerColor}" 
+                    Background="{DynamicResource AppDividerColor}" 
                     Margin="0,4,0,16"/>
 
             <!-- Package Options Section -->
             <TextBlock Text="Package Options" 
                        FontSize="13" 
                        FontWeight="SemiBold"
-                       Foreground="{StaticResource AppTextColor}" 
+                       Foreground="{DynamicResource AppTextColor}" 
                        FontFamily="Segoe UI"
                        Margin="0,0,0,12"/>
 
@@ -166,7 +166,7 @@
                           Content="Include Winget Updater" 
                           IsChecked="{Binding IncludeWingetUpdateScript, Mode=TwoWay}"
                           Style="{StaticResource SettingCheckBoxStyle}"
-                          Foreground="{StaticResource AppTextColor}"
+                          Foreground="{DynamicResource AppTextColor}"
                           FontFamily="Segoe UI"/>
                 <Button Grid.Column="1" 
                         Style="{StaticResource InfoButtonStyle}"
@@ -183,7 +183,7 @@
 
             <!-- Compression Level -->
             <TextBlock Text="Compression Level" 
-                       Foreground="{StaticResource AppTextSecondaryColor}"
+                       Foreground="{DynamicResource AppTextSecondaryColor}"
                        FontSize="12"
                        FontWeight="Medium"
                        FontFamily="Segoe UI"
@@ -206,7 +206,7 @@
 
                 <ComboBox.ItemContainerStyle>
                     <Style TargetType="ComboBoxItem">
-                        <Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource AppTextColor}"/>
                         <Setter Property="Background" Value="Transparent"/>
                         <Setter Property="Padding" Value="10,5"/>
                         <Setter Property="FontFamily" Value="Segoe UI"/>
@@ -217,7 +217,7 @@
                                 <Setter Property="Opacity" Value="0.7"/>
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter Property="Background" Value="{StaticResource AppPrimaryColor}"/>
+                                <Setter Property="Background" Value="{DynamicResource AppPrimaryColor}"/>
                                 <Setter Property="Foreground" Value="#f1f5f9"/>
                             </Trigger>
                         </Style.Triggers>
@@ -248,7 +248,7 @@
                           Content="Require administrator rights" 
                           IsChecked="{Binding RequiresAdmin, Mode=TwoWay}"
                           Style="{StaticResource SettingCheckBoxStyle}"
-                          Foreground="{StaticResource AppTextColor}"
+                          Foreground="{DynamicResource AppTextColor}"
                           FontFamily="Segoe UI"/>
                 <Button Grid.Column="1" 
                         Style="{StaticResource InfoButtonStyle}"
