@@ -6,12 +6,12 @@
         Width="420"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
-        Background="{StaticResource AppBackgroundColor}">
+        Background="{DynamicResource AppBackgroundColor}">
 
     <Grid Margin="12">
 
-        <Border Background="{StaticResource AppPanelColor}"
-                BorderBrush="{StaticResource AppBorderColor}"
+        <Border Background="{DynamicResource AppPanelColor}"
+                BorderBrush="{DynamicResource AppBorderColor}"
                 BorderThickness="1"
                 CornerRadius="10"
                 Padding="18">
@@ -21,7 +21,7 @@
                 <TextBlock Text="Enter your VirusTotal API Key"
                            FontSize="15"
                            FontWeight="SemiBold"
-                           Foreground="{StaticResource AppTextColor}"
+                           Foreground="{DynamicResource AppTextColor}"
                            Margin="0,0,0,12"/>
 
                 <TextBox x:Name="ApiKeyBox"
@@ -40,9 +40,9 @@
                             Click="Cancel_Click">
                         <Button.Style>
                             <Style TargetType="Button">
-                                <Setter Property="Background" Value="{StaticResource AppPanelHoverColor}"/>
-                                <Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
-                                <Setter Property="BorderBrush" Value="{StaticResource AppBorderColor}"/>
+                                <Setter Property="Background" Value="{DynamicResource AppPanelHoverColor}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource AppTextColor}"/>
+                                <Setter Property="BorderBrush" Value="{DynamicResource AppBorderColor}"/>
                                 <Setter Property="BorderThickness" Value="1"/>
                                 <Setter Property="FontFamily" Value="Segoe UI"/>
                                 <Setter Property="FontSize" Value="13"/>
@@ -59,7 +59,7 @@
                                 </Setter>
                                 <Style.Triggers>
                                     <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter Property="Background" Value="{StaticResource AppBorderColor}"/>
+                                        <Setter Property="Background" Value="{DynamicResource AppBorderColor}"/>
                                     </Trigger>
                                 </Style.Triggers>
                             </Style>

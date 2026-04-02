@@ -8,16 +8,16 @@
              mc:Ignorable="d"
              d:DesignHeight="320" d:DesignWidth="400">
 
-    <Border Background="{StaticResource AppPanelColor}"
+    <Border Background="{DynamicResource AppPanelColor}"
             CornerRadius="12"
             Padding="20"
             Margin="0,0,0,15"
-            BorderBrush="{StaticResource AppBorderColor}"
+            BorderBrush="{DynamicResource AppBorderColor}"
             BorderThickness="1">
 
         <StackPanel>
 
-    <!-- Header ──────────────────────────────────────────────────── -->
+            <!-- Header ──────────────────────────────────────────────────── -->
             <Grid Margin="0,0,0,12">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
@@ -34,7 +34,7 @@
                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
                     <TextBlock Text="Shortcuts"
                                FontSize="16"
-                               Foreground="{StaticResource AppTextColor}"
+                               Foreground="{DynamicResource AppTextColor}"
                                FontWeight="SemiBold"
                                FontFamily="Segoe UI">
                         <TextBlock.ToolTip>
@@ -58,7 +58,7 @@
                     <TextBlock Text="Created on the end-user's machine after installation"
                                FontSize="11"
                                FontFamily="Segoe UI"
-                               Foreground="{StaticResource AppTextTertiaryColor}"
+                               Foreground="{DynamicResource AppTextTertiaryColor}"
                                Margin="0,1,0,0"/>
                 </StackPanel>
 
@@ -80,12 +80,12 @@
 
             <!-- Divider ─────────────────────────────────────────────────── -->
             <Border Height="1"
-                    Background="{StaticResource AppDividerColor}"
+                    Background="{DynamicResource AppDividerColor}"
                     Margin="0,0,0,12"/>
 
             <!-- Empty state hint ─────────────────────────────────────────── -->
             <TextBlock Text="No shortcuts defined. Click '+ Add' to create one or press Alt+A."
-                       Foreground="{StaticResource AppTextTertiaryColor}"
+                       Foreground="{DynamicResource AppTextTertiaryColor}"
                        FontSize="12"
                        FontFamily="Segoe UI"
                        TextWrapping="Wrap"
@@ -107,8 +107,8 @@
             <ItemsControl ItemsSource="{Binding Items}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate DataType="{x:Type vm:ShortcutViewModel}">
-                        <Border Background="{StaticResource AppCardColor}"
-                                BorderBrush="{StaticResource AppBorderColor}"
+                        <Border Background="{DynamicResource AppCardColor}"
+                                BorderBrush="{DynamicResource AppBorderColor}"
                                 BorderThickness="1"
                                 CornerRadius="8"
                                 Padding="12"
@@ -151,10 +151,10 @@
                                         <TextBox.Style>
                                             <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
                                                 <Setter Property="BorderThickness" Value="1"/>
-                                                <Setter Property="BorderBrush" Value="{StaticResource AppBorderColor}"/>
+                                                <Setter Property="BorderBrush" Value="{DynamicResource AppBorderColor}"/>
                                                 <Style.Triggers>
                                                     <Trigger Property="IsFocused" Value="True">
-                                                        <Setter Property="BorderBrush" Value="{StaticResource AppPrimaryColor}"/>
+                                                        <Setter Property="BorderBrush" Value="{DynamicResource AppPrimaryColor}"/>
                                                         <Setter Property="BorderThickness" Value="2"/>
                                                     </Trigger>
                                                 </Style.Triggers>
@@ -165,7 +165,7 @@
                                     <!-- Required indicator for Name -->
                                     <TextBlock Grid.Column="1" Margin="4,0,0,0"
                                                Text="*"
-                                               Foreground="{StaticResource AppErrorColor}"
+                                               Foreground="{DynamicResource AppErrorColor}"
                                                VerticalAlignment="Center"
                                                FontWeight="Bold"
                                                ToolTip="Required field"/>
@@ -183,7 +183,7 @@
                                               ToolTip="Where the shortcut will be placed">
                                         <ComboBox.ItemContainerStyle>
                                             <Style TargetType="ComboBoxItem">
-                                                <Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
+                                                <Setter Property="Foreground" Value="{DynamicResource AppTextColor}"/>
                                                 <Setter Property="Background" Value="Transparent"/>
                                                 <Setter Property="Padding" Value="10,5"/>
                                                 <Setter Property="FontFamily" Value="Segoe UI"/>
@@ -193,11 +193,11 @@
                                                         <Setter Property="Background" Value="#2d2d44"/>
                                                     </Trigger>
                                                     <Trigger Property="IsSelected" Value="True">
-                                                        <Setter Property="Background" Value="{StaticResource AppPrimaryColor}"/>
+                                                        <Setter Property="Background" Value="{DynamicResource AppPrimaryColor}"/>
                                                         <Setter Property="Foreground" Value="#f1f5f9"/>
                                                     </Trigger>
                                                     <Trigger Property="IsFocused" Value="True">
-                                                        <Setter Property="BorderBrush" Value="{StaticResource AppPrimaryColor}"/>
+                                                        <Setter Property="BorderBrush" Value="{DynamicResource AppPrimaryColor}"/>
                                                     </Trigger>
                                                 </Style.Triggers>
                                             </Style>
@@ -221,7 +221,7 @@
                                         <Button.Style>
                                             <Style TargetType="Button">
                                                 <Setter Property="Background" Value="Transparent"/>
-                                                <Setter Property="Foreground" Value="{StaticResource AppTextTertiaryColor}"/>
+                                                <Setter Property="Foreground" Value="{DynamicResource AppTextTertiaryColor}"/>
                                                 <Setter Property="BorderThickness" Value="0"/>
                                                 <Setter Property="Template">
                                                     <Setter.Value>
@@ -241,7 +241,7 @@
                                                         <Setter Property="Foreground" Value="#ef4444"/>
                                                     </Trigger>
                                                     <Trigger Property="IsFocused" Value="True">
-                                                        <Setter Property="BorderBrush" Value="{StaticResource AppPrimaryColor}"/>
+                                                        <Setter Property="BorderBrush" Value="{DynamicResource AppPrimaryColor}"/>
                                                         <Setter Property="BorderThickness" Value="2"/>
                                                     </Trigger>
                                                 </Style.Triggers>
@@ -263,10 +263,10 @@
                                     <TextBox.Style>
                                         <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
                                             <Setter Property="BorderThickness" Value="1"/>
-                                            <Setter Property="BorderBrush" Value="{StaticResource AppBorderColor}"/>
+                                            <Setter Property="BorderBrush" Value="{DynamicResource AppBorderColor}"/>
                                             <Style.Triggers>
                                                 <Trigger Property="IsFocused" Value="True">
-                                                    <Setter Property="BorderBrush" Value="{StaticResource AppPrimaryColor}"/>
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource AppPrimaryColor}"/>
                                                     <Setter Property="BorderThickness" Value="2"/>
                                                 </Trigger>
                                             </Style.Triggers>
@@ -287,10 +287,10 @@
                                     <TextBox.Style>
                                         <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
                                             <Setter Property="BorderThickness" Value="1"/>
-                                            <Setter Property="BorderBrush" Value="{StaticResource AppBorderColor}"/>
+                                            <Setter Property="BorderBrush" Value="{DynamicResource AppBorderColor}"/>
                                             <Style.Triggers>
                                                 <Trigger Property="IsFocused" Value="True">
-                                                    <Setter Property="BorderBrush" Value="{StaticResource AppPrimaryColor}"/>
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource AppPrimaryColor}"/>
                                                     <Setter Property="BorderThickness" Value="2"/>
                                                 </Trigger>
                                             </Style.Triggers>
@@ -311,10 +311,10 @@
                                     <TextBox.Style>
                                         <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
                                             <Setter Property="BorderThickness" Value="1"/>
-                                            <Setter Property="BorderBrush" Value="{StaticResource AppBorderColor}"/>
+                                            <Setter Property="BorderBrush" Value="{DynamicResource AppBorderColor}"/>
                                             <Style.Triggers>
                                                 <Trigger Property="IsFocused" Value="True">
-                                                    <Setter Property="BorderBrush" Value="{StaticResource AppPrimaryColor}"/>
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource AppPrimaryColor}"/>
                                                     <Setter Property="BorderThickness" Value="2"/>
                                                 </Trigger>
                                             </Style.Triggers>

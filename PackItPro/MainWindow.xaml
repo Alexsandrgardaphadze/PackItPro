@@ -101,17 +101,58 @@
                     <Border Width="1" Background="{DynamicResource AppDividerColor}"
                             Margin="0,6,8,6" VerticalAlignment="Stretch"/>
 
-                    <!-- Theme Toggle Button -->
+                    <!-- Theme Toggle Button — modern pill switch -->
                     <Button Command="{Binding ToggleThemeCommand}"
-                            Background="Transparent"
-                            BorderThickness="0"
-                            Padding="6,4"
+                            Width="58" Height="28"
                             VerticalAlignment="Center"
                             Margin="0,0,8,0"
-                            ToolTip="Toggle Light/Dark Theme"
-                            Foreground="{DynamicResource AppTextTertiaryColor}"
-                            FontSize="14">
-                        <TextBlock Text="🌙/☀️" VerticalAlignment="Center"/>
+                            ToolTip="Toggle Light / Dark theme"
+                            Cursor="Hand"
+                            FocusVisualStyle="{x:Null}">
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <Setter Property="Background"      Value="{DynamicResource AppCardColor}"/>
+                                <Setter Property="BorderBrush"     Value="{DynamicResource AppBorderColor}"/>
+                                <Setter Property="BorderThickness" Value="1"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border x:Name="pill"
+                                                    Background="{TemplateBinding Background}"
+                                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                                    CornerRadius="14">
+                                                <StackPanel Orientation="Horizontal"
+                                                            HorizontalAlignment="Center"
+                                                            VerticalAlignment="Center"
+                                                            Margin="6,0">
+                                                    <TextBlock Text="🌙" FontSize="12"
+                                                               VerticalAlignment="Center"
+                                                               Margin="0,0,4,0"/>
+                                                    <Border Width="1"
+                                                            Background="{DynamicResource AppBorderColor}"
+                                                            Margin="0,3"/>
+                                                    <TextBlock Text="☀️" FontSize="12"
+                                                               VerticalAlignment="Center"
+                                                               Margin="4,0,0,0"/>
+                                                </StackPanel>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="pill" Property="Background"
+                                                            Value="{DynamicResource AppHoverOverlayColor}"/>
+                                                    <Setter TargetName="pill" Property="BorderBrush"
+                                                            Value="{DynamicResource AppPrimaryColor}"/>
+                                                </Trigger>
+                                                <Trigger Property="IsPressed" Value="True">
+                                                    <Setter TargetName="pill" Property="Opacity" Value="0.75"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </Button.Style>
                     </Button>
 
                     <!-- Another divider -->

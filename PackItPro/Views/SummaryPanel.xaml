@@ -7,10 +7,10 @@
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="400">
 
-    <Border Background="{StaticResource AppPanelColor}" 
+    <Border Background="{DynamicResource AppPanelColor}" 
             CornerRadius="12" 
             Padding="20"
-            BorderBrush="{StaticResource AppBorderColor}"
+            BorderBrush="{DynamicResource AppBorderColor}"
             BorderThickness="1">
 
         <Grid>
@@ -33,7 +33,7 @@
                 <TextBlock Grid.Column="1"
                           Text="Package Summary" 
                           FontSize="16" 
-                          Foreground="{StaticResource AppTextColor}" 
+                          Foreground="{DynamicResource AppTextColor}" 
                           FontWeight="SemiBold"
                           FontFamily="Segoe UI"
                           VerticalAlignment="Center"/>
@@ -42,11 +42,11 @@
             <!-- Summary Content - DYNAMIC BINDINGS -->
             <StackPanel Grid.Row="1">
                 <!-- Total Files - Highlighted Card -->
-                <Border Background="{StaticResource AppCardColor}"
+                <Border Background="{DynamicResource AppCardColor}"
                        CornerRadius="8"
                        Padding="14"
                        Margin="0,0,0,10"
-                       BorderBrush="{StaticResource AppBorderColor}"
+                       BorderBrush="{DynamicResource AppBorderColor}"
                        BorderThickness="1">
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -55,7 +55,7 @@
                         </Grid.ColumnDefinitions>
                         <Grid Grid.Column="0" Margin="0,0,10,0">
                             <Border Width="36" Height="36"
-                                   Background="{StaticResource AppPrimaryColor}"
+                                   Background="{DynamicResource AppPrimaryColor}"
                                    CornerRadius="6"
                                    Opacity="0.15"/>
                             <TextBlock Text="📄"
@@ -66,22 +66,22 @@
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
                             <TextBlock Text="Total Files"
                                       FontSize="10"
-                                      Foreground="{StaticResource AppTextTertiaryColor}"
+                                      Foreground="{DynamicResource AppTextTertiaryColor}"
                                       FontFamily="Segoe UI"
                                       Margin="0,0,0,2"/>
                             <TextBlock Text="{Binding FilesLabel}"
                                       FontSize="20"
                                       FontWeight="Bold"
                                       FontFamily="Segoe UI"
-                                      Foreground="{StaticResource AppTextColor}"/>
+                                      Foreground="{DynamicResource AppTextColor}"/>
                             <!-- Capacity bar -->
                             <ProgressBar Value="{Binding Files, Mode=OneWay}"
                                          Maximum="{Binding MaxFiles, Mode=OneWay}"
                                          Height="3"
                                          Margin="0,6,0,0"
                                          BorderThickness="0"
-                                         Background="{StaticResource AppBorderColor}"
-                                         Foreground="{StaticResource AppStatusCleanColor}"/>
+                                         Background="{DynamicResource AppBorderColor}"
+                                         Foreground="{DynamicResource AppStatusCleanColor}"/>
                         </StackPanel>
                     </Grid>
                 </Border>
@@ -94,48 +94,48 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <Border Grid.Column="0"
-                           Background="{StaticResource AppCardColor}"
+                           Background="{DynamicResource AppCardColor}"
                            CornerRadius="6"
                            Padding="10"
-                           BorderBrush="{StaticResource AppBorderColor}"
+                           BorderBrush="{DynamicResource AppBorderColor}"
                            BorderThickness="1">
                         <StackPanel>
                             <TextBlock Text="Total Size" 
                                       FontSize="10" 
-                                      Foreground="{StaticResource AppTextTertiaryColor}"
+                                      Foreground="{DynamicResource AppTextTertiaryColor}"
                                       FontFamily="Segoe UI"
                                       Margin="0,0,0,3"/>
                             <TextBlock Text="{Binding TotalSize, Converter={StaticResource ByteToSizeConverter}}" 
                                       FontSize="14" 
                                       FontWeight="SemiBold"
                                       FontFamily="Consolas"
-                                      Foreground="{StaticResource AppTextColor}"/>
+                                      Foreground="{DynamicResource AppTextColor}"/>
                         </StackPanel>
                     </Border>
                     <Border Grid.Column="2"
-                           Background="{StaticResource AppCardColor}"
+                           Background="{DynamicResource AppCardColor}"
                            CornerRadius="6"
                            Padding="10"
-                           BorderBrush="{StaticResource AppBorderColor}"
+                           BorderBrush="{DynamicResource AppBorderColor}"
                            BorderThickness="1">
                         <StackPanel>
                             <TextBlock Text="Safe Files" 
                                       FontSize="10" 
-                                      Foreground="{StaticResource AppTextTertiaryColor}"
+                                      Foreground="{DynamicResource AppTextTertiaryColor}"
                                       FontFamily="Segoe UI"
                                       Margin="0,0,0,3"/>
                             <TextBlock Text="{Binding CleanFiles}" 
                                       FontSize="14" 
                                       FontWeight="SemiBold"
                                       FontFamily="Consolas"
-                                      Foreground="{StaticResource AppStatusCleanColor}"/>
+                                      Foreground="{DynamicResource AppStatusCleanColor}"/>
                         </StackPanel>
                     </Border>
                 </Grid>
 
                 <!-- Divider -->
                 <Border Height="1" 
-                       Background="{StaticResource AppDividerColor}" 
+                       Background="{DynamicResource AppDividerColor}" 
                        Margin="0,6,0,12"/>
 
                 <!-- Additional Stats -->
@@ -149,7 +149,7 @@
                         <TextBlock Grid.Column="0"
                                   Text="Scanned"
                                   FontSize="12"
-                                  Foreground="{StaticResource AppTextTertiaryColor}"
+                                  Foreground="{DynamicResource AppTextTertiaryColor}"
                                   FontFamily="Segoe UI"
                                   VerticalAlignment="Center"/>
                         <TextBlock Grid.Column="1"
@@ -159,10 +159,10 @@
                                   HorizontalAlignment="Right">
                             <TextBlock.Style>
                                 <Style TargetType="TextBlock">
-                                    <Setter Property="Foreground" Value="{StaticResource AppTextTertiaryColor}"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource AppTextTertiaryColor}"/>
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding AllScanned}" Value="True">
-                                            <Setter Property="Foreground" Value="{StaticResource AppStatusCleanColor}"/>
+                                            <Setter Property="Foreground" Value="{DynamicResource AppStatusCleanColor}"/>
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
@@ -182,7 +182,7 @@
                         <TextBlock Grid.Column="0"
                                   Text="VirusTotal"
                                   FontSize="12"
-                                  Foreground="{StaticResource AppTextTertiaryColor}"
+                                  Foreground="{DynamicResource AppTextTertiaryColor}"
                                   FontFamily="Segoe UI"
                                   VerticalAlignment="Center"/>
                         <TextBlock Grid.Column="1"
@@ -193,12 +193,12 @@
                             <TextBlock.Style>
                                 <Style TargetType="TextBlock">
                                     <Setter Property="Text" Value="Off"/>
-                                    <Setter Property="Foreground" Value="{StaticResource AppStatusErrorColor}"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource AppStatusErrorColor}"/>
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding DataContext.Settings.ScanWithVirusTotal,
                                             RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
                                             <Setter Property="Text" Value="Active"/>
-                                            <Setter Property="Foreground" Value="{StaticResource AppStatusCleanColor}"/>
+                                            <Setter Property="Foreground" Value="{DynamicResource AppStatusCleanColor}"/>
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
@@ -215,7 +215,7 @@
                         <TextBlock Grid.Column="0"
                                   Text="Status"
                                   FontSize="12"
-                                  Foreground="{StaticResource AppTextTertiaryColor}"
+                                  Foreground="{DynamicResource AppTextTertiaryColor}"
                                   FontFamily="Segoe UI"
                                   VerticalAlignment="Center"/>
                         <Border Grid.Column="1"
@@ -224,22 +224,22 @@
                                 Opacity="0.85">
                             <Border.Style>
                                 <Style TargetType="Border">
-                                    <Setter Property="Background" Value="{StaticResource AppStatusCleanColor}"/>
+                                    <Setter Property="Background" Value="{DynamicResource AppStatusCleanColor}"/>
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding Status}" Value="⚠️ Infected Files">
-                                            <Setter Property="Background" Value="{StaticResource AppStatusErrorColor}"/>
+                                            <Setter Property="Background" Value="{DynamicResource AppStatusErrorColor}"/>
                                         </DataTrigger>
                                         <DataTrigger Binding="{Binding Status}" Value="⚠️ Scan Errors">
-                                            <Setter Property="Background" Value="{StaticResource AppStatusWarningColor}"/>
+                                            <Setter Property="Background" Value="{DynamicResource AppStatusWarningColor}"/>
                                         </DataTrigger>
                                         <DataTrigger Binding="{Binding Status}" Value="No Files">
-                                            <Setter Property="Background" Value="{StaticResource AppTextTertiaryColor}"/>
+                                            <Setter Property="Background" Value="{DynamicResource AppTextTertiaryColor}"/>
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
                             </Border.Style>
                             <TextBlock Text="{Binding Status}"
-                                      Foreground="{StaticResource AppBackgroundColor}"
+                                      Foreground="{DynamicResource AppBackgroundColor}"
                                       FontSize="11"
                                       FontWeight="SemiBold"
                                       FontFamily="Segoe UI"/>
@@ -255,7 +255,7 @@
                         <TextBlock Grid.Column="0"
                                   Text="Package Size" 
                                   FontSize="12"
-                                  Foreground="{StaticResource AppTextTertiaryColor}"
+                                  Foreground="{DynamicResource AppTextTertiaryColor}"
                                   FontFamily="Segoe UI"
                                   VerticalAlignment="Center"/>
                         <TextBlock Grid.Column="1"
@@ -263,7 +263,7 @@
                                   FontSize="13"
                                   FontWeight="SemiBold"
                                   FontFamily="Consolas"
-                                  Foreground="{StaticResource AppTextColor}"
+                                  Foreground="{DynamicResource AppTextColor}"
                                   HorizontalAlignment="Right"/>
                     </Grid>
 
@@ -276,7 +276,7 @@
                         <TextBlock Grid.Column="0"
                                   Text="Est. Time" 
                                   FontSize="12"
-                                  Foreground="{StaticResource AppTextTertiaryColor}"
+                                  Foreground="{DynamicResource AppTextTertiaryColor}"
                                   FontFamily="Segoe UI"
                                   VerticalAlignment="Center"/>
                         <TextBlock Grid.Column="1"
@@ -284,7 +284,7 @@
                                   FontSize="13"
                                   FontWeight="SemiBold"
                                   FontFamily="Consolas"
-                                  Foreground="{StaticResource AppTextColor}"
+                                  Foreground="{DynamicResource AppTextColor}"
                                   HorizontalAlignment="Right"/>
                     </Grid>
 
@@ -297,7 +297,7 @@
                         <TextBlock Grid.Column="0"
                                   Text="Requires Admin" 
                                   FontSize="12"
-                                  Foreground="{StaticResource AppTextTertiaryColor}"
+                                  Foreground="{DynamicResource AppTextTertiaryColor}"
                                   FontFamily="Segoe UI"
                                   VerticalAlignment="Center"/>
                         <TextBlock Grid.Column="1"
@@ -305,29 +305,29 @@
                                   FontSize="13"
                                   FontWeight="SemiBold"
                                   FontFamily="Segoe UI"
-                                  Foreground="{StaticResource AppTextColor}"
+                                  Foreground="{DynamicResource AppTextColor}"
                                   HorizontalAlignment="Right"/>
                     </Grid>
                 </StackPanel>
 
                 <!-- Quick Tip Info Box -->
-                <Border Background="{StaticResource AppCardColor}"
+                <Border Background="{DynamicResource AppCardColor}"
                        CornerRadius="6"
                        Padding="12"
                        Margin="0,6,0,0"
-                       BorderBrush="{StaticResource AppPrimaryColor}"
+                       BorderBrush="{DynamicResource AppPrimaryColor}"
                        BorderThickness="1"
                        Opacity="0.7">
                     <StackPanel>
                         <TextBlock Text="💡 Quick Tip" 
                                   FontSize="10" 
                                   FontWeight="SemiBold"
-                                  Foreground="{StaticResource AppTextSecondaryColor}"
+                                  Foreground="{DynamicResource AppTextSecondaryColor}"
                                   FontFamily="Segoe UI"
                                   Margin="0,0,0,3"/>
                         <TextBlock Text="Use VirusTotal scanning to ensure all files are safe before packaging." 
                                   FontSize="10" 
-                                  Foreground="{StaticResource AppTextTertiaryColor}"
+                                  Foreground="{DynamicResource AppTextTertiaryColor}"
                                   FontFamily="Segoe UI"
                                   TextWrapping="Wrap"
                                   LineHeight="14"/>

@@ -145,7 +145,7 @@
 
                           Fill="Transparent"
 
-                          Stroke="{StaticResource AppPrimaryColor}"
+                          Stroke="{DynamicResource AppPrimaryColor}"
 
                           HorizontalAlignment="Center"
 
@@ -217,7 +217,7 @@
 
                         <Path Data="M10 2a8 8 0 1 1 0 16A8 8 0 0 1 10 2Zm3.36 5.65a.5.5 0 0 0-.64-.06l-.07.06L9 11.3 7.35 9.65l-.07-.06a.5.5 0 0 0-.7.7l.06.07 2 2 .07.06a.5.5 0 0 0 .57 0l.07-.06 4-4 .06-.07a.5.5 0 0 0-.06-.64Z"
 
-                              Fill="{StaticResource AppStatusCleanColor}"/>
+                              Fill="{DynamicResource AppStatusCleanColor}"/>
 
                     </Canvas>
 
@@ -263,7 +263,7 @@
 
                         <Path Data="M10 2a8 8 0 1 1 0 16A8 8 0 0 1 10 2Zm3.36 5.65a.5.5 0 0 0-.64-.06l-.07.06L9 11.3 7.35 9.65l-.07-.06a.5.5 0 0 0-.7.7l.06.07 2 2 .07.06a.5.5 0 0 0 .57 0l.07-.06 4-4 .06-.07a.5.5 0 0 0-.06-.64Z"
 
-                              Fill="{StaticResource AppStatusCleanColor}"
+                              Fill="{DynamicResource AppStatusCleanColor}"
 
                               Opacity="0.35"/>
 
@@ -285,7 +285,7 @@
 
             <TextBlock Text="{Binding Message}"
 
-                       Foreground="{StaticResource AppTextColor}"
+                       Foreground="{DynamicResource AppTextColor}"
 
                        FontFamily="Segoe UI"
 
@@ -305,9 +305,9 @@
 
                          Value="{Binding ProgressPercentage}"
 
-                         Foreground="{StaticResource AppPrimaryColor}"
+                         Foreground="{DynamicResource AppPrimaryColor}"
 
-                         Background="{StaticResource AppBorderColor}"
+                         Background="{DynamicResource AppBorderColor}"
 
                          Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}"
 
@@ -323,7 +323,7 @@
 
                    Text="{Binding ProgressPercentage, StringFormat={}{0:F0}%}"
 
-                   Foreground="{StaticResource AppTextTertiaryColor}"
+                   Foreground="{DynamicResource AppTextTertiaryColor}"
 
                    FontFamily="Consolas"
 
