@@ -153,6 +153,8 @@ namespace PackItPro.ViewModels.CommandHandlers
                 _lastPackedFile = outputPath;
                 succeeded = true;
                 _settings.OutputFileName = string.Empty;
+                _settings.SettingsModel.AddRecentPackage(outputPath);
+                _ = _settings.SaveSettingsAsync();
                 _status.SetStatusSuccess($"Package created — {Path.GetFileName(outputPath)}");
                 RaiseCanExecuteChanged();
 

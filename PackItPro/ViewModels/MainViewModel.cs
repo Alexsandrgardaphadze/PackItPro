@@ -108,11 +108,18 @@ namespace PackItPro.ViewModels
         public ICommand CheckUpdatesCommand => _helpHandler?.CheckUpdatesCommand ?? NullCommand;
         public ICommand AboutCommand => _helpHandler?.AboutCommand ?? NullCommand;
 
+        // Theme
+        public ICommand ToggleThemeCommand { get; }
+        public ICommand SetThemeDarkCommand { get; }
+        public ICommand SetThemeLightCommand { get; }
+        public ICommand OpenThemesFolderCommand { get; }
+
+        // Shortcuts
+        public ICommand AddShortcutCommand { get; }
+        public ICommand ManageShortcutsCommand { get; }
+
         // Application
         public ICommand ExitCommand => _applicationHandler?.ExitCommand ?? NullCommand;
-
-        /// <summary>Toggles between light and dark themes.</summary>
-        public ICommand ToggleThemeCommand { get; set; }
 
         #endregion
 
@@ -135,12 +142,15 @@ namespace PackItPro.ViewModels
             Error = new ErrorViewModel();
             Shortcuts = new ShortcutListViewModel();
 
-            // Initialize ToggleThemeCommand with reference to Settings
-            ToggleThemeCommand = new RelayCommand(_ =>
-            {
-                Services.ThemeService.Toggle();
-                Settings.UseLightTheme = !Settings.UseLightTheme;
-            });
+            // Initialize theme commands
+            ToggleThemeCommand = new RelayCommand(_ => ThemeService.Toggle());
+            SetThemeDarkCommand = new RelayCommand(_ => ThemeService.Apply(AppTheme.Dark));
+            SetThemeLightCommand = new RelayCommand(_ => ThemeService.Apply(AppTheme.Light));
+            OpenThemesFolderCommand = new RelayCommand(_ => ThemeService.OpenThemesFolder());
+
+            // Initialize shortcut commands
+            AddShortcutCommand = new RelayCommand(_ => Shortcuts.AddBlank());
+            ManageShortcutsCommand = new RelayCommand(_ => ShowShortcutsWindow());
 
             _logService.Info("MainViewModel constructed");
         }
@@ -165,8 +175,8 @@ namespace PackItPro.ViewModels
                 _logService.Info("Settings loaded");
 
                 // Apply the saved theme preference
-                ThemeService.ApplyFromSettings(Settings.UseLightTheme);
-                _logService.Info($"Theme: {(Settings.UseLightTheme ? "Light" : "Dark")}");
+                ThemeService.ApplyFromSettings(Settings.ThemeName);
+                _logService.Info($"Theme: {Settings.ThemeName}");
 
                 _virusTotalClient = new VirusTotalClient(_cacheFilePath, Settings.VirusTotalApiKey);
                 await _virusTotalClient.LoadCacheAsync(_logService);
@@ -214,6 +224,23 @@ namespace PackItPro.ViewModels
             _logService.Info("All handlers initialized");
         }
 
+        private void ShowShortcutsWindow()
+        {
+            try
+            {
+                var window = new PackItPro.Views.ShortcutsManagerWindow(Shortcuts)
+                {
+                    Owner = System.Windows.Application.Current?.MainWindow
+                };
+                window.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                _logService.Error("Failed to open shortcuts manager", ex);
+                Error.ShowError("Could not open Shortcuts Manager. See logs for details.");
+            }
+        }
+
         private void NotifyAllCommandsAvailable()
         {
             OnPropertyChanged(nameof(PackCommand));
@@ -237,8 +264,13 @@ namespace PackItPro.ViewModels
             OnPropertyChanged(nameof(ReportIssueCommand));
             OnPropertyChanged(nameof(CheckUpdatesCommand));
             OnPropertyChanged(nameof(AboutCommand));
-            OnPropertyChanged(nameof(ExitCommand));
             OnPropertyChanged(nameof(ToggleThemeCommand));
+            OnPropertyChanged(nameof(SetThemeDarkCommand));
+            OnPropertyChanged(nameof(SetThemeLightCommand));
+            OnPropertyChanged(nameof(OpenThemesFolderCommand));
+            OnPropertyChanged(nameof(AddShortcutCommand));
+            OnPropertyChanged(nameof(ManageShortcutsCommand));
+            OnPropertyChanged(nameof(ExitCommand));
             _logService.Info("All command bindings refreshed");
         }
 

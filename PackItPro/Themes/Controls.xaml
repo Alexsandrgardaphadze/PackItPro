@@ -358,6 +358,50 @@
     </Style>
 
     <!-- ── Modern Button (Win11Button) ─────────────────────────────────────── -->
+
+    <!-- ── File row entrance animation ──────────────────────────────────────
+         Each new row fades + slides in from 8px left when it's first rendered.
+         Applied via ItemContainerStyle on the FileListPanel ListView.
+    -->
+    <Style x:Key="FileRowSlideInStyle" TargetType="ListViewItem">
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="Padding"  Value="2,0"/>
+        <Setter Property="Opacity"  Value="1"/>
+        <Setter Property="RenderTransform">
+            <Setter.Value>
+                <TranslateTransform X="0"/>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <EventTrigger RoutedEvent="Loaded">
+                <BeginStoryboard>
+                    <Storyboard>
+                        <DoubleAnimation
+                            Storyboard.TargetProperty="Opacity"
+                            From="0" To="1"
+                            Duration="0:0:0.18"
+                            EasingFunction="{x:Null}"/>
+                        <DoubleAnimation
+                            Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)"
+                            From="-8" To="0"
+                            Duration="0:0:0.18">
+                            <DoubleAnimation.EasingFunction>
+                                <CubicEase EasingMode="EaseOut"/>
+                            </DoubleAnimation.EasingFunction>
+                        </DoubleAnimation>
+                    </Storyboard>
+                </BeginStoryboard>
+            </EventTrigger>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource AppHoverOverlayColor}"/>
+            </Trigger>
+            <Trigger Property="IsSelected" Value="True">
+                <Setter Property="Background" Value="{DynamicResource AppPrimaryColor}"/>
+                <Setter Property="Foreground" Value="White"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
     <Style x:Key="Win11Button" TargetType="Button">
         <Setter Property="Background" Value="{DynamicResource AppPrimaryColor}"/>
         <Setter Property="Foreground" Value="{DynamicResource AppTextColor}"/>

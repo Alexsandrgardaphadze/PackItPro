@@ -19,6 +19,7 @@ namespace PackItPro.ViewModels
     public class ShortcutListViewModel : INotifyPropertyChanged
     {
         private readonly ObservableCollection<ShortcutViewModel> _items = new();
+        private ICommand? _closeCommand;
 
         /// <summary>Live collection of shortcut rows bound to the UI.</summary>
         public ObservableCollection<ShortcutViewModel> Items => _items;
@@ -31,9 +32,17 @@ namespace PackItPro.ViewModels
         /// <summary>Adds a blank shortcut row that the user fills in.</summary>
         public ICommand AddShortcutCommand { get; }
 
+        /// <summary>Closes the Shortcuts Manager window.</summary>
+        public ICommand CloseCommand
+        {
+            get => _closeCommand ?? new RelayCommand(_ => { });
+            set => _closeCommand = value;
+        }
+
         public ShortcutListViewModel()
         {
-            AddShortcutCommand = new RelayCommand(_ => AddBlank());
+            AddShortcutCommand = new RelayCommand(_ => AddBlankInternal());
+            CloseCommand = new RelayCommand(_ => { /* Handled by Window.Close() in code-behind */ });
             _items.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasShortcuts));
         }
 
@@ -53,9 +62,15 @@ namespace PackItPro.ViewModels
         /// <summary>Removes all shortcuts from the list.</summary>
         public void Clear() => _items.Clear();
 
+        /// <summary>Public method to add a blank shortcut row from external commands.</summary>
+        public void AddBlank()
+        {
+            AddBlankInternal();
+        }
+
         // ── Private helpers ───────────────────────────────────────────────────
 
-        private void AddBlank()
+        private void AddBlankInternal()
         {
             var vm = new ShortcutViewModel();
             

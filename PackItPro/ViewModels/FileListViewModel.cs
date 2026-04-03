@@ -76,6 +76,52 @@ namespace PackItPro.ViewModels
 
         public void ClearAll() => _items.Clear();
 
+        private string _sortColumn = "";
+        private bool _sortAscending = true;
+
+        /// <summary>
+        /// Sorts the file list by the specified column.
+        /// Toggles sort order if the same column is clicked again.
+        /// </summary>
+        public void SortBy(string column)
+        {
+            if (_sortColumn == column)
+                _sortAscending = !_sortAscending;
+            else
+            {
+                _sortColumn = column;
+                _sortAscending = true;
+            }
+
+            var sorted = _sortAscending
+                ? column switch
+                {
+                    "FileName" => _items.OrderBy(f => f.FileName).ToList(),
+                    "Size" => _items.OrderBy(f => f.FilePath != null
+                                  ? new FileInfo(f.FilePath).Length : 0).ToList(),
+                    "Status" => _items.OrderBy(f => f.Status.ToString()).ToList(),
+                    _ => _items.OrderBy(f => f.InstallOrder).ToList(),
+                }
+                : column switch
+                {
+                    "FileName" => _items.OrderByDescending(f => f.FileName).ToList(),
+                    "Size" => _items.OrderByDescending(f => f.FilePath != null
+                                  ? new FileInfo(f.FilePath).Length : 0).ToList(),
+                    "Status" => _items.OrderByDescending(f => f.Status.ToString()).ToList(),
+                    _ => _items.OrderByDescending(f => f.InstallOrder).ToList(),
+                };
+
+            for (int i = 0; i < sorted.Count; i++)
+            {
+                int current = _items.IndexOf(sorted[i]);
+                if (current != i) _items.Move(current, i);
+            }
+
+            // Re-assign InstallOrder after sort
+            for (int i = 0; i < _items.Count; i++)
+                _items[i].InstallOrder = i;
+        }
+
         public class AddFilesResult
         {
             public int SuccessCount { get; set; }

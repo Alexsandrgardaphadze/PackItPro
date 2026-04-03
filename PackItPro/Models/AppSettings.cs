@@ -72,5 +72,29 @@ namespace PackItPro.Models
 
         /// <summary>When true the light theme is active; false = dark (default).</summary>
         public bool UseLightTheme { get; set; } = false;
+
+        /// <summary>
+        /// Display name of the last used theme ("Dark", "Light", or a custom pack name).
+        /// Persisted to settings.json and restored on startup.
+        /// </summary>
+        public string ThemeName { get; set; } = "Dark";
+
+        /// <summary>
+        /// List of recently created package paths, up to 5 most recent.
+        /// Used in the File menu for quick access to recent packages.
+        /// </summary>
+        public List<string> RecentPackages { get; set; } = new();
+
+        /// <summary>
+        /// Adds a package path to the recent list, removing duplicates and keeping only 5 most recent.
+        /// </summary>
+        public void AddRecentPackage(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return;
+            RecentPackages.Remove(path); // remove duplicate
+            RecentPackages.Insert(0, path);
+            if (RecentPackages.Count > 5)
+                RecentPackages.RemoveRange(5, RecentPackages.Count - 5);
+        }
     }
 }

@@ -107,6 +107,18 @@ namespace PackItPro.ViewModels
             }
         }
 
+        public string ThemeName
+        {
+            get => SettingsModel.ThemeName;
+            set
+            {
+                SettingsModel.ThemeName = value;
+                OnPropertyChanged();
+                ThemeService.Apply(value);
+                _ = SaveSettingsAsync();
+            }
+        }
+
         public SettingsViewModel(string settingsFilePath)
         {
             SettingsModel = new AppSettings();
@@ -135,9 +147,13 @@ namespace PackItPro.ViewModels
                         SettingsModel.CompressionLevel = loadedSettings.CompressionLevel;
                         SettingsModel.ScanOnAdd = loadedSettings.ScanOnAdd;   // NEW
                         SettingsModel.UseLightTheme = loadedSettings.UseLightTheme;
+                        SettingsModel.ThemeName = loadedSettings.ThemeName;
 
                         if (loadedSettings.TrustedEngines?.Count > 0)
                             SettingsModel.TrustedEngines = loadedSettings.TrustedEngines;
+
+                        if (loadedSettings.RecentPackages?.Count > 0)
+                            SettingsModel.RecentPackages = loadedSettings.RecentPackages;
 
                         await MigrateLegacyApiKeyIfNeededAsync(json, cancellationToken);
                     }
