@@ -21,14 +21,14 @@
         </Storyboard>
 
         <Style x:Key="DeleteButtonStyle" TargetType="Button">
-            <Setter Property="Width" Value="24"/>
-            <Setter Property="Height" Value="24"/>
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Foreground" Value="{DynamicResource AppTextTertiaryColor}"/>
+            <Setter Property="Width"           Value="24"/>
+            <Setter Property="Height"          Value="24"/>
+            <Setter Property="Background"      Value="Transparent"/>
+            <Setter Property="Foreground"      Value="{DynamicResource AppTextTertiaryColor}"/>
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Padding" Value="0"/>
-            <Setter Property="ToolTip" Value="Remove"/>
+            <Setter Property="Cursor"          Value="Hand"/>
+            <Setter Property="Padding"         Value="0"/>
+            <Setter Property="ToolTip"         Value="Remove"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -49,7 +49,7 @@
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter Property="Background" Value="{DynamicResource AppStatusErrorColor}"/>
-                                <Setter Property="Opacity" Value="0.8"/>
+                                <Setter Property="Opacity"    Value="0.8"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -57,17 +57,17 @@
             </Setter>
         </Style>
 
-        <!-- Notes TextBox: invisible at rest, subtle border on hover/focus -->
+        <!-- Custom Args TextBox: invisible at rest, border on hover/focus -->
         <Style x:Key="NotesTextBoxStyle" TargetType="TextBox">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Foreground" Value="{DynamicResource AppTextSecondaryColor}"/>
-            <Setter Property="FontFamily" Value="Segoe UI"/>
-            <Setter Property="FontSize" Value="11"/>
-            <Setter Property="Padding" Value="4,2"/>
+            <Setter Property="Background"             Value="Transparent"/>
+            <Setter Property="BorderThickness"        Value="0"/>
+            <Setter Property="Foreground"             Value="{DynamicResource AppTextSecondaryColor}"/>
+            <Setter Property="FontFamily"             Value="Segoe UI"/>
+            <Setter Property="FontSize"               Value="11"/>
+            <Setter Property="Padding"                Value="4,2"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
-            <Setter Property="CaretBrush" Value="{DynamicResource AppPrimaryColor}"/>
-            <Setter Property="SelectionBrush" Value="{DynamicResource AppPrimaryColor}"/>
+            <Setter Property="CaretBrush"             Value="{DynamicResource AppPrimaryColor}"/>
+            <Setter Property="SelectionBrush"         Value="{DynamicResource AppPrimaryColor}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TextBox">
@@ -160,7 +160,13 @@
                 </StackPanel>
             </Grid>
 
-            <!-- FILE LIST -->
+            <!-- FILE LIST
+                 ItemContainerStyle = FileRowSlideInStyle (defined in Controls.xaml)
+                 This gives each new row a 180ms fade + 8px slide-in.
+                 VirtualizingPanel.IsVirtualizing is kept True for performance —
+                 the slide-in animation fires on the ListViewItem.Loaded event
+                 which virtualisation still raises when a row enters the viewport.
+            -->
             <ListView x:Name="FileListView"
                       Background="Transparent" BorderThickness="0" Margin="15"
                       AllowDrop="True"
@@ -176,20 +182,20 @@
                       SizeChanged="FileListView_SizeChanged"
                       Visibility="{Binding HasFiles, Converter={StaticResource BoolToVisibility}}"
                       ItemsSource="{Binding Items}"
-                      ItemContainerStyle="{StaticResource FileItemStyle}"
+                      ItemContainerStyle="{StaticResource FileRowSlideInStyle}"
                       ScrollViewer.HorizontalScrollBarVisibility="Hidden"
                       VirtualizingPanel.IsVirtualizing="True"
                       VirtualizingPanel.VirtualizationMode="Recycling">
 
                 <ListView.Resources>
                     <Style TargetType="GridViewColumnHeader">
-                        <Setter Property="Background" Value="Transparent"/>
-                        <Setter Property="Foreground" Value="{DynamicResource AppTextTertiaryColor}"/>
-                        <Setter Property="FontSize" Value="11"/>
-                        <Setter Property="FontWeight" Value="SemiBold"/>
-                        <Setter Property="Padding" Value="8,8,8,6"/>
+                        <Setter Property="Background"              Value="Transparent"/>
+                        <Setter Property="Foreground"              Value="{DynamicResource AppTextTertiaryColor}"/>
+                        <Setter Property="FontSize"                Value="11"/>
+                        <Setter Property="FontWeight"              Value="SemiBold"/>
+                        <Setter Property="Padding"                 Value="8,8,8,6"/>
                         <Setter Property="HorizontalContentAlignment" Value="Left"/>
-                        <Setter Property="BorderThickness" Value="0"/>
+                        <Setter Property="BorderThickness"         Value="0"/>
                         <Setter Property="Template">
                             <Setter.Value>
                                 <ControlTemplate TargetType="GridViewColumnHeader">
@@ -281,13 +287,12 @@
                             </GridViewColumn.CellTemplate>
                         </GridViewColumn>
 
-                        <!-- Notes — stretches to fill remaining space; width managed in SizeChanged -->
+                        <!-- Custom Args — stretches; width managed in SizeChanged -->
                         <GridViewColumn x:Name="NotesColumn" Header="Custom Args" Width="120"
                                         HeaderContainerStyle="{StaticResource GridViewColumnHeaderStyle}">
                             <GridViewColumn.CellTemplate>
                                 <DataTemplate>
                                     <Grid>
-                                        <!-- Placeholder shown when Notes is empty -->
                                         <TextBlock Text="Override args…"
                                                    FontSize="11" FontFamily="Segoe UI" FontStyle="Italic"
                                                    Foreground="{DynamicResource AppTextTertiaryColor}"
@@ -307,14 +312,14 @@
                                         <TextBox Text="{Binding CustomArgs, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
                                                  Style="{StaticResource NotesTextBoxStyle}"
                                                  MaxLength="120"
-                                                 ToolTip="{Binding CustomArgs}"
+                                                 ToolTip="Override auto-detected silent args (e.g. /S /D=C:\MyApp)"
                                                  SpellCheck.IsEnabled="False"/>
                                     </Grid>
                                 </DataTemplate>
                             </GridViewColumn.CellTemplate>
                         </GridViewColumn>
 
-                        <!-- Delete — fixed 32px, always last so it's never clipped -->
+                        <!-- Delete — fixed 32px -->
                         <GridViewColumn Header="" Width="32"
                                         HeaderContainerStyle="{StaticResource GridViewColumnHeaderStyle}">
                             <GridViewColumn.CellTemplate>

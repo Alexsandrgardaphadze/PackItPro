@@ -22,27 +22,38 @@
         <vm:MainViewModel />
     </Window.DataContext>
 
-    <!-- ── Keyboard shortcuts ──────────────────────────────────────────────── -->
+    <!--
+        Keyboard shortcuts
+        ──────────────────
+        Ctrl+O   Browse / Add files
+        Ctrl+K   Pack now
+        Ctrl+S   Scan files
+        Ctrl+T   Toggle dark/light theme
+
+        NOTE: Delete is intentionally NOT a global shortcut.
+        It is handled locally in FileListPanel.KeyDown only when the
+        ListView (not a TextBox child) has keyboard focus — this prevents
+        the key from eating characters while the user types in Custom Args.
+
+        Alt+A (Add shortcut) is also NOT a global window shortcut — the
+        shortcut panel's Add button has it as an accelerator label only.
+        Wiring it globally would fire while the user types "A" in any field.
+    -->
     <Window.InputBindings>
         <KeyBinding Key="O" Modifiers="Ctrl" Command="{Binding BrowseFilesCommand}"/>
         <KeyBinding Key="K" Modifiers="Ctrl" Command="{Binding PackCommand}"/>
-        <KeyBinding Key="Delete" Command="{Binding ClearAllFilesCommand}"/>
-        <KeyBinding Key="T" Modifiers="Ctrl" Command="{Binding ToggleThemeCommand}"/>
         <KeyBinding Key="S" Modifiers="Ctrl" Command="{Binding ScanFilesCommand}"/>
-        <KeyBinding Key="A" Modifiers="Alt" Command="{Binding AddShortcutCommand}"/>
-        <KeyBinding Key="A" Modifiers="Alt+Shift" Command="{Binding ManageShortcutsCommand}"/>
+        <KeyBinding Key="T" Modifiers="Ctrl" Command="{Binding ToggleThemeCommand}"/>
     </Window.InputBindings>
 
-    <!-- ── Entrance animation — entire window fades in over 220ms ─────────── -->
+    <!-- Entrance fade — entire window fades in over 220ms on Loaded -->
     <Window.Triggers>
         <EventTrigger RoutedEvent="Loaded">
             <BeginStoryboard>
                 <Storyboard>
-                    <DoubleAnimation
-                        Storyboard.TargetName="RootGrid"
-                        Storyboard.TargetProperty="Opacity"
-                        From="0" To="1"
-                        Duration="0:0:0.22">
+                    <DoubleAnimation Storyboard.TargetName="RootGrid"
+                                     Storyboard.TargetProperty="Opacity"
+                                     From="0" To="1" Duration="0:0:0.22">
                         <DoubleAnimation.EasingFunction>
                             <CubicEase EasingMode="EaseOut"/>
                         </DoubleAnimation.EasingFunction>
@@ -62,10 +73,7 @@
             <!-- Status Panel -->
         </Grid.RowDefinitions>
 
-        <!-- ══ MENU BAR ════════════════════════════════════════════════════════
-             Icons use Segoe MDL2 Assets (built into Windows 10/11).
-             InputGestureText shows keyboard shortcuts right-aligned in each item.
-        -->
+        <!-- ══ MENU BAR ═══════════════════════════════════════════════════════ -->
         <Border Grid.Row="0"
                 Background="{DynamicResource AppPanelColor}"
                 CornerRadius="8"
@@ -76,13 +84,13 @@
 
             <DockPanel LastChildFill="False">
 
-                <!-- ── Left: navigation menu ────────────────────────────── -->
+                <!-- Left: menu items -->
                 <Menu DockPanel.Dock="Left"
                       Background="Transparent"
                       Padding="0,4,0,4"
                       VerticalAlignment="Center">
 
-                    <!-- FILE ─────────────────────────────────────────────── -->
+                    <!-- FILE ──────────────────────────────────────────────── -->
                     <MenuItem Header="File" Style="{StaticResource MenuItemStyle}">
                         <MenuItem Header="Add Files…"
                                   Command="{Binding BrowseFilesCommand}"
@@ -99,7 +107,6 @@
                         </MenuItem>
                         <MenuItem Header="Clear All Files"
                                   Command="{Binding ClearAllFilesCommand}"
-                                  InputGestureText="Del"
                                   Style="{StaticResource SubMenuItemStyle}">
                             <MenuItem.Icon>
                                 <Viewbox Width="14" Height="14">
@@ -138,7 +145,7 @@
                         </MenuItem>
                     </MenuItem>
 
-                    <!-- SETTINGS ─────────────────────────────────────────── -->
+                    <!-- SETTINGS ──────────────────────────────────────────── -->
                     <MenuItem Header="Settings" Style="{StaticResource MenuItemStyle}">
                         <MenuItem Header="Output Location…"
                                   Command="{Binding SetOutputLocationCommand}"
@@ -163,7 +170,6 @@
                                   Command="{Binding PackItProSettingsCommand}"
                                   Style="{StaticResource SubMenuItemStyle}"/>
                         <Separator Background="{DynamicResource AppBorderColor}"/>
-                        <!-- Theme submenu -->
                         <MenuItem Header="Appearance" Style="{StaticResource SubMenuItemStyle}">
                             <MenuItem Header="Dark Theme"
                                       Command="{Binding SetThemeDarkCommand}"
@@ -178,7 +184,7 @@
                         </MenuItem>
                     </MenuItem>
 
-                    <!-- TOOLS ────────────────────────────────────────────── -->
+                    <!-- TOOLS ─────────────────────────────────────────────── -->
                     <MenuItem Header="Tools" Style="{StaticResource MenuItemStyle}">
                         <MenuItem Header="Pack Now"
                                   Command="{Binding PackCommand}"
@@ -222,37 +228,7 @@
                                   Style="{StaticResource SubMenuItemStyle}"/>
                     </MenuItem>
 
-                    <!-- SHORTCUTS ────────────────────────────────────────── -->
-                    <MenuItem Header="Shortcuts" Style="{StaticResource MenuItemStyle}">
-                        <MenuItem Header="Add Shortcut"
-                                  Command="{Binding AddShortcutCommand}"
-                                  InputGestureText="Alt+A"
-                                  Style="{StaticResource SubMenuItemStyle}">
-                            <MenuItem.Icon>
-                                <Viewbox Width="14" Height="14">
-                                    <Canvas Width="20" Height="20">
-                                        <Path Data="{StaticResource Icon.DocumentAdd}"
-                                              Fill="{DynamicResource AppPrimaryColor}"/>
-                                    </Canvas>
-                                </Viewbox>
-                            </MenuItem.Icon>
-                        </MenuItem>
-                        <MenuItem Header="Manage Shortcuts…"
-                                  Command="{Binding ManageShortcutsCommand}"
-                                  InputGestureText="Alt+Shift+A"
-                                  Style="{StaticResource SubMenuItemStyle}">
-                            <MenuItem.Icon>
-                                <Viewbox Width="14" Height="14">
-                                    <Canvas Width="20" Height="20">
-                                        <Path Data="{StaticResource Icon.Document}"
-                                              Fill="{DynamicResource AppTextTertiaryColor}"/>
-                                    </Canvas>
-                                </Viewbox>
-                            </MenuItem.Icon>
-                        </MenuItem>
-                    </MenuItem>
-
-                    <!-- HELP ─────────────────────────────────────────────── -->
+                    <!-- HELP ──────────────────────────────────────────────── -->
                     <MenuItem Header="Help" Style="{StaticResource MenuItemStyle}">
                         <MenuItem Header="Documentation"
                                   Command="{Binding DocumentationCommand}"
@@ -274,7 +250,7 @@
                     </MenuItem>
                 </Menu>
 
-                <!-- ── Right: theme pill + version ──────────────────────── -->
+                <!-- Right: theme pill + version -->
                 <StackPanel DockPanel.Dock="Right"
                             Orientation="Horizontal"
                             VerticalAlignment="Center"
@@ -283,7 +259,7 @@
                     <Border Width="1" Background="{DynamicResource AppDividerColor}"
                             Margin="0,6,8,6" VerticalAlignment="Stretch"/>
 
-                    <!-- Modern pill toggle — Ctrl+T -->
+                    <!-- Pill theme toggle — Ctrl+T -->
                     <Button Command="{Binding ToggleThemeCommand}"
                             Width="58" Height="26"
                             VerticalAlignment="Center"
@@ -313,14 +289,11 @@
                                                             VerticalAlignment="Center"
                                                             Margin="5,0">
                                                     <TextBlock Text="🌙" FontSize="11"
-                                                               VerticalAlignment="Center"
-                                                               Margin="0,0,3,0"/>
-                                                    <Border Width="1"
-                                                            Background="{DynamicResource AppBorderColor}"
+                                                               VerticalAlignment="Center" Margin="0,0,3,0"/>
+                                                    <Border Width="1" Background="{DynamicResource AppBorderColor}"
                                                             Margin="0,3"/>
                                                     <TextBlock Text="☀️" FontSize="11"
-                                                               VerticalAlignment="Center"
-                                                               Margin="3,0,0,0"/>
+                                                               VerticalAlignment="Center" Margin="3,0,0,0"/>
                                                 </StackPanel>
                                             </Border>
                                             <ControlTemplate.Triggers>
@@ -354,7 +327,7 @@
             </DockPanel>
         </Border>
 
-        <!-- ── MAIN CONTENT AREA ────────────────────────────────────────────── -->
+        <!-- MAIN CONTENT AREA -->
         <Grid Grid.Row="1" Margin="0,0,0,10">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="3*"/>
@@ -367,13 +340,21 @@
                           VerticalScrollBarVisibility="Auto"
                           HorizontalScrollBarVisibility="Disabled">
                 <StackPanel>
+                    <!--
+                        ShortcutsPanel: lets the packager define Windows shortcuts
+                        that StubInstaller will create on the end-user's machine.
+                        The "+ Add" button inside has an underlined "A" label as a
+                        visual hint — Alt+A is NOT a global Window shortcut (it would
+                        fire while typing). Users click the button or use Tab to reach it.
+                    -->
+                    <views:ShortcutsPanel   DataContext="{Binding Shortcuts}"  Margin="0,0,0,10"/>
                     <views:PackSettingsPanel DataContext="{Binding Settings}"   Margin="0,0,0,10"/>
                     <views:SummaryPanel     DataContext="{Binding Summary}"/>
                 </StackPanel>
             </ScrollViewer>
         </Grid>
 
-        <!-- ── STATUS PANEL ─────────────────────────────────────────────────── -->
+        <!-- STATUS PANEL -->
         <views:StatusPanel Grid.Row="2" Margin="0,0,0,8" DataContext="{Binding Status}"/>
     </Grid>
 </Window>

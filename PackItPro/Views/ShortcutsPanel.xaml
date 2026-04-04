@@ -165,7 +165,7 @@
                                     <!-- Required indicator for Name -->
                                     <TextBlock Grid.Column="1" Margin="4,0,0,0"
                                                Text="*"
-                                               Foreground="{DynamicResource AppErrorColor}"
+                                               Foreground="{DynamicResource AppStatusErrorColor}"
                                                VerticalAlignment="Center"
                                                FontWeight="Bold"
                                                ToolTip="Required field"/>
@@ -190,11 +190,11 @@
                                                 <Setter Property="FontSize" Value="12"/>
                                                 <Style.Triggers>
                                                     <Trigger Property="IsMouseOver" Value="True">
-                                                        <Setter Property="Background" Value="#2d2d44"/>
+                                                        <Setter Property="Background" Value="{DynamicResource AppHoverOverlayColor}"/>
                                                     </Trigger>
                                                     <Trigger Property="IsSelected" Value="True">
                                                         <Setter Property="Background" Value="{DynamicResource AppPrimaryColor}"/>
-                                                        <Setter Property="Foreground" Value="#f1f5f9"/>
+                                                        <Setter Property="Foreground" Value="{DynamicResource AppTextColor}"/>
                                                     </Trigger>
                                                     <Trigger Property="IsFocused" Value="True">
                                                         <Setter Property="BorderBrush" Value="{DynamicResource AppPrimaryColor}"/>
@@ -237,8 +237,8 @@
                                                 </Setter>
                                                 <Style.Triggers>
                                                     <Trigger Property="IsMouseOver" Value="True">
-                                                        <Setter Property="Background" Value="#3a1a1a"/>
-                                                        <Setter Property="Foreground" Value="#ef4444"/>
+                                                        <Setter Property="Background" Value="{DynamicResource AppErrorSubtleBg}"/>
+                                                        <Setter Property="Foreground" Value="{DynamicResource AppStatusErrorColor}"/>
                                                     </Trigger>
                                                     <Trigger Property="IsFocused" Value="True">
                                                         <Setter Property="BorderBrush" Value="{DynamicResource AppPrimaryColor}"/>

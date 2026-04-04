@@ -1,10 +1,16 @@
 ﻿// PackItPro/Views/FileListPanel.xaml.cs
+//
+// Fixes in this version:
+//   1. Insertion line now uses AdornerLayer (renders on top of everything, no layout impact)
+//   2. Drag still works with VirtualizingPanel because we only iterate visible containers
+//   3. Delete key guard — only fires on the ListView when no TextBox has focus
+//   4. _suppressDrag also guards against TextBox edits in the Custom Args column
 using PackItPro.ViewModels;
 using System;
-using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
@@ -17,25 +23,22 @@ namespace PackItPro.Views
         private Storyboard? _pulseAnimation;
 
         // ── Column width constants ────────────────────────────────────────────
-        // Sum of every fixed-width column + scrollbar allowance.
         private const double FixedColumnsWidth = 452 + 18; // 470
         private const double ArgsMinWidth = 60;
 
         // ── Resize debounce ───────────────────────────────────────────────────
-        // Instead of recalculating on every pixel of a drag, we wait 16 ms
-        // (one 60 fps frame) after the last SizeChanged event fires.
-        // This cuts layout work by ~95% during a resize drag.
         private readonly DispatcherTimer _resizeDebounce;
         private double _pendingArgsWidth;
 
-        // ── Drag-threshold state ──────────────────────────────────────────────
+        // ── Drag state ────────────────────────────────────────────────────────
         private Point _dragStartPoint;
         private bool _isDragStartPending;
         private bool _suppressDrag;
 
-        // ── Drag insertion indicator ──────────────────────────────────────────
-        // A thin 2px accent line shown between rows to indicate drop position.
-        private readonly System.Windows.Shapes.Rectangle _insertionLine;
+        // ── Drag insertion indicator (AdornerLayer) ───────────────────────────
+        // InsertionAdorner renders the 2px line on top of the ListView via
+        // the WPF adorner system — no layout impact, always on top, correct coords.
+        private InsertionLineAdorner? _insertionAdorner;
 
         // ── Static frozen brushes ─────────────────────────────────────────────
         private static readonly SolidColorBrush DragHoverBorderBrush =
@@ -46,8 +49,6 @@ namespace PackItPro.Views
             Frozen(new SolidColorBrush(Color.FromRgb(0x3F, 0x3F, 0x46)));
         private static readonly SolidColorBrush FallbackPanelBrush =
             Frozen(new SolidColorBrush(Color.FromRgb(0x18, 0x18, 0x1B)));
-        private static readonly SolidColorBrush InsertionBrush =
-            Frozen(new SolidColorBrush(Color.FromRgb(0x63, 0x66, 0xF1)));
 
         private static SolidColorBrush Frozen(SolidColorBrush b) { b.Freeze(); return b; }
 
@@ -57,7 +58,6 @@ namespace PackItPro.Views
         {
             InitializeComponent();
 
-            // Debounce timer — fires once, 16 ms after the last resize event.
             _resizeDebounce = new DispatcherTimer(DispatcherPriority.Render)
             {
                 Interval = TimeSpan.FromMilliseconds(16)
@@ -68,47 +68,29 @@ namespace PackItPro.Views
                 NotesColumn.Width = _pendingArgsWidth;
             };
 
-            // Insertion line — added to the ListView's adorner layer at runtime.
-            _insertionLine = new System.Windows.Shapes.Rectangle
-            {
-                Height = 2,
-                Fill = InsertionBrush,
-                IsHitTestVisible = false,
-                Visibility = Visibility.Collapsed,
-                HorizontalAlignment = HorizontalAlignment.Stretch,
-            };
-
             EmptyDropState.IsVisibleChanged += EmptyDropState_IsVisibleChanged;
             Loaded += OnLoaded;
         }
 
         private void OnLoaded(object sender, RoutedEventArgs e)
         {
-            // Inject insertion line into an AdornerDecorator above the ListView
-            // so it renders on top of all rows without affecting layout.
-            // We use the ListView's parent Panel instead, which is simpler and reliable.
-            if (FileListView.Parent is Panel parentPanel &&
-                !parentPanel.Children.Contains(_insertionLine))
+            // Create the adorner once the ListView is in the visual tree.
+            // AdornerLayer.GetAdornerLayer walks up from FileListView to find
+            // the nearest AdornerDecorator (provided by Window/UserControl).
+            var layer = AdornerLayer.GetAdornerLayer(FileListView);
+            if (layer != null)
             {
-                parentPanel.Children.Add(_insertionLine);
+                _insertionAdorner = new InsertionLineAdorner(FileListView);
+                layer.Add(_insertionAdorner);
             }
         }
 
         // ── Args column stretching (debounced) ───────────────────────────────
 
-        /// <summary>
-        /// Queues a column-width recalculation instead of doing it immediately.
-        /// The DispatcherTimer fires once per ~16 ms after resize ends.
-        /// </summary>
         private void FileListView_SizeChanged(object sender, SizeChangedEventArgs e)
         {
             if (!e.WidthChanged) return;
-
-            _pendingArgsWidth = Math.Max(
-                FileListView.ActualWidth - FixedColumnsWidth,
-                ArgsMinWidth);
-
-            // Restart the debounce window.
+            _pendingArgsWidth = Math.Max(FileListView.ActualWidth - FixedColumnsWidth, ArgsMinWidth);
             _resizeDebounce.Stop();
             _resizeDebounce.Start();
         }
@@ -128,40 +110,41 @@ namespace PackItPro.Views
             }
         }
 
-        // ── Keyboard navigation ──────────────────────────────────────────────
+        // ── Keyboard navigation ───────────────────────────────────────────────
 
         private void FileListView_KeyDown(object sender, KeyEventArgs e)
         {
             if (DataContext is not FileListViewModel vm) return;
 
-            // Delete — remove selected item
+            // Only handle Delete when the ListView itself (not a child TextBox) has focus.
+            // This prevents eating the Delete key while the user edits Custom Args.
             if (e.Key == Key.Delete &&
+                Keyboard.FocusedElement is not TextBox &&
                 FileListView.SelectedItem is FileItemViewModel selected)
             {
                 selected.RemoveCommand?.Execute(null);
                 e.Handled = true;
-                return;
             }
-
-            // Ctrl+A — select all (WPF ListView already supports this by default)
-            // Tab is handled by WPF naturally
         }
 
-        // ── Drag-to-reorder (internal list items) ────────────────────────────
+        // ── Drag-to-reorder ───────────────────────────────────────────────────
 
         private void FileListView_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             _dragStartPoint = e.GetPosition(FileListView);
             _isDragStartPending = true;
             var clicked = e.OriginalSource as DependencyObject;
-            _suppressDrag = WalkUpVisualTree<ButtonBase>(clicked) != null;
+            // Suppress drag if click originated inside a Button OR a TextBox
+            // (so the Custom Args editor doesn't trigger a drag).
+            _suppressDrag = WalkUpVisualTree<ButtonBase>(clicked) != null
+                         || WalkUpVisualTree<TextBox>(clicked) != null;
         }
 
         private void FileListView_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
             _isDragStartPending = false;
             _suppressDrag = false;
-            HideInsertionLine();
+            _insertionAdorner?.Hide();
         }
 
         private void FileListView_PreviewMouseMove(object sender, MouseEventArgs e)
@@ -171,21 +154,18 @@ namespace PackItPro.Views
             if (_suppressDrag) return;
             if (sender is not ListView lv) return;
 
-            var currentPos = e.GetPosition(lv);
-            var dx = Math.Abs(currentPos.X - _dragStartPoint.X);
-            var dy = Math.Abs(currentPos.Y - _dragStartPoint.Y);
-
-            if (dx < SystemParameters.MinimumHorizontalDragDistance &&
-                dy < SystemParameters.MinimumVerticalDragDistance)
+            var pos = e.GetPosition(lv);
+            if (Math.Abs(pos.X - _dragStartPoint.X) < SystemParameters.MinimumHorizontalDragDistance &&
+                Math.Abs(pos.Y - _dragStartPoint.Y) < SystemParameters.MinimumVerticalDragDistance)
                 return;
 
             var hit = lv.InputHitTest(_dragStartPoint) as DependencyObject;
-            var listViewItem = WalkUpVisualTree<ListViewItem>(hit);
-            if (listViewItem?.DataContext is not FileItemViewModel fileItem) return;
+            var item = WalkUpVisualTree<ListViewItem>(hit);
+            if (item?.DataContext is not FileItemViewModel fileItem) return;
 
             _isDragStartPending = false;
             DragDrop.DoDragDrop(lv, fileItem, DragDropEffects.Move);
-            HideInsertionLine();
+            _insertionAdorner?.Hide();
         }
 
         private void FileListView_DragOver(object sender, DragEventArgs e)
@@ -197,7 +177,7 @@ namespace PackItPro.Views
                 return;
             }
             e.Effects = DragDropEffects.Move;
-            ShowInsertionLine(sender as ListView, e.GetPosition(sender as ListView));
+            _insertionAdorner?.Update(e.GetPosition(FileListView));
             e.Handled = true;
         }
 
@@ -211,21 +191,20 @@ namespace PackItPro.Views
 
         private void FileListView_DragLeave(object sender, DragEventArgs e)
         {
-            HideInsertionLine();
+            _insertionAdorner?.Hide();
             e.Handled = true;
         }
 
         private void FileListView_Drop(object sender, DragEventArgs e)
         {
-            HideInsertionLine();
+            _insertionAdorner?.Hide();
 
             if (sender is not ListView lv) return;
             if (e.Data.GetData(typeof(FileItemViewModel)) is not FileItemViewModel fileItem) return;
             if (lv.DataContext is not FileListViewModel vm) return;
 
             int fromIndex = lv.Items.IndexOf(fileItem);
-            int rawToIndex = GetInsertIndex(lv, e.GetPosition(lv));
-            int toIndex = Math.Clamp(rawToIndex, 0, vm.Items.Count - 1);
+            int toIndex = Math.Clamp(GetInsertIndex(lv, e.GetPosition(lv)), 0, vm.Items.Count - 1);
 
             if (fromIndex < 0 || fromIndex == toIndex) return;
 
@@ -236,60 +215,20 @@ namespace PackItPro.Views
             e.Handled = true;
         }
 
-        // ── Insertion line helpers ────────────────────────────────────────────
-
-        private void ShowInsertionLine(ListView? lv, Point mousePos)
-        {
-            if (lv == null || lv.Items.Count == 0) { HideInsertionLine(); return; }
-
-            // Find the item nearest the pointer to place the line above/below it.
-            ListViewItem? nearest = null;
-            double nearestY = double.MaxValue;
-            bool insertAfter = false;
-
-            foreach (var item in lv.Items)
-            {
-                var container = lv.ItemContainerGenerator.ContainerFromItem(item) as ListViewItem;
-                if (container == null) continue;
-
-                var pos = container.TranslatePoint(new Point(0, 0), lv);
-                var mid = pos.Y + container.ActualHeight / 2;
-                var dist = Math.Abs(mousePos.Y - mid);
-                if (dist < nearestY) { nearestY = dist; nearest = container; insertAfter = mousePos.Y > mid; }
-            }
-
-            if (nearest == null) { HideInsertionLine(); return; }
-
-            var itemTopInLv = nearest.TranslatePoint(new Point(0, 0), lv);
-            double lineY = insertAfter
-                ? itemTopInLv.Y + nearest.ActualHeight
-                : itemTopInLv.Y;
-
-            // Translate into the parent panel's coordinate space.
-            if (lv.Parent is Panel panel)
-            {
-                var lvOriginInPanel = lv.TranslatePoint(new Point(0, 0), panel);
-                Canvas.SetTop(_insertionLine, lvOriginInPanel.Y + lineY - 1);
-                _insertionLine.Width = lv.ActualWidth;
-                _insertionLine.Visibility = Visibility.Visible;
-            }
-        }
-
-        private void HideInsertionLine() =>
-            _insertionLine.Visibility = Visibility.Collapsed;
-
-        // ── Static helpers ────────────────────────────────────────────────────
+        // ── Index helper ──────────────────────────────────────────────────────
 
         private static int GetInsertIndex(ListView lv, Point point)
         {
             var hit = lv.InputHitTest(point) as DependencyObject;
-            var listViewItem = WalkUpVisualTree<ListViewItem>(hit);
-            if (listViewItem == null) return lv.Items.Count;
-            int index = lv.Items.IndexOf(listViewItem.DataContext);
+            var item = WalkUpVisualTree<ListViewItem>(hit);
+            if (item == null) return lv.Items.Count;
+            int index = lv.Items.IndexOf(item.DataContext);
             if (index < 0) return lv.Items.Count;
-            var itemPos = listViewItem.TranslatePoint(new Point(0, 0), lv);
-            return point.Y < itemPos.Y + listViewItem.ActualHeight / 2 ? index : index + 1;
+            var itemPos = item.TranslatePoint(new Point(0, 0), lv);
+            return point.Y < itemPos.Y + item.ActualHeight / 2 ? index : index + 1;
         }
+
+        // ── Visual tree helper ────────────────────────────────────────────────
 
         private static T? WalkUpVisualTree<T>(DependencyObject? element) where T : DependencyObject
         {
@@ -333,11 +272,8 @@ namespace PackItPro.Views
             viewModel.AddFilesWithValidation(files, out var result);
 
             if (result.SuccessCount > 0 || result.SkippedCount > 0)
-                FileAddResultWindow.Show(
-                    Window.GetWindow(this),
-                    result.SuccessCount,
-                    result.SkippedCount,
-                    result.SkipReasons);
+                FileAddResultWindow.Show(Window.GetWindow(this),
+                    result.SuccessCount, result.SkippedCount, result.SkipReasons);
 
             if (result.SuccessCount > 0)
                 TriggerScanOnAddIfEnabled();
@@ -355,6 +291,102 @@ namespace PackItPro.Views
         {
             MainBorder.BorderBrush = TryFindResource("AppBorderColor") as SolidColorBrush ?? FallbackBorderBrush;
             MainBorder.Background = TryFindResource("AppPanelColor") as SolidColorBrush ?? FallbackPanelBrush;
+        }
+    }
+
+    // ── InsertionLineAdorner ──────────────────────────────────────────────────
+    //
+    // Renders the 2px drop-position indicator using the WPF adorner system.
+    // Adorners render in a separate layer (AdornerLayer) that floats above all
+    // other visual content, so the line is always visible and never clipped by
+    // the ListView's scroll container.
+    //
+    // Usage:
+    //   adorner.Update(mousePositionRelativeToListView)  — reposition and show
+    //   adorner.Hide()                                   — hide
+    //
+    internal sealed class InsertionLineAdorner : Adorner
+    {
+        private static readonly Pen LinePen = MakePen();
+        private double _lineY = -1;
+        private bool _visible;
+
+        public InsertionLineAdorner(ListView adornedElement)
+            : base(adornedElement) { IsHitTestVisible = false; }
+
+        private ListView ListView => (ListView)AdornedElement;
+
+        /// <summary>
+        /// Recalculates line position based on <paramref name="mousePos"/>
+        /// (in ListView coordinates) and triggers a redraw.
+        /// </summary>
+        public void Update(Point mousePos)
+        {
+            _lineY = CalculateLineY(mousePos);
+            _visible = _lineY >= 0;
+            InvalidateVisual();
+        }
+
+        public void Hide()
+        {
+            _visible = false;
+            InvalidateVisual();
+        }
+
+        protected override void OnRender(DrawingContext dc)
+        {
+            if (!_visible || _lineY < 0) return;
+
+            // The adorner's render coordinate space matches the adornedElement,
+            // so we can draw directly in ListView-local coordinates.
+            dc.DrawLine(LinePen,
+                new Point(0, _lineY),
+                new Point(ListView.ActualWidth, _lineY));
+        }
+
+        private double CalculateLineY(Point mousePos)
+        {
+            if (ListView.Items.Count == 0) return -1;
+
+            ListViewItem? nearest = null;
+            double nearestDist = double.MaxValue;
+            bool insertAfter = false;
+
+            foreach (var dataItem in ListView.Items)
+            {
+                var container = ListView.ItemContainerGenerator
+                    .ContainerFromItem(dataItem) as ListViewItem;
+                if (container == null) continue;
+
+                var origin = container.TranslatePoint(new Point(0, 0), ListView);
+                var mid = origin.Y + container.ActualHeight / 2.0;
+                var dist = Math.Abs(mousePos.Y - mid);
+
+                if (dist < nearestDist)
+                {
+                    nearestDist = dist;
+                    nearest = container;
+                    insertAfter = mousePos.Y > mid;
+                }
+            }
+
+            if (nearest == null) return -1;
+
+            var itemOrigin = nearest.TranslatePoint(new Point(0, 0), ListView);
+            return insertAfter
+                ? itemOrigin.Y + nearest.ActualHeight
+                : itemOrigin.Y;
+        }
+
+        private static Pen MakePen()
+        {
+            // Indigo accent — matches AppPrimaryColor in both themes.
+            // Frozen so WPF caches it as a shared resource.
+            var brush = new SolidColorBrush(Color.FromRgb(0x63, 0x66, 0xF1));
+            brush.Freeze();
+            var pen = new Pen(brush, 2.0) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round };
+            pen.Freeze();
+            return pen;
         }
     }
 }
