@@ -47,12 +47,22 @@
             <!-- StyledTextBoxStyle is the global implicit TextBox style from Controls.xaml
                  (rounded dark look matching the ComboBox). No explicit Style= needed. -->
             <TextBox Text="{Binding OutputFileName, Mode=TwoWay}"
-                     Margin="0,0,0,16"
+                     Margin="0,0,0,4"
                      Height="36"
                      Padding="10,4"
                      VerticalContentAlignment="Center"
                      FontFamily="Segoe UI"
                      FontSize="13"/>
+
+            <!-- Output Preview -->
+            <TextBlock FontSize="10" FontFamily="Segoe UI"
+                       Foreground="{DynamicResource AppTextTertiaryColor}"
+                       TextTrimming="CharacterEllipsis"
+                       Margin="0,0,0,16"
+                       ToolTip="{Binding OutputPreview, Mode=OneWay}">
+                <Run Text="Will create: "/>
+                <Run Text="{Binding OutputPreview, Mode=OneWay}" FontFamily="Consolas"/>
+            </TextBlock>
 
             <!-- Divider -->
             <Border Height="1" 
@@ -262,6 +272,34 @@
                     </Button.ToolTip>
                 </Button>
             </Grid>
+
+            <!-- Require Admin Warning Card -->
+            <Border Margin="0,8,0,0"
+                    Background="{DynamicResource AppWarningSubtleBg}"
+                    BorderBrush="{DynamicResource AppWarningSubtleBorder}"
+                    BorderThickness="1" CornerRadius="6" Padding="10,7">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding RequiresAdmin}" Value="True">
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="⚠" FontSize="12" Margin="0,0,7,0"
+                               Foreground="{DynamicResource AppStatusWarningColor}"
+                               VerticalAlignment="Top"/>
+                    <TextBlock FontSize="11" FontFamily="Segoe UI"
+                               Foreground="{DynamicResource AppStatusWarningColor}"
+                               TextWrapping="Wrap">
+                        <Run Text="StubInstaller will request" FontWeight="SemiBold"/>
+                        <Run Text=" UAC elevation on the end-user's machine. Only enable if the bundled installers genuinely require administrator privileges."/>
+                    </TextBlock>
+                </StackPanel>
+            </Border>
 
         </StackPanel>
     </Border>

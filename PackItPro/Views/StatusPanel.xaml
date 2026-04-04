@@ -175,7 +175,9 @@
                        FontFamily="Segoe UI"
                        FontSize="13"
                        FontWeight="Medium"
-                       Margin="0,0,0,4"/>
+                       Margin="0,0,0,4"
+                       AutomationProperties.LiveSetting="Polite"
+                       AutomationProperties.Name="Status message"/>
 
             <!--
                 Smooth progress bar. Value is set from code-behind via the
@@ -203,22 +205,79 @@
                    Margin="12,0"
                    Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}"/>
 
-        <!-- Pack Now button -->
-        <Button Grid.Column="3"
-                Content="Pack Now"
-                Command="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=DataContext.PackCommand}"
-                Style="{StaticResource Win11Button}"
-                Height="40"
-                FontSize="13"
-                FontWeight="SemiBold"
-                IsEnabled="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=DataContext.FileList.HasFiles}"
-                MinWidth="120"
-                Padding="20,0"
-                Cursor="Hand">
-            <Button.Effect>
-                <DropShadowEffect Color="#4f46e5" Opacity="0.4" BlurRadius="15" ShadowDepth="0" po:Freeze="True"/>
-            </Button.Effect>
-        </Button>
+        <!-- Pack Now button group: scan warning dot + button -->
+        <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+
+            <!--
+                B2: Scan-before-pack amber indicator.
+                Visible when files exist but ALL are still Pending (none scanned).
+                Bound via FileList on the Window DataContext.
+                Uses the InverseBoolToVisibility converter on HasScannedFiles.
+                HasScannedFiles = CleanCount + InfectedCount + FailedCount + TrustedCount > 0.
+                Since we may not have HasScannedFiles yet, we approximate with
+                HasFiles AND InfectedCount==0 AND CleanCount==0.
+            -->
+            <Border Width="8" Height="8" CornerRadius="4"
+                    Background="{DynamicResource AppStatusWarningColor}"
+                    VerticalAlignment="Center" Margin="0,0,8,0"
+                    ToolTip="Consider scanning files with VirusTotal before packaging (Ctrl+S)">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers>
+                            <!--
+                                Show when files exist AND none have been scanned yet.
+                                CleanCount = 0 AND InfectedCount = 0 AND HasFiles = True
+                                means every file is still Pending.
+                            -->
+                            <MultiDataTrigger>
+                                <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding RelativeSource={RelativeSource AncestorType=Window},
+                                               Path=DataContext.FileList.HasFiles}" Value="True"/>
+                                    <Condition Binding="{Binding RelativeSource={RelativeSource AncestorType=Window},
+                                               Path=DataContext.FileList.CleanCount,
+                                               Converter={StaticResource IsZeroConverter}}" Value="True"/>
+                                    <Condition Binding="{Binding RelativeSource={RelativeSource AncestorType=Window},
+                                               Path=DataContext.FileList.InfectedCount,
+                                               Converter={StaticResource IsZeroConverter}}" Value="True"/>
+                                </MultiDataTrigger.Conditions>
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </MultiDataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+            </Border>
+
+            <!--
+                B1: Pack Now button with disabled-state tooltip.
+                When no files are loaded IsEnabled=False shows "Add files first".
+            -->
+            <Button Content="Pack Now"
+                    Command="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=DataContext.PackCommand}"
+                    Height="40"
+                    FontSize="13"
+                    FontWeight="SemiBold"
+                    IsEnabled="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=DataContext.FileList.HasFiles}"
+                    MinWidth="120"
+                    Padding="20,0"
+                    Cursor="Hand"
+                    AutomationProperties.Name="Pack Now"
+                    AutomationProperties.HelpText="Create the installer package from the files in the list">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource Win11Button}">
+                        <Setter Property="ToolTip" Value="Create installer package (Ctrl+K)"/>
+                        <Style.Triggers>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="ToolTip" Value="Add files to the list first (Ctrl+O)"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+                <Button.Effect>
+                    <DropShadowEffect Color="#4f46e5" Opacity="0.4" BlurRadius="15" ShadowDepth="0" po:Freeze="True"/>
+                </Button.Effect>
+            </Button>
+        </StackPanel>
 
     </Grid>
 </UserControl>

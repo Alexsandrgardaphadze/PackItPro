@@ -250,7 +250,7 @@
                     </MenuItem>
                 </Menu>
 
-                <!-- Right: theme pill + version -->
+                <!-- Right: file count badge + theme pill + version -->
                 <StackPanel DockPanel.Dock="Right"
                             Orientation="Horizontal"
                             VerticalAlignment="Center"

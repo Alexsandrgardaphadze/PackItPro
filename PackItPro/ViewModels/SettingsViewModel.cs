@@ -34,13 +34,43 @@ namespace PackItPro.ViewModels
         public string OutputLocation
         {
             get => SettingsModel.OutputLocation;
-            set { SettingsModel.OutputLocation = value; OnPropertyChanged(); }
+            set
+            {
+                SettingsModel.OutputLocation = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(OutputPreview));
+            }
         }
 
         public string OutputFileName
         {
             get => SettingsModel.OutputFileName;
-            set { SettingsModel.OutputFileName = value; OnPropertyChanged(); }
+            set
+            {
+                SettingsModel.OutputFileName = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(OutputPreview));
+            }
+        }
+
+        /// <summary>
+        /// Preview of the output file path shown under the Output Location field.
+        /// Updates whenever OutputLocation or OutputFileName changes.
+        /// </summary>
+        public string OutputPreview
+        {
+            get
+            {
+                try
+                {
+                    var dir = string.IsNullOrWhiteSpace(OutputLocation)
+                        ? Environment.GetFolderPath(Environment.SpecialFolder.Desktop)
+                        : OutputLocation;
+                    var name = string.IsNullOrWhiteSpace(OutputFileName) ? "Package" : OutputFileName;
+                    return Path.Combine(dir, name + ".exe");
+                }
+                catch { return ""; }
+            }
         }
 
         public bool OnlyScanExecutables

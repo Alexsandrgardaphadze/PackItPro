@@ -10,7 +10,7 @@
         xmlns:vm="clr-namespace:PackItPro.ViewModels"
         mc:Ignorable="d"
         Title="Manage Shortcuts"
-        Height="600" Width="900"
+        Height="680" Width="900"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResize"
         MinHeight="400" MinWidth="700"
@@ -32,15 +32,77 @@
             </Grid.ColumnDefinitions>
 
             <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                <TextBlock Text="Shortcuts"
-                           FontSize="22" FontWeight="SemiBold"
+                <TextBlock Text="Windows Shortcuts"
+                           FontSize="20" FontWeight="SemiBold"
                            Foreground="{DynamicResource AppTextColor}"
                            FontFamily="Segoe UI"/>
-                <TextBlock Text="Create Windows shortcuts installed on the end-user's machine after packaging."
-                           FontSize="12"
+                <TextBlock FontSize="12" FontFamily="Segoe UI"
                            Foreground="{DynamicResource AppTextTertiaryColor}"
-                           FontFamily="Segoe UI"
-                           Margin="0,3,0,0"/>
+                           TextWrapping="Wrap" Margin="0,3,0,0">
+                    <Run Text="Shortcuts (.lnk files) that "/>
+                    <Run Text="StubInstaller" FontWeight="SemiBold" Foreground="{DynamicResource AppPrimaryColor}"/>
+                    <Run Text=" creates on the end-user's machine after all installers finish."/>
+                </TextBlock>
+
+                <!-- 3-step how-it-works card -->
+                <Border Background="{DynamicResource AppCardColor}"
+                        BorderBrush="{DynamicResource AppBorderColor}"
+                        BorderThickness="1" CornerRadius="6"
+                        Padding="12,8" Margin="0,10,0,0">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="20"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="20"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Step 1 -->
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="1 · You define"
+                                       FontSize="11" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource AppPrimaryColor}"
+                                       FontFamily="Segoe UI"/>
+                            <TextBlock Text="Name, target .exe path, location (Desktop / Start Menu / Startup)"
+                                       FontSize="11" FontFamily="Segoe UI"
+                                       Foreground="{DynamicResource AppTextTertiaryColor}"
+                                       TextWrapping="Wrap" Margin="0,2,0,0"/>
+                        </StackPanel>
+
+                        <TextBlock Grid.Column="1" Text="→" FontSize="14"
+                                   VerticalAlignment="Center" HorizontalAlignment="Center"
+                                   Foreground="{DynamicResource AppTextQuaternaryColor}"/>
+
+                        <!-- Step 2 -->
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="2 · PackItPro saves"
+                                       FontSize="11" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource AppPrimaryColor}"
+                                       FontFamily="Segoe UI"/>
+                            <TextBlock Text="Definitions are stored in packitmeta.json inside the package"
+                                       FontSize="11" FontFamily="Segoe UI"
+                                       Foreground="{DynamicResource AppTextTertiaryColor}"
+                                       TextWrapping="Wrap" Margin="0,2,0,0"/>
+                        </StackPanel>
+
+                        <TextBlock Grid.Column="3" Text="→" FontSize="14"
+                                   VerticalAlignment="Center" HorizontalAlignment="Center"
+                                   Foreground="{DynamicResource AppTextQuaternaryColor}"/>
+
+                        <!-- Step 3 -->
+                        <StackPanel Grid.Column="4">
+                            <TextBlock Text="3 · StubInstaller creates"
+                                       FontSize="11" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource AppPrimaryColor}"
+                                       FontFamily="Segoe UI"/>
+                            <TextBlock Text=".lnk files appear in the chosen location on the end-user's PC"
+                                       FontSize="11" FontFamily="Segoe UI"
+                                       Foreground="{DynamicResource AppTextTertiaryColor}"
+                                       TextWrapping="Wrap" Margin="0,2,0,0"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
             </StackPanel>
 
             <Button Grid.Column="1"

@@ -215,6 +215,20 @@ namespace PackItPro.Views
             e.Handled = true;
         }
 
+        // ── Drag cursor (E1) ──────────────────────────────────────────────────
+
+        /// <summary>
+        /// Shows a Hand cursor during internal drag-to-reorder so users get
+        /// clear visual feedback that they are repositioning a row.
+        /// Without this WPF shows its default drag-copy cursor (arrow + box).
+        /// </summary>
+        private void FileListView_GiveFeedback(object sender, GiveFeedbackEventArgs e)
+        {
+            e.UseDefaultCursors = false;
+            Mouse.SetCursor(Cursors.Hand);
+            e.Handled = true;
+        }
+
         // ── Index helper ──────────────────────────────────────────────────────
 
         private static int GetInsertIndex(ListView lv, Point point)

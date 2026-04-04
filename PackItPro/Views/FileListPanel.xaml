@@ -179,13 +179,13 @@
                       DragLeave="FileListView_DragLeave"
                       Drop="FileListView_Drop"
                       KeyDown="FileListView_KeyDown"
+                      GiveFeedback="FileListView_GiveFeedback"
                       SizeChanged="FileListView_SizeChanged"
                       Visibility="{Binding HasFiles, Converter={StaticResource BoolToVisibility}}"
                       ItemsSource="{Binding Items}"
                       ItemContainerStyle="{StaticResource FileRowSlideInStyle}"
                       ScrollViewer.HorizontalScrollBarVisibility="Hidden"
-                      VirtualizingPanel.IsVirtualizing="True"
-                      VirtualizingPanel.VirtualizationMode="Recycling">
+                      VirtualizingPanel.IsVirtualizing="False">
 
                 <ListView.Resources>
                     <Style TargetType="GridViewColumnHeader">
@@ -235,15 +235,33 @@
                 <ListView.View>
                     <GridView>
 
-                        <!-- Icon — fixed 35px -->
+                        <!-- Icon + install-order badge — fixed 35px -->
                         <GridViewColumn Header="📄" Width="35"
                                         HeaderContainerStyle="{StaticResource GridViewColumnHeaderStyle}">
                             <GridViewColumn.CellTemplate>
                                 <DataTemplate>
-                                    <TextBlock Text="{Binding FileTypeIcon}"
-                                               FontSize="16" FontFamily="Segoe UI Emoji"
-                                               HorizontalAlignment="Center"
-                                               Foreground="{DynamicResource AppTextColor}"/>
+                                    <Grid Width="24" Height="24" VerticalAlignment="Center"
+                                          HorizontalAlignment="Center">
+                                        <!-- File type emoji -->
+                                        <TextBlock Text="{Binding FileTypeIcon}"
+                                                   FontSize="15" FontFamily="Segoe UI Emoji"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource AppTextColor}"/>
+                                        <!-- Install order badge — bottom-right, 1-based -->
+                                        <Border Width="13" Height="13" CornerRadius="6.5"
+                                                Background="{DynamicResource AppPrimaryColor}"
+                                                HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                                Margin="0,0,-2,-2">
+                                            <TextBlock Text="{Binding InstallOrder,
+                                                               Converter={StaticResource PlusOneConverter}}"
+                                                       FontSize="7.5" FontWeight="Bold"
+                                                       Foreground="White"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"
+                                                       FontFamily="Segoe UI"/>
+                                        </Border>
+                                    </Grid>
                                 </DataTemplate>
                             </GridViewColumn.CellTemplate>
                         </GridViewColumn>
@@ -280,7 +298,7 @@
                                             CornerRadius="4" Padding="6,3" HorizontalAlignment="Left"
                                             ToolTip="{Binding TrustTooltip}">
                                         <TextBlock Text="{Binding StatusDisplay}" FontSize="10" FontWeight="SemiBold"
-                                                   Foreground="{DynamicResource AppTextColor}" FontFamily="Segoe UI"
+                                                   Foreground="White" FontFamily="Segoe UI"
                                                    TextTrimming="CharacterEllipsis"/>
                                     </Border>
                                 </DataTemplate>
@@ -325,7 +343,8 @@
                             <GridViewColumn.CellTemplate>
                                 <DataTemplate>
                                     <Button Style="{StaticResource DeleteButtonStyle}"
-                                            Command="{Binding RemoveCommand}"/>
+                                            Command="{Binding RemoveCommand}"
+                                            AutomationProperties.Name="Remove file"/>
                                 </DataTemplate>
                             </GridViewColumn.CellTemplate>
                         </GridViewColumn>

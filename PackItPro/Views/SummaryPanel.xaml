@@ -308,6 +308,28 @@
                                   Foreground="{DynamicResource AppTextColor}"
                                   HorizontalAlignment="Right"/>
                     </Grid>
+
+                    <!-- Shortcuts defined count -->
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                  Text="Shortcuts"
+                                  FontSize="12"
+                                  Foreground="{DynamicResource AppTextTertiaryColor}"
+                                  FontFamily="Segoe UI"
+                                  VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="1"
+                                  Text="{Binding RelativeSource={RelativeSource AncestorType=Window},
+                                                 Path=DataContext.Shortcuts.Items.Count}"
+                                  FontSize="13"
+                                  FontWeight="SemiBold"
+                                  FontFamily="Consolas"
+                                  Foreground="{DynamicResource AppTextColor}"
+                                  HorizontalAlignment="Right"/>
+                    </Grid>
                 </StackPanel>
 
                 <!-- Quick Tip Info Box -->

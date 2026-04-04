@@ -7,4 +7,6 @@
     <conv:FileStatusToColorConverter x:Key="FileStatusToColor" />
     <conv:ByteToSizeConverter x:Key="ByteToSizeConverter" />
     <conv:StatusToBackgroundConverter x:Key="StatusToBackground" />
+    <conv:PlusOneConverter x:Key="PlusOneConverter" />
+    <conv:IsZeroConverter x:Key="IsZeroConverter" />
 </ResourceDictionary>

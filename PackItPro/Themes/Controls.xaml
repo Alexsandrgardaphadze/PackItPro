@@ -362,6 +362,7 @@
     <!-- ── File row entrance animation ──────────────────────────────────────
          Each new row fades + slides in from 8px left when it's first rendered.
          Applied via ItemContainerStyle on the FileListPanel ListView.
+         The ControlTemplate adds a left accent bar (2px) visible on hover/selected.
     -->
     <Style x:Key="FileRowSlideInStyle" TargetType="ListViewItem">
         <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
@@ -370,6 +371,42 @@
         <Setter Property="RenderTransform">
             <Setter.Value>
                 <TranslateTransform X="0"/>
+            </Setter.Value>
+        </Setter>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListViewItem">
+                    <Grid>
+                        <!-- Left accent bar — 2px, visible on hover/selected -->
+                        <Border x:Name="LeftAccent"
+                                Width="2"
+                                HorizontalAlignment="Left"
+                                Background="{DynamicResource AppPrimaryColor}"
+                                Opacity="0"
+                                CornerRadius="0,1,1,0"/>
+                        <!-- Row background -->
+                        <Border x:Name="RowBg"
+                                Background="Transparent"
+                                Padding="{TemplateBinding Padding}">
+                            <GridViewRowPresenter
+                                Content="{TemplateBinding Content}"
+                                Columns="{Binding Path=View.Columns,
+                                          RelativeSource={RelativeSource AncestorType=ListView}}"/>
+                        </Border>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="RowBg"     Property="Background"
+                                    Value="{DynamicResource AppHoverOverlayColor}"/>
+                            <Setter TargetName="LeftAccent" Property="Opacity" Value="1"/>
+                        </Trigger>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="RowBg"     Property="Background"
+                                    Value="{DynamicResource AppHoverOverlayColor}"/>
+                            <Setter TargetName="LeftAccent" Property="Opacity" Value="1"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
             </Setter.Value>
         </Setter>
         <Style.Triggers>
@@ -392,13 +429,6 @@
                     </Storyboard>
                 </BeginStoryboard>
             </EventTrigger>
-            <Trigger Property="IsMouseOver" Value="True">
-                <Setter Property="Background" Value="{DynamicResource AppHoverOverlayColor}"/>
-            </Trigger>
-            <Trigger Property="IsSelected" Value="True">
-                <Setter Property="Background" Value="{DynamicResource AppPrimaryColor}"/>
-                <Setter Property="Foreground" Value="White"/>
-            </Trigger>
         </Style.Triggers>
     </Style>
 
