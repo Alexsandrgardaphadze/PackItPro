@@ -226,6 +226,27 @@
                         <MenuItem Header="Export List…"
                                   Command="{Binding ExportListCommand}"
                                   Style="{StaticResource SubMenuItemStyle}"/>
+                        <Separator Background="{DynamicResource AppBorderColor}"/>
+                        <!-- Shortcuts submenu ─────────────────────────────── -->
+                        <MenuItem Header="Shortcuts" Style="{StaticResource SubMenuItemStyle}">
+                            <MenuItem.Icon>
+                                <Viewbox Width="14" Height="14">
+                                    <Canvas Width="20" Height="20">
+                                        <Path Data="{StaticResource Icon.OpenExternal}"
+                                              Fill="{DynamicResource AppTextTertiaryColor}"/>
+                                    </Canvas>
+                                </Viewbox>
+                            </MenuItem.Icon>
+                            <MenuItem Header="Manage Shortcuts…"
+                                      Command="{Binding ManageShortcutsCommand}"
+                                      Style="{StaticResource SubMenuItemStyle}"
+                                      ToolTip="Add Desktop / Start Menu shortcuts that StubInstaller creates after installation"/>
+                            <Separator Background="{DynamicResource AppBorderColor}"/>
+                            <MenuItem Header="Add Shortcut"
+                                      Command="{Binding AddShortcutCommand}"
+                                      Style="{StaticResource SubMenuItemStyle}"
+                                      ToolTip="Quickly add a new shortcut entry"/>
+                        </MenuItem>
                     </MenuItem>
 
                     <!-- HELP ──────────────────────────────────────────────── -->
@@ -250,7 +271,7 @@
                     </MenuItem>
                 </Menu>
 
-                <!-- Right: file count badge + theme pill + version -->
+                <!-- Right: theme pill + version -->
                 <StackPanel DockPanel.Dock="Right"
                             Orientation="Horizontal"
                             VerticalAlignment="Center"
@@ -340,14 +361,7 @@
                           VerticalScrollBarVisibility="Auto"
                           HorizontalScrollBarVisibility="Disabled">
                 <StackPanel>
-                    <!--
-                        ShortcutsPanel: lets the packager define Windows shortcuts
-                        that StubInstaller will create on the end-user's machine.
-                        The "+ Add" button inside has an underlined "A" label as a
-                        visual hint — Alt+A is NOT a global Window shortcut (it would
-                        fire while typing). Users click the button or use Tab to reach it.
-                    -->
-                    <views:ShortcutsPanel   DataContext="{Binding Shortcuts}"  Margin="0,0,0,10"/>
+
                     <views:PackSettingsPanel DataContext="{Binding Settings}"   Margin="0,0,0,10"/>
                     <views:SummaryPanel     DataContext="{Binding Summary}"/>
                 </StackPanel>

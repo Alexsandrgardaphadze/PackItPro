@@ -157,22 +157,46 @@
                                     CornerRadius="8"
                                     Padding="16"
                                     Margin="0,0,0,12">
-                                <Grid>
+                    <Grid>
                                     <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>  <!-- Name label -->
                                         <RowDefinition Height="Auto"/>  <!-- Name + Location + Remove -->
                                         <RowDefinition Height="8"/>
-                                        <RowDefinition Height="Auto"/>  <!-- Target path -->
+                                        <RowDefinition Height="Auto"/>  <!-- Target path label -->
+                                        <RowDefinition Height="Auto"/>  <!-- Target path + Browse -->
                                         <RowDefinition Height="8"/>
+                                        <RowDefinition Height="Auto"/>  <!-- Arguments label -->
                                         <RowDefinition Height="Auto"/>  <!-- Arguments -->
                                         <RowDefinition Height="8"/>
+                                        <RowDefinition Height="Auto"/>  <!-- Description label -->
                                         <RowDefinition Height="Auto"/>  <!-- Description -->
+                                        <RowDefinition Height="8"/>
+                                        <RowDefinition Height="Auto"/>  <!-- Validation error -->
                                     </Grid.RowDefinitions>
 
-                                    <!-- Row 0: Name, Location, Remove -->
-                                    <Grid Grid.Row="0">
+                                    <!-- Row 0: Name label -->
+                                    <Grid Grid.Row="0" Margin="0,0,0,4">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0"
+                                                   Text="Shortcut Name"
+                                                   FontSize="11" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource AppTextColor}"
+                                                   FontFamily="Segoe UI"/>
+                                        <TextBlock Grid.Column="1"
+                                                   Text="*"
+                                                   Foreground="{DynamicResource AppStatusErrorColor}"
+                                                   FontWeight="Bold"
+                                                   FontSize="12"
+                                                   Margin="4,0,0,0"/>
+                                    </Grid>
+
+                                    <!-- Row 1: Name, Location, Remove -->
+                                    <Grid Grid.Row="1">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="8"/>
                                             <ColumnDefinition Width="140"/>
                                             <ColumnDefinition Width="8"/>
@@ -184,7 +208,7 @@
                                                  Height="36" Padding="10,6"
                                                  VerticalContentAlignment="Center"
                                                  FontFamily="Segoe UI" FontSize="13"
-                                                 ToolTip="Shortcut display name shown on Desktop / Start Menu (required)">
+                                                 ToolTip="Shortcut display name shown on Desktop / Start Menu">
                                             <TextBox.Style>
                                                 <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
                                                     <Setter Property="BorderThickness" Value="1"/>
@@ -199,16 +223,8 @@
                                             </TextBox.Style>
                                         </TextBox>
 
-                                        <!-- Required indicator -->
-                                        <TextBlock Grid.Column="1" Margin="6,0,0,0"
-                                                   Text="*"
-                                                   Foreground="{DynamicResource AppStatusErrorColor}"
-                                                   VerticalAlignment="Center"
-                                                   FontWeight="Bold"
-                                                   ToolTip="Required field"/>
-
                                         <!-- Location -->
-                                        <ComboBox Grid.Column="3"
+                                        <ComboBox Grid.Column="2"
                                                   SelectedItem="{Binding Location, Mode=TwoWay}"
                                                   Height="36"
                                                   Style="{StaticResource ComprehensiveComboBoxStyle}"
@@ -239,7 +255,7 @@
                                         </ComboBox>
 
                                         <!-- Remove -->
-                                        <Button Grid.Column="5"
+                                        <Button Grid.Column="4"
                                                 Content="✕"
                                                 Command="{Binding RemoveCommand}"
                                                 Width="36" Height="36"
@@ -275,29 +291,100 @@
                                         </Button>
                                     </Grid>
 
-                                    <!-- Row 2: Target Path -->
-                                    <TextBox Grid.Row="2"
-                                             Text="{Binding TargetPath, UpdateSourceTrigger=PropertyChanged}"
-                                             Height="36" Padding="10,6"
-                                             VerticalContentAlignment="Center"
-                                             FontFamily="Consolas" FontSize="12"
-                                             ToolTip="Full path to the target executable. Supports %ProgramFiles%, %AppData%, etc. (required)">
-                                        <TextBox.Style>
-                                            <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
-                                                <Setter Property="BorderThickness" Value="1"/>
-                                                <Setter Property="BorderBrush"     Value="{DynamicResource AppBorderColor}"/>
-                                                <Style.Triggers>
-                                                    <Trigger Property="IsFocused" Value="True">
-                                                        <Setter Property="BorderBrush"     Value="{DynamicResource AppPrimaryColor}"/>
-                                                        <Setter Property="BorderThickness" Value="2"/>
-                                                    </Trigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </TextBox.Style>
-                                    </TextBox>
+                                    <!-- Row 3: Target path label -->
+                                    <Grid Grid.Row="3" Margin="0,0,0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0"
+                                                   Text="Target Path (Executable)"
+                                                   FontSize="11" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource AppTextColor}"
+                                                   FontFamily="Segoe UI"/>
+                                        <TextBlock Grid.Column="1"
+                                                   Text="*"
+                                                   Foreground="{DynamicResource AppStatusErrorColor}"
+                                                   FontWeight="Bold"
+                                                   FontSize="12"
+                                                   Margin="4,0,0,0"/>
+                                    </Grid>
 
-                                    <!-- Row 4: Arguments -->
-                                    <TextBox Grid.Row="4"
+                                    <!-- Row 4: Target Path + Browse -->
+                                    <Grid Grid.Row="4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="8"/>
+                                            <ColumnDefinition Width="36"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox Grid.Column="0"
+                                                 Text="{Binding TargetPath, UpdateSourceTrigger=PropertyChanged}"
+                                                 Height="36" Padding="10,6"
+                                                 VerticalContentAlignment="Center"
+                                                 FontFamily="Consolas" FontSize="12"
+                                                 ToolTip="Full path to the target executable. Supports %ProgramFiles%, %AppData%, etc.">
+                                            <TextBox.Style>
+                                                <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+                                                    <Setter Property="BorderThickness" Value="1"/>
+                                                    <Setter Property="BorderBrush"     Value="{DynamicResource AppBorderColor}"/>
+                                                    <Style.Triggers>
+                                                        <Trigger Property="IsFocused" Value="True">
+                                                            <Setter Property="BorderBrush"     Value="{DynamicResource AppPrimaryColor}"/>
+                                                            <Setter Property="BorderThickness" Value="2"/>
+                                                        </Trigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBox.Style>
+                                        </TextBox>
+
+                                        <!-- Browse button -->
+                                        <Button Grid.Column="2"
+                                                Content="…"
+                                                Click="BrowseTargetPath_Click"
+                                                Height="36" Width="36"
+                                                FontSize="13"
+                                                ToolTip="Browse for executable"
+                                                Cursor="Hand">
+                                            <Button.Style>
+                                                <Style TargetType="Button">
+                                                    <Setter Property="Background"      Value="{DynamicResource AppCardColor}"/>
+                                                    <Setter Property="Foreground"      Value="{DynamicResource AppTextColor}"/>
+                                                    <Setter Property="BorderBrush"     Value="{DynamicResource AppBorderColor}"/>
+                                                    <Setter Property="BorderThickness" Value="1"/>
+                                                    <Setter Property="Template">
+                                                        <Setter.Value>
+                                                            <ControlTemplate TargetType="Button">
+                                                                <Border Background="{TemplateBinding Background}"
+                                                                        CornerRadius="6"
+                                                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                                                        BorderThickness="{TemplateBinding BorderThickness}">
+                                                                    <ContentPresenter HorizontalAlignment="Center"
+                                                                                      VerticalAlignment="Center"/>
+                                                                </Border>
+                                                            </ControlTemplate>
+                                                        </Setter.Value>
+                                                    </Setter>
+                                                    <Style.Triggers>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter Property="Background" Value="{DynamicResource AppHoverOverlayColor}"/>
+                                                            <Setter Property="BorderBrush" Value="{DynamicResource AppPrimaryColor}"/>
+                                                        </Trigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                        </Button>
+                                    </Grid>
+
+                                    <!-- Row 6: Arguments label -->
+                                    <TextBlock Grid.Row="6"
+                                               Text="Arguments (Optional)"
+                                               FontSize="11" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource AppTextColor}"
+                                               FontFamily="Segoe UI"
+                                               Margin="0,0,0,4"/>
+
+                                    <!-- Row 7: Arguments -->
+                                    <TextBox Grid.Row="7"
                                              Text="{Binding Arguments, UpdateSourceTrigger=PropertyChanged}"
                                              Height="36" Padding="10,6"
                                              VerticalContentAlignment="Center"
@@ -317,8 +404,16 @@
                                         </TextBox.Style>
                                     </TextBox>
 
-                                    <!-- Row 6: Description -->
-                                    <TextBox Grid.Row="6"
+                                    <!-- Row 9: Description label -->
+                                    <TextBlock Grid.Row="9"
+                                               Text="Description (Optional)"
+                                               FontSize="11" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource AppTextColor}"
+                                               FontFamily="Segoe UI"
+                                               Margin="0,0,0,4"/>
+
+                                    <!-- Row 10: Description -->
+                                    <TextBox Grid.Row="10"
                                              Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}"
                                              Height="36" Padding="10,6"
                                              VerticalContentAlignment="Center"
@@ -337,6 +432,31 @@
                                             </Style>
                                         </TextBox.Style>
                                     </TextBox>
+
+                                    <!-- Row 12: Validation error -->
+                                    <TextBlock Grid.Row="12"
+                                               Text="{Binding ValidationError}"
+                                               FontSize="10" FontFamily="Segoe UI"
+                                               Foreground="{DynamicResource AppStatusErrorColor}"
+                                               TextWrapping="Wrap"
+                                               Margin="0,4,0,0">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding ValidationError}" Value="">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding ValidationError}" Value="{x:Null}">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                    </DataTrigger>
+                                                    <Trigger Property="Text" Value="">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                    </Trigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
                                 </Grid>
                             </Border>
                         </DataTemplate>

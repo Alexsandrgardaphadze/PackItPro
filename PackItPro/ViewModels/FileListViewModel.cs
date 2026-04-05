@@ -210,7 +210,7 @@ namespace PackItPro.ViewModels
                     Status = FileStatusEnum.Pending,
                     Positives = 0,
                     TotalScans = 0,
-                    InstallOrder = 0
+                    InstallOrder = _items.Count
                 };
                 fileItem.RemoveCommand = new RelayCommand(_ => ExecuteRemoveFile(fileItem));
                 _items.Add(fileItem);
