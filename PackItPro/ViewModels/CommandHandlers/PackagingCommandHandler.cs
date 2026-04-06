@@ -138,6 +138,21 @@ namespace PackItPro.ViewModels.CommandHandlers
                 // Collect shortcuts — blank rows are filtered inside ToModelList().
                 var shortcuts = _shortcuts.ToModelList();
 
+                // P0 FIX: Validate shortcuts before packing
+                var invalidShortcuts = _shortcuts.Items
+                    .Where(s => !string.IsNullOrWhiteSpace(s.Name) || !string.IsNullOrWhiteSpace(s.TargetPath))
+                    .Where(s => !string.IsNullOrWhiteSpace(s.ValidationError))
+                    .ToList();
+
+                if (invalidShortcuts.Count > 0)
+                {
+                    var details = string.Join("\n", invalidShortcuts.Select((s, i) =>
+                        $"  {i + 1}. {s.Name}: {s.ValidationError}"));
+                    _error.ShowError(
+                        $"Cannot create package: {invalidShortcuts.Count} shortcut(s) have validation errors:\n\n{details}");
+                    return;
+                }
+
                 string outputPath = await Packager.CreatePackageAsync(
                     filePaths: fileEntries,
                     outputDirectory: Path.GetDirectoryName(saveDialog.FileName) ?? _settings.OutputLocation,

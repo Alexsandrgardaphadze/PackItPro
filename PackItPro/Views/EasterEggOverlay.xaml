@@ -1,0 +1,119 @@
+﻿<!-- PackItPro/Views/EasterEggOverlay.xaml
+     Triggered by the Konami code (↑↑↓↓←→←→BA) in MainWindow.
+     A borderless translucent overlay that fades in, celebrates, then closes.
+     All colors are hardcoded Miku-teal so they look correct in both themes.
+-->
+<Window x:Class="PackItPro.Views.EasterEggOverlay"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title=""
+        Width="420" Height="340"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ResizeMode="NoResize"
+        Topmost="True"
+        ShowInTaskbar="False"
+        Focusable="False"
+        IsHitTestVisible="False">
+
+    <Window.Triggers>
+        <!-- Auto-play the full animation sequence on load -->
+        <EventTrigger RoutedEvent="Loaded">
+            <BeginStoryboard>
+                <Storyboard x:Name="EggStoryboard">
+                    <!-- Fade in -->
+                    <DoubleAnimation Storyboard.TargetName="EggRoot"
+                                     Storyboard.TargetProperty="Opacity"
+                                     From="0" To="1"
+                                     Duration="0:0:0.35"
+                                     BeginTime="0:0:0"/>
+                    <!-- Bounce the card in from below -->
+                    <DoubleAnimation Storyboard.TargetName="CardTranslate"
+                                     Storyboard.TargetProperty="Y"
+                                     From="40" To="0"
+                                     Duration="0:0:0.4"
+                                     BeginTime="0:0:0">
+                        <DoubleAnimation.EasingFunction>
+                            <BackEase EasingMode="EaseOut" Amplitude="0.4"/>
+                        </DoubleAnimation.EasingFunction>
+                    </DoubleAnimation>
+                    <!-- Hold for 2.8 seconds -->
+                    <!-- Fade out -->
+                    <DoubleAnimation Storyboard.TargetName="EggRoot"
+                                     Storyboard.TargetProperty="Opacity"
+                                     From="1" To="0"
+                                     Duration="0:0:0.5"
+                                     BeginTime="0:0:3.2"/>
+                </Storyboard>
+            </BeginStoryboard>
+        </EventTrigger>
+    </Window.Triggers>
+
+    <Grid x:Name="EggRoot" Opacity="0">
+        <!-- Semi-transparent backdrop -->
+        <Border CornerRadius="20"
+                Background="#CC0d1117"
+                BorderBrush="#3939d4c8"
+                BorderThickness="1">
+            <Border.Effect>
+                <DropShadowEffect Color="#39d4c8" Opacity="0.5" BlurRadius="30" ShadowDepth="0"/>
+            </Border.Effect>
+        </Border>
+
+        <!-- Card content -->
+        <Border CornerRadius="20" Padding="32,28">
+            <Border.RenderTransform>
+                <TranslateTransform x:Name="CardTranslate" Y="40"/>
+            </Border.RenderTransform>
+
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+
+                <!-- Miku kaomoji / ASCII art -->
+                <TextBlock Text="ミク"
+                           FontSize="48"
+                           FontFamily="Segoe UI Emoji, Yu Gothic, MS Gothic"
+                           HorizontalAlignment="Center"
+                           Foreground="#39d4c8"
+                           Margin="0,0,0,4"/>
+
+                <TextBlock Text="(ﾉ◕ヮ◕)ﾉ*:･ﾟ✧"
+                           FontSize="22"
+                           FontFamily="Segoe UI Emoji"
+                           HorizontalAlignment="Center"
+                           Foreground="#5be0d8"
+                           Margin="0,0,0,16"/>
+
+                <!-- Message -->
+                <TextBlock Text="You found the Easter egg! ✨"
+                           FontSize="16" FontWeight="SemiBold"
+                           FontFamily="Segoe UI"
+                           Foreground="#ffffff"
+                           HorizontalAlignment="Center"
+                           Margin="0,0,0,6"/>
+
+                <TextBlock FontSize="12" FontFamily="Segoe UI"
+                           Foreground="#94a3b8"
+                           HorizontalAlignment="Center"
+                           TextAlignment="Center"
+                           TextWrapping="Wrap"
+                           MaxWidth="320">
+                    <Run Text="Hatsune Miku says: keep packaging and never stop"/>
+                    <LineBreak/>
+                    <Run Text="✨ 初音ミクはあなたを応援しています ✨" FontSize="11"/>
+                </TextBlock>
+
+                <!-- Teal divider -->
+                <Border Height="1" Background="#2239d4c8"
+                        Margin="0,18,0,14" CornerRadius="1"/>
+
+                <!-- Konami hint -->
+                <TextBlock Text="↑ ↑ ↓ ↓ ← → ← → B A"
+                           FontSize="11" FontFamily="Consolas"
+                           Foreground="#39d4c8"
+                           HorizontalAlignment="Center"
+                           Opacity="0.6"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

@@ -271,14 +271,12 @@
                     </MenuItem>
                 </Menu>
 
-                <!-- Right: theme pill + version -->
+                <!-- Right: file count badge + theme pill + version -->
                 <StackPanel DockPanel.Dock="Right"
                             Orientation="Horizontal"
                             VerticalAlignment="Center"
                             Margin="0,0,8,0">
 
-                    <Border Width="1" Background="{DynamicResource AppDividerColor}"
-                            Margin="0,6,8,6" VerticalAlignment="Stretch"/>
 
                     <!-- Pill theme toggle — Ctrl+T -->
                     <Button Command="{Binding ToggleThemeCommand}"

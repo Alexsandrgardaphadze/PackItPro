@@ -19,9 +19,12 @@
 
     <Grid Margin="20" Background="{DynamicResource AppBackgroundColor}">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>  <!-- Header -->
-            <RowDefinition Height="*"/>     <!-- Content -->
-            <RowDefinition Height="Auto"/>  <!-- Footer -->
+            <RowDefinition Height="Auto"/>
+            <!-- Header -->
+            <RowDefinition Height="*"/>
+            <!-- Content -->
+            <RowDefinition Height="Auto"/>
+            <!-- Footer -->
         </Grid.RowDefinitions>
 
         <!-- Header -->
@@ -157,21 +160,30 @@
                                     CornerRadius="8"
                                     Padding="16"
                                     Margin="0,0,0,12">
-                    <Grid>
+                                <Grid>
                                     <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>  <!-- Name label -->
-                                        <RowDefinition Height="Auto"/>  <!-- Name + Location + Remove -->
+                                        <RowDefinition Height="Auto"/>
+                                        <!-- Name label -->
+                                        <RowDefinition Height="Auto"/>
+                                        <!-- Name + Location + Remove -->
                                         <RowDefinition Height="8"/>
-                                        <RowDefinition Height="Auto"/>  <!-- Target path label -->
-                                        <RowDefinition Height="Auto"/>  <!-- Target path + Browse -->
+                                        <RowDefinition Height="Auto"/>
+                                        <!-- Target path label -->
+                                        <RowDefinition Height="Auto"/>
+                                        <!-- Target path + Browse -->
                                         <RowDefinition Height="8"/>
-                                        <RowDefinition Height="Auto"/>  <!-- Arguments label -->
-                                        <RowDefinition Height="Auto"/>  <!-- Arguments -->
+                                        <RowDefinition Height="Auto"/>
+                                        <!-- Arguments label -->
+                                        <RowDefinition Height="Auto"/>
+                                        <!-- Arguments -->
                                         <RowDefinition Height="8"/>
-                                        <RowDefinition Height="Auto"/>  <!-- Description label -->
-                                        <RowDefinition Height="Auto"/>  <!-- Description -->
+                                        <RowDefinition Height="Auto"/>
+                                        <!-- Description label -->
+                                        <RowDefinition Height="Auto"/>
+                                        <!-- Description -->
                                         <RowDefinition Height="8"/>
-                                        <RowDefinition Height="Auto"/>  <!-- Validation error -->
+                                        <RowDefinition Height="Auto"/>
+                                        <!-- Validation error -->
                                     </Grid.RowDefinitions>
 
                                     <!-- Row 0: Name label -->
@@ -433,7 +445,7 @@
                                         </TextBox.Style>
                                     </TextBox>
 
-                                    <!-- Row 12: Validation error -->
+                                    <!-- Row 12: Validation error — visible when non-empty -->
                                     <TextBlock Grid.Row="12"
                                                Text="{Binding ValidationError}"
                                                FontSize="10" FontFamily="Segoe UI"
@@ -442,7 +454,8 @@
                                                Margin="0,4,0,0">
                                         <TextBlock.Style>
                                             <Style TargetType="TextBlock">
-                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <!-- Default: Visible — collapsed only when error is empty/null -->
+                                                <Setter Property="Visibility" Value="Visible"/>
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding ValidationError}" Value="">
                                                         <Setter Property="Visibility" Value="Collapsed"/>
@@ -450,9 +463,6 @@
                                                     <DataTrigger Binding="{Binding ValidationError}" Value="{x:Null}">
                                                         <Setter Property="Visibility" Value="Collapsed"/>
                                                     </DataTrigger>
-                                                    <Trigger Property="Text" Value="">
-                                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                                    </Trigger>
                                                 </Style.Triggers>
                                             </Style>
                                         </TextBlock.Style>
