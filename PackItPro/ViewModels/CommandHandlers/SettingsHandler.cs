@@ -7,9 +7,13 @@ using System.IO;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Threading;
 
 namespace PackItPro.ViewModels.CommandHandlers
 {
+    /// <summary>
+    /// Handles Settings-related commands and provides debounced auto-save.
+    /// </summary>
     public class SettingsHandler : CommandHandlerBase
     {
         private readonly SettingsViewModel _settings;
@@ -20,6 +24,10 @@ namespace PackItPro.ViewModels.CommandHandlers
         private readonly string _cacheFilePath;
         private readonly string _appDataDir;
         private readonly ILogService _log;
+
+        // P1 FIX: Debounce timer for settings auto-save
+        private DispatcherTimer? _saveDebounceTimer;
+        private const int DebounceDelayMs = 500;
 
         public ICommand SetOutputLocationCommand { get; }
         public ICommand SetVirusApiKeyCommand { get; }
@@ -55,6 +63,49 @@ namespace PackItPro.ViewModels.CommandHandlers
             ExportLogsCommand = new RelayCommand(ExecuteExportLogs);
             PackItProSettingsCommand = new RelayCommand(ExecutePackItProSettings);
             ViewCacheCommand = new RelayCommand(ExecuteViewCache);
+
+            // P1 FIX: Subscribe to settings changes for debounced auto-save
+            _settings.PropertyChanged += (s, e) =>
+            {
+                if (e.PropertyName == nameof(SettingsViewModel.OnlyScanExecutables) ||
+                    e.PropertyName == nameof(SettingsViewModel.AutoRemoveInfectedFiles) ||
+                    e.PropertyName == nameof(SettingsViewModel.MinimumDetectionsToFlag) ||
+                    e.PropertyName == nameof(SettingsViewModel.IncludeWingetUpdateScript) ||
+                    e.PropertyName == nameof(SettingsViewModel.RequiresAdmin) ||
+                    e.PropertyName == nameof(SettingsViewModel.ScanWithVirusTotal) ||
+                    e.PropertyName == nameof(SettingsViewModel.CompressionLevel) ||
+                    e.PropertyName == nameof(SettingsViewModel.ScanOnAdd) ||
+                    e.PropertyName == nameof(SettingsViewModel.OutputLocation) ||
+                    e.PropertyName == nameof(SettingsViewModel.OutputFileName))
+                {
+                    ScheduleDebouncedSave();
+                }
+            };
+        }
+
+        /// <summary>
+        /// Schedules settings to be saved after a debounce delay.
+        /// If another property changes within the delay, the timer resets.
+        /// This prevents multiple disk writes when the user rapidly changes settings.
+        /// </summary>
+        private void ScheduleDebouncedSave()
+        {
+            _saveDebounceTimer?.Stop();
+            _saveDebounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(DebounceDelayMs) };
+            _saveDebounceTimer.Tick += async (s, e) =>
+            {
+                _saveDebounceTimer?.Stop();
+                await _settings.SaveSettingsAsync();
+                _log.Debug("Settings auto-saved (debounced)");
+            };
+            _saveDebounceTimer.Start();
+        }
+
+        public override void Dispose()
+        {
+            _saveDebounceTimer?.Stop();
+            _saveDebounceTimer = null;
+            base.Dispose();
         }
 
         // ── Output Location ───────────────────────────────────────────────────

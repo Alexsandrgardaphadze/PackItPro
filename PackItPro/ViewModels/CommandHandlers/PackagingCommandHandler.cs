@@ -20,6 +20,7 @@ namespace PackItPro.ViewModels.CommandHandlers
         private readonly StatusViewModel _status;
         private readonly ErrorViewModel _error;
         private readonly ILogService _log;
+        private readonly ShortcutListViewModel _shortcuts;
 
         private CancellationTokenSource? _packCts;
         private string? _lastPackedFile; // used by TestPackageCommand
@@ -32,13 +33,15 @@ namespace PackItPro.ViewModels.CommandHandlers
             SettingsViewModel settings,
             StatusViewModel status,
             ErrorViewModel error,
-            ILogService log)
+            ILogService log,
+            ShortcutListViewModel shortcuts)
         {
             _fileList = fileList ?? throw new ArgumentNullException(nameof(fileList));
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
             _status = status ?? throw new ArgumentNullException(nameof(status));
             _error = error ?? throw new ArgumentNullException(nameof(error));
             _log = log ?? throw new ArgumentNullException(nameof(log));
+            _shortcuts = shortcuts ?? throw new ArgumentNullException(nameof(shortcuts));
 
             PackCommand = new AsyncRelayCommand(ExecutePackAsync, CanExecutePack);
             TestPackageCommand = new RelayCommand(ExecuteTestPackage, CanTestPackage);
@@ -59,11 +62,8 @@ namespace PackItPro.ViewModels.CommandHandlers
 
         // ── Can Execute ───────────────────────────────────────────────────────
 
-        private bool CanExecutePack(object? _) =>
-            _fileList.HasFiles && !_status.IsBusy;
-
-        private bool CanTestPackage(object? _) =>
-            !string.IsNullOrEmpty(_lastPackedFile) && File.Exists(_lastPackedFile);
+        private bool CanExecutePack(object? _) => _fileList.HasFiles && !_status.IsBusy;
+        private bool CanTestPackage(object? _) => !string.IsNullOrEmpty(_lastPackedFile) && File.Exists(_lastPackedFile);
 
         // ── Pack ──────────────────────────────────────────────────────────────
 
@@ -81,9 +81,6 @@ namespace PackItPro.ViewModels.CommandHandlers
                     return;
                 }
 
-                // Show disclaimer on first pack. Once accepted with "do not show again"
-                // ticked, it is saved to settings.json and suppressed on future packs.
-                // Disclaimer shows on every pack (DisclaimerAccepted intentionally ignored)
                 {
                     int pendingCount = _fileList.Items.Count(f => f.Status == FileStatusEnum.Pending);
                     int scannedCount = _fileList.CleanCount + _fileList.InfectedCount + _fileList.FailedCount;
@@ -124,20 +121,37 @@ namespace PackItPro.ViewModels.CommandHandlers
                     _log.Debug($"Pack {report.percentage}%: {report.message}");
                 });
 
-                // Build FileEntry list — carries Notes and VT scan result per file.
-                // Status→string mapping: Clean/Trusted→"clean", Infected→"infected", others→null
+                // Build FileEntry list — carries CustomArgs and VT scan result per file.
                 var fileEntries = _fileList.Items
                     .Select(f => new ManifestGenerator.FileEntry(
                         Path: f.FilePath,
-                        Notes: string.IsNullOrWhiteSpace(f.Notes) ? null : f.Notes.Trim(),
+                        CustomArgs: string.IsNullOrWhiteSpace(f.CustomArgs) ? null : f.CustomArgs.Trim(),
                         ScanResult: f.Status switch
                         {
                             FileStatusEnum.Clean => "clean",
-                            FileStatusEnum.Trusted => "clean",    // trusted = confirmed safe
+                            FileStatusEnum.Trusted => "clean",
                             FileStatusEnum.Infected => "infected",
-                            _ => null,                             // Pending/ScanFailed/Skipped
+                            _ => null,
                         }))
                     .ToList();
+
+                // Collect shortcuts — blank rows are filtered inside ToModelList().
+                var shortcuts = _shortcuts.ToModelList();
+
+                // P0 FIX: Validate shortcuts before packing
+                var invalidShortcuts = _shortcuts.Items
+                    .Where(s => !string.IsNullOrWhiteSpace(s.Name) || !string.IsNullOrWhiteSpace(s.TargetPath))
+                    .Where(s => !string.IsNullOrWhiteSpace(s.ValidationError))
+                    .ToList();
+
+                if (invalidShortcuts.Count > 0)
+                {
+                    var details = string.Join("\n", invalidShortcuts.Select((s, i) =>
+                        $"  {i + 1}. {s.Name}: {s.ValidationError}"));
+                    _error.ShowError(
+                        $"Cannot create package: {invalidShortcuts.Count} shortcut(s) have validation errors:\n\n{details}");
+                    return;
+                }
 
                 string outputPath = await Packager.CreatePackageAsync(
                     filePaths: fileEntries,
@@ -148,15 +162,17 @@ namespace PackItPro.ViewModels.CommandHandlers
                     includeWingetUpdateScript: _settings.IncludeWingetUpdateScript,
                     progress: progress,
                     log: _log,
-                    ct: _packCts.Token);
+                    ct: _packCts.Token,
+                    shortcuts: shortcuts.Count > 0 ? shortcuts : null);
 
                 _lastPackedFile = outputPath;
                 succeeded = true;
-                _settings.OutputFileName = string.Empty; // Reset for next package
+                _settings.OutputFileName = string.Empty;
+                _settings.SettingsModel.AddRecentPackage(outputPath);
+                _ = _settings.SaveSettingsAsync();
                 _status.SetStatusSuccess($"Package created — {Path.GetFileName(outputPath)}");
-                RaiseCanExecuteChanged(); // enable TestPackageCommand
+                RaiseCanExecuteChanged();
 
-                // Windows toast — fires immediately; dialog appears after
                 ToastService.NotifyPackageCreated(Path.GetFileName(outputPath), outputPath);
 
                 bool openFolder = ConfirmDialog.Show(
@@ -167,8 +183,7 @@ namespace PackItPro.ViewModels.CommandHandlers
                     cancelLabel: "Close",
                     kind: ConfirmDialog.Kind.Info);
 
-                if (openFolder)
-                    OpenFolderAndSelect(outputPath);
+                if (openFolder) OpenFolderAndSelect(outputPath);
             }
             catch (OperationCanceledException)
             {
@@ -219,20 +234,15 @@ namespace PackItPro.ViewModels.CommandHandlers
         }
 
         // ── Test Package ──────────────────────────────────────────────────────
-        // Opens the folder containing the last packed file and selects it in Explorer.
-        // This is the most useful "test" action short of running the installer —
-        // it lets users immediately drag it to a VM, share it, or run it manually.
 
         private void ExecuteTestPackage(object? parameter)
         {
-            // If we have a recently packed file, reveal it in Explorer
             if (!string.IsNullOrEmpty(_lastPackedFile) && File.Exists(_lastPackedFile))
             {
                 OpenFolderAndSelect(_lastPackedFile);
                 return;
             }
 
-            // Otherwise let them browse to a .exe to open its folder
             var dialog = new OpenFileDialog
             {
                 Title = "Select a PackItPro package to locate",
@@ -241,9 +251,7 @@ namespace PackItPro.ViewModels.CommandHandlers
             };
 
             if (dialog.ShowDialog() != true) return;
-
-            if (File.Exists(dialog.FileName))
-                OpenFolderAndSelect(dialog.FileName);
+            if (File.Exists(dialog.FileName)) OpenFolderAndSelect(dialog.FileName);
         }
 
         // ── Helpers ───────────────────────────────────────────────────────────
@@ -252,7 +260,6 @@ namespace PackItPro.ViewModels.CommandHandlers
         {
             try
             {
-                // /select highlights the specific file in Explorer
                 System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
                 {
                     FileName = "explorer.exe",

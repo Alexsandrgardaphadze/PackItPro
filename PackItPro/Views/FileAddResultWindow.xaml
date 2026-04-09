@@ -6,12 +6,12 @@
         SizeToContent="Height"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
-        Background="{StaticResource AppBackgroundColor}"
+        Background="{DynamicResource AppBackgroundColor}"
         ShowInTaskbar="False">
 
     <Grid Margin="12">
-        <Border Background="{StaticResource AppPanelColor}"
-                BorderBrush="{StaticResource AppBorderColor}"
+        <Border Background="{DynamicResource AppPanelColor}"
+                BorderBrush="{DynamicResource AppBorderColor}"
                 BorderThickness="1"
                 CornerRadius="10"
                 Padding="22,18">
@@ -31,16 +31,16 @@
                     <TextBlock x:Name="TitleText"
                                Text="Files Added"
                                FontSize="15" FontWeight="SemiBold"
-                               Foreground="{StaticResource AppTextColor}"
+                               Foreground="{DynamicResource AppTextColor}"
                                FontFamily="Segoe UI"
                                VerticalAlignment="Center"/>
                 </StackPanel>
 
                 <!-- Success count -->
                 <Border x:Name="SuccessBox"
-                        Background="{StaticResource AppCardColor}"
+                        Background="{DynamicResource AppCardColor}"
                         CornerRadius="8" Padding="14,10"
-                        BorderBrush="{StaticResource AppBorderColor}"
+                        BorderBrush="{DynamicResource AppBorderColor}"
                         BorderThickness="1"
                         Margin="0,0,0,10"
                         Visibility="Collapsed">
@@ -51,22 +51,22 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0"
                                    Text="Added successfully"
-                                   FontSize="13" Foreground="{StaticResource AppTextSecondaryColor}"
+                                   FontSize="13" Foreground="{DynamicResource AppTextSecondaryColor}"
                                    FontFamily="Segoe UI" VerticalAlignment="Center"/>
                         <TextBlock x:Name="SuccessCountText"
                                    Grid.Column="1"
                                    Text="0 file(s)"
                                    FontSize="14" FontWeight="Bold"
                                    FontFamily="Consolas"
-                                   Foreground="{StaticResource AppStatusCleanColor}"/>
+                                   Foreground="{DynamicResource AppStatusCleanColor}"/>
                     </Grid>
                 </Border>
 
                 <!-- Skipped section -->
                 <Border x:Name="SkippedBox"
-                        Background="{StaticResource AppCardColor}"
+                        Background="{DynamicResource AppCardColor}"
                         CornerRadius="8" Padding="14,10"
-                        BorderBrush="{StaticResource AppBorderColor}"
+                        BorderBrush="{DynamicResource AppBorderColor}"
                         BorderThickness="1"
                         Margin="0,0,0,10"
                         Visibility="Collapsed">
@@ -78,23 +78,23 @@
                             </Grid.ColumnDefinitions>
                             <TextBlock Grid.Column="0"
                                        Text="Skipped"
-                                       FontSize="13" Foreground="{StaticResource AppTextSecondaryColor}"
+                                       FontSize="13" Foreground="{DynamicResource AppTextSecondaryColor}"
                                        FontFamily="Segoe UI" VerticalAlignment="Center"/>
                             <TextBlock x:Name="SkippedCountText"
                                        Grid.Column="1"
                                        Text="0 file(s)"
                                        FontSize="14" FontWeight="Bold"
                                        FontFamily="Consolas"
-                                       Foreground="{StaticResource AppStatusErrorColor}"/>
+                                       Foreground="{DynamicResource AppStatusErrorColor}"/>
                         </Grid>
-                        <Border Height="1" Background="{StaticResource AppDividerColor}" Margin="0,0,0,8"/>
+                        <Border Height="1" Background="{DynamicResource AppDividerColor}" Margin="0,0,0,8"/>
                         <ItemsControl x:Name="SkipReasonsList">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <TextBlock Text="{Binding}"
                                                FontSize="11"
                                                FontFamily="Segoe UI"
-                                               Foreground="{StaticResource AppTextTertiaryColor}"
+                                               Foreground="{DynamicResource AppTextTertiaryColor}"
                                                TextWrapping="Wrap"
                                                Margin="0,1"/>
                                 </DataTemplate>
@@ -102,7 +102,7 @@
                         </ItemsControl>
                         <TextBlock x:Name="MoreSkippedText"
                                    FontSize="11"
-                                   Foreground="{StaticResource AppTextTertiaryColor}"
+                                   Foreground="{DynamicResource AppTextTertiaryColor}"
                                    FontFamily="Segoe UI"
                                    Margin="0,4,0,0"
                                    Visibility="Collapsed"/>

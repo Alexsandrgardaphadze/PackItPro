@@ -6,12 +6,12 @@
         SizeToContent="Height"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
-        Background="{StaticResource AppBackgroundColor}"
+        Background="{DynamicResource AppBackgroundColor}"
         ShowInTaskbar="False">
 
     <Grid Margin="12">
-        <Border Background="{StaticResource AppPanelColor}"
-                BorderBrush="{StaticResource AppBorderColor}"
+        <Border Background="{DynamicResource AppPanelColor}"
+                BorderBrush="{DynamicResource AppBorderColor}"
                 BorderThickness="1"
                 CornerRadius="10"
                 Padding="24,20">
@@ -32,12 +32,12 @@
                         <TextBlock x:Name="TitleText"
                                    Text="Scan Complete"
                                    FontSize="16" FontWeight="SemiBold"
-                                   Foreground="{StaticResource AppTextColor}"
+                                   Foreground="{DynamicResource AppTextColor}"
                                    FontFamily="Segoe UI"/>
                         <TextBlock x:Name="SubtitleText"
                                    Text=""
                                    FontSize="12"
-                                   Foreground="{StaticResource AppTextTertiaryColor}"
+                                   Foreground="{DynamicResource AppTextTertiaryColor}"
                                    FontFamily="Segoe UI"/>
                     </StackPanel>
                 </StackPanel>
@@ -52,44 +52,44 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <Border Grid.Column="0" Background="{StaticResource AppCardColor}"
+                    <Border Grid.Column="0" Background="{DynamicResource AppCardColor}"
                             CornerRadius="8" Padding="10,8"
-                            BorderBrush="{StaticResource AppBorderColor}" BorderThickness="1">
+                            BorderBrush="{DynamicResource AppBorderColor}" BorderThickness="1">
                         <StackPanel HorizontalAlignment="Center">
                             <TextBlock x:Name="TotalText" Text="0"
                                        FontSize="20" FontWeight="Bold" FontFamily="Consolas"
-                                       Foreground="{StaticResource AppTextColor}"
+                                       Foreground="{DynamicResource AppTextColor}"
                                        HorizontalAlignment="Center"/>
                             <TextBlock Text="Scanned"
-                                       FontSize="10" Foreground="{StaticResource AppTextTertiaryColor}"
+                                       FontSize="10" Foreground="{DynamicResource AppTextTertiaryColor}"
                                        FontFamily="Segoe UI" HorizontalAlignment="Center"/>
                         </StackPanel>
                     </Border>
 
-                    <Border Grid.Column="2" Background="{StaticResource AppCardColor}"
+                    <Border Grid.Column="2" Background="{DynamicResource AppCardColor}"
                             CornerRadius="8" Padding="10,8"
-                            BorderBrush="{StaticResource AppBorderColor}" BorderThickness="1">
+                            BorderBrush="{DynamicResource AppBorderColor}" BorderThickness="1">
                         <StackPanel HorizontalAlignment="Center">
                             <TextBlock x:Name="CleanText" Text="0"
                                        FontSize="20" FontWeight="Bold" FontFamily="Consolas"
-                                       Foreground="{StaticResource AppStatusCleanColor}"
+                                       Foreground="{DynamicResource AppStatusCleanColor}"
                                        HorizontalAlignment="Center"/>
                             <TextBlock Text="Clean"
-                                       FontSize="10" Foreground="{StaticResource AppTextTertiaryColor}"
+                                       FontSize="10" Foreground="{DynamicResource AppTextTertiaryColor}"
                                        FontFamily="Segoe UI" HorizontalAlignment="Center"/>
                         </StackPanel>
                     </Border>
 
-                    <Border Grid.Column="4" Background="{StaticResource AppCardColor}"
+                    <Border Grid.Column="4" Background="{DynamicResource AppCardColor}"
                             CornerRadius="8" Padding="10,8"
-                            BorderBrush="{StaticResource AppBorderColor}" BorderThickness="1">
+                            BorderBrush="{DynamicResource AppBorderColor}" BorderThickness="1">
                         <StackPanel HorizontalAlignment="Center">
                             <TextBlock x:Name="IssueText" Text="0"
                                        FontSize="20" FontWeight="Bold" FontFamily="Consolas"
-                                       Foreground="{StaticResource AppStatusErrorColor}"
+                                       Foreground="{DynamicResource AppStatusErrorColor}"
                                        HorizontalAlignment="Center"/>
                             <TextBlock x:Name="IssueLabel" Text="Infected"
-                                       FontSize="10" Foreground="{StaticResource AppTextTertiaryColor}"
+                                       FontSize="10" Foreground="{DynamicResource AppTextTertiaryColor}"
                                        FontFamily="Segoe UI" HorizontalAlignment="Center"/>
                         </StackPanel>
                     </Border>
@@ -97,15 +97,15 @@
 
                 <!-- Detail message -->
                 <Border x:Name="DetailBox"
-                        Background="{StaticResource AppCardColor}"
+                        Background="{DynamicResource AppCardColor}"
                         CornerRadius="6" Padding="12"
-                        BorderBrush="{StaticResource AppBorderColor}"
+                        BorderBrush="{DynamicResource AppBorderColor}"
                         BorderThickness="1"
                         Margin="0,0,0,20"
                         Visibility="Collapsed">
                     <TextBlock x:Name="DetailText"
                                FontSize="12"
-                               Foreground="{StaticResource AppTextSecondaryColor}"
+                               Foreground="{DynamicResource AppTextSecondaryColor}"
                                FontFamily="Segoe UI"
                                TextWrapping="Wrap"
                                LineHeight="18"/>

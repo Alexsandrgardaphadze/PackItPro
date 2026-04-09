@@ -6,7 +6,7 @@
         MinHeight="420" MinWidth="420"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
-        Background="{StaticResource AppBackgroundColor}"
+        Background="{DynamicResource AppBackgroundColor}"
         ShowInTaskbar="False">
 
     <Grid Margin="16">
@@ -27,23 +27,23 @@
         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,14">
             <TextBlock Text="&#x2B06;" FontSize="20" Margin="0,0,10,0"
                        VerticalAlignment="Center"
-                       Foreground="{StaticResource AppStatusCleanColor}"/>
+                       Foreground="{DynamicResource AppStatusCleanColor}"/>
             <StackPanel VerticalAlignment="Center">
                 <TextBlock Text="Update Available"
                            FontSize="16" FontWeight="SemiBold"
                            FontFamily="Segoe UI"
-                           Foreground="{StaticResource AppTextColor}"/>
+                           Foreground="{DynamicResource AppTextColor}"/>
                 <TextBlock x:Name="SubtitleText"
                            FontSize="12" FontFamily="Segoe UI"
-                           Foreground="{StaticResource AppTextTertiaryColor}"
+                           Foreground="{DynamicResource AppTextTertiaryColor}"
                            Margin="0,2,0,0"/>
             </StackPanel>
         </StackPanel>
 
         <!-- Version pill row -->
         <Border Grid.Row="1"
-                Background="{StaticResource AppCardColor}"
-                BorderBrush="{StaticResource AppBorderColor}"
+                Background="{DynamicResource AppCardColor}"
+                BorderBrush="{DynamicResource AppBorderColor}"
                 BorderThickness="1" CornerRadius="8"
                 Padding="14,10" Margin="0,0,0,12">
             <Grid>
@@ -57,19 +57,19 @@
                     <TextBlock Text="CURRENT"
                                FontSize="9" FontWeight="SemiBold"
                                FontFamily="Segoe UI"
-                               Foreground="{StaticResource AppTextTertiaryColor}"
+                               Foreground="{DynamicResource AppTextTertiaryColor}"
                                HorizontalAlignment="Center"/>
                     <TextBlock x:Name="CurrentVersionText"
                                FontSize="15" FontWeight="SemiBold"
                                FontFamily="Consolas"
-                               Foreground="{StaticResource AppTextSecondaryColor}"
+                               Foreground="{DynamicResource AppTextSecondaryColor}"
                                HorizontalAlignment="Center"
                                Margin="0,3,0,0"/>
                 </StackPanel>
 
                 <TextBlock Grid.Column="1" Text="&#x2192;"
                            FontSize="18"
-                           Foreground="{StaticResource AppStatusCleanColor}"
+                           Foreground="{DynamicResource AppStatusCleanColor}"
                            VerticalAlignment="Center"
                            Margin="16,0"/>
 
@@ -77,12 +77,12 @@
                     <TextBlock Text="NEW"
                                FontSize="9" FontWeight="SemiBold"
                                FontFamily="Segoe UI"
-                               Foreground="{StaticResource AppTextTertiaryColor}"
+                               Foreground="{DynamicResource AppTextTertiaryColor}"
                                HorizontalAlignment="Center"/>
                     <TextBlock x:Name="NewVersionText"
                                FontSize="15" FontWeight="SemiBold"
                                FontFamily="Consolas"
-                               Foreground="{StaticResource AppStatusCleanColor}"
+                               Foreground="{DynamicResource AppStatusCleanColor}"
                                HorizontalAlignment="Center"
                                Margin="0,3,0,0"/>
                 </StackPanel>
@@ -91,8 +91,8 @@
 
         <!-- Release notes -->
         <Border Grid.Row="2"
-                Background="{StaticResource AppCardColor}"
-                BorderBrush="{StaticResource AppBorderColor}"
+                Background="{DynamicResource AppCardColor}"
+                BorderBrush="{DynamicResource AppBorderColor}"
                 BorderThickness="1" CornerRadius="8"
                 Padding="14,10" Margin="0,0,0,12">
             <DockPanel>
@@ -100,13 +100,13 @@
                            Text="RELEASE NOTES"
                            FontSize="9" FontWeight="SemiBold"
                            FontFamily="Segoe UI"
-                           Foreground="{StaticResource AppTextTertiaryColor}"
+                           Foreground="{DynamicResource AppTextTertiaryColor}"
                            Margin="0,0,0,6"/>
                 <ScrollViewer VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled">
                     <TextBlock x:Name="ReleaseNotesText"
                                FontSize="12" FontFamily="Segoe UI"
-                               Foreground="{StaticResource AppTextSecondaryColor}"
+                               Foreground="{DynamicResource AppTextSecondaryColor}"
                                TextWrapping="Wrap"
                                LineHeight="18"/>
                 </ScrollViewer>
@@ -121,18 +121,18 @@
                 <TextBlock x:Name="ProgressLabel"
                            Text="Downloading..."
                            FontSize="12" FontFamily="Segoe UI"
-                           Foreground="{StaticResource AppTextSecondaryColor}"
+                           Foreground="{DynamicResource AppTextSecondaryColor}"
                            DockPanel.Dock="Left"/>
                 <TextBlock x:Name="ProgressBytes"
                            FontSize="12" FontFamily="Consolas"
-                           Foreground="{StaticResource AppTextTertiaryColor}"
+                           Foreground="{DynamicResource AppTextTertiaryColor}"
                            HorizontalAlignment="Right"/>
             </DockPanel>
             <ProgressBar x:Name="DownloadProgress"
                          Height="6" Minimum="0" Maximum="100"
-                         Background="{StaticResource AppCardColor}"
+                         Background="{DynamicResource AppCardColor}"
                          BorderThickness="0"
-                         Foreground="{StaticResource AppStatusCleanColor}"/>
+                         Foreground="{DynamicResource AppStatusCleanColor}"/>
         </StackPanel>
 
         <!-- Buttons -->
@@ -148,7 +148,7 @@
             <TextBlock Grid.Column="0"
                        VerticalAlignment="Center">
                 <Hyperlink x:Name="OpenBrowserLink" Click="OpenBrowser_Click"
-                           Foreground="{StaticResource AppTextTertiaryColor}">
+                           Foreground="{DynamicResource AppTextTertiaryColor}">
                     <Run Text="View on GitHub"/>
                 </Hyperlink>
             </TextBlock>
@@ -159,9 +159,9 @@
                     Click="Later_Click">
                 <Button.Style>
                     <Style TargetType="Button">
-                        <Setter Property="Background" Value="{StaticResource AppPanelHoverColor}"/>
-                        <Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
-                        <Setter Property="BorderBrush" Value="{StaticResource AppBorderColor}"/>
+                        <Setter Property="Background" Value="{DynamicResource AppPanelHoverColor}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource AppTextColor}"/>
+                        <Setter Property="BorderBrush" Value="{DynamicResource AppBorderColor}"/>
                         <Setter Property="BorderThickness" Value="1"/>
                         <Setter Property="FontFamily" Value="Segoe UI"/>
                         <Setter Property="FontSize" Value="13"/>
@@ -181,7 +181,7 @@
                         </Setter>
                         <Style.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="{StaticResource AppBorderColor}"/>
+                                <Setter Property="Background" Value="{DynamicResource AppBorderColor}"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Opacity" Value="0.4"/>

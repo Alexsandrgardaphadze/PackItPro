@@ -5,23 +5,23 @@
 
     <!-- ToolTip Style -->
     <Style TargetType="ToolTip">
-        <Setter Property="Background" Value="{StaticResource AppCardColor}"/>
-        <Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
-        <Setter Property="BorderBrush" Value="{StaticResource AppBorderColor}"/>
+        <Setter Property="Background" Value="{DynamicResource AppCardColor}"/>
+        <Setter Property="Foreground" Value="{DynamicResource AppTextColor}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource AppBorderColor}"/>
         <Setter Property="Padding" Value="10"/>
         <Setter Property="FontSize" Value="12"/>
     </Style>
 
     <!-- Summary TextBlock Styles -->
     <Style x:Key="SummaryLabelStyle" TargetType="TextBlock">
-        <Setter Property="Foreground" Value="{StaticResource AppTextTertiaryColor}"/>
+        <Setter Property="Foreground" Value="{DynamicResource AppTextTertiaryColor}"/>
         <Setter Property="FontSize" Value="13"/>
         <Setter Property="VerticalAlignment" Value="Center"/>
         <Setter Property="MinWidth" Value="110"/>
     </Style>
 
     <Style x:Key="SummaryValueStyle" TargetType="TextBlock">
-        <Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
+        <Setter Property="Foreground" Value="{DynamicResource AppTextColor}"/>
         <Setter Property="FontSize" Value="14"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="FontFamily" Value="Consolas"/>
@@ -31,7 +31,7 @@
 
     <Style x:Key="SummarySeparatorStyle" TargetType="Border">
         <Setter Property="Height" Value="1"/>
-        <Setter Property="Background" Value="{StaticResource AppDividerColor}"/>
+        <Setter Property="Background" Value="{DynamicResource AppDividerColor}"/>
         <Setter Property="Margin" Value="0,8,0,8"/>
     </Style>
 
@@ -47,7 +47,7 @@
 	      · Padding slightly increased (14,8) for a more generous click target
 	-->
     <Style x:Key="MenuItemStyle" TargetType="MenuItem">
-        <Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
+        <Setter Property="Foreground" Value="{DynamicResource AppTextColor}"/>
         <Setter Property="FontSize" Value="13"/>
         <Setter Property="FontWeight" Value="Medium"/>
         <Setter Property="Padding" Value="14,8"/>
@@ -68,8 +68,8 @@
                                    IsOpen="{TemplateBinding IsSubmenuOpen}"
                                    AllowsTransparency="True"
                                    Focusable="False">
-                                <Border Background="{StaticResource AppCardColor}"
-                                        BorderBrush="{StaticResource AppBorderColor}"
+                                <Border Background="{DynamicResource AppCardColor}"
+                                        BorderBrush="{DynamicResource AppBorderColor}"
                                         BorderThickness="1"
                                         CornerRadius="8"
                                         Padding="4"
@@ -85,13 +85,13 @@
                     <ControlTemplate.Triggers>
                         <!-- Hover state: pill highlight + accent text -->
                         <Trigger Property="IsHighlighted" Value="True">
-                            <Setter TargetName="border" Property="Background" Value="{StaticResource AppPanelHoverColor}"/>
-                            <Setter Property="Foreground" Value="{StaticResource AppPrimaryColor}"/>
+                            <Setter TargetName="border" Property="Background" Value="{DynamicResource AppPanelHoverColor}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource AppPrimaryColor}"/>
                         </Trigger>
                         <!-- Submenu-open state: stronger accent so active menu is obvious -->
                         <Trigger Property="IsSubmenuOpen" Value="True">
-                            <Setter TargetName="border" Property="Background" Value="#224f46e5"/>
-                            <Setter Property="Foreground" Value="White"/>
+                            <Setter TargetName="border" Property="Background" Value="{DynamicResource AppHoverOverlayColor}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource AppPrimaryColor}"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -100,7 +100,7 @@
     </Style>
 
     <Style x:Key="SubMenuItemStyle" TargetType="MenuItem">
-        <Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
+        <Setter Property="Foreground" Value="{DynamicResource AppTextColor}"/>
         <Setter Property="FontSize" Value="13"/>
         <Setter Property="Padding" Value="10,8"/>
         <Setter Property="Margin" Value="2"/>
@@ -120,7 +120,7 @@
                                             Margin="{TemplateBinding Padding}"/>
                             <TextBlock Grid.Column="1"
                                       Text="{TemplateBinding InputGestureText}"
-                                      Foreground="{StaticResource AppTextTertiaryColor}"
+                                      Foreground="{DynamicResource AppTextTertiaryColor}"
                                       FontSize="11"
                                       Margin="20,0,10,0"
                                       VerticalAlignment="Center"/>
@@ -128,8 +128,91 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsHighlighted" Value="True">
-                            <Setter TargetName="border" Property="Background" Value="{StaticResource AppPrimaryColor}"/>
+                            <Setter TargetName="border" Property="Background" Value="{DynamicResource AppPrimaryColor}"/>
                             <Setter Property="Foreground" Value="White"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+
+    <!--
+        SubMenuHeaderStyle — for MenuItem items that have child MenuItems (flyout submenus).
+        Includes PART_Popup so the submenu flyout actually opens.
+        Use SubMenuItemStyle for leaf items (Commands), this style for flyout parents.
+    -->
+    <Style x:Key="SubMenuHeaderStyle" TargetType="MenuItem">
+        <Setter Property="Foreground"  Value="{DynamicResource AppTextColor}"/>
+        <Setter Property="FontSize"    Value="13"/>
+        <Setter Property="Padding"     Value="10,8"/>
+        <Setter Property="Margin"      Value="2"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="MenuItem">
+                    <Border x:Name="border" Background="Transparent" CornerRadius="6">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Optional icon slot -->
+                            <ContentPresenter Grid.Column="0"
+                                              ContentSource="Icon"
+                                              Width="18" Height="18"
+                                              Margin="8,0,4,0"
+                                              VerticalAlignment="Center"
+                                              HorizontalAlignment="Center"/>
+
+                            <!-- Header text -->
+                            <ContentPresenter Grid.Column="1"
+                                              ContentSource="Header"
+                                              Margin="{TemplateBinding Padding}"
+                                              VerticalAlignment="Center"/>
+
+                            <TextBlock Grid.Column="2"
+                                       Text="›"
+                                       FontSize="15"
+                                       Foreground="{DynamicResource AppTextTertiaryColor}"
+                                       VerticalAlignment="Center"
+                                       Margin="4,0,10,0"/>
+
+                            <Popup x:Name="PART_Popup"
+                                   Placement="Right"
+                                   IsOpen="{TemplateBinding IsSubmenuOpen}"
+                                   AllowsTransparency="True"
+                                   Focusable="False"
+                                   PopupAnimation="Fade">
+                                <Border Background="{DynamicResource AppCardColor}"
+                                        BorderBrush="{DynamicResource AppBorderColor}"
+                                        BorderThickness="1"
+                                        CornerRadius="8"
+                                        Padding="4"
+                                        Margin="4,0,0,0">
+                                    <Border.Effect>
+                                        <DropShadowEffect Color="Black" Opacity="0.3"
+                                                          BlurRadius="14" ShadowDepth="3"/>
+                                    </Border.Effect>
+                                    <ItemsPresenter/>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsHighlighted" Value="True">
+                            <Setter TargetName="border" Property="Background"
+                                    Value="{DynamicResource AppHoverOverlayColor}"/>
+                            <Setter Property="Foreground"
+                                    Value="{DynamicResource AppPrimaryColor}"/>
+                        </Trigger>
+                        <Trigger Property="IsSubmenuOpen" Value="True">
+                            <Setter TargetName="border" Property="Background"
+                                    Value="{DynamicResource AppHoverOverlayColor}"/>
+                            <Setter Property="Foreground"
+                                    Value="{DynamicResource AppPrimaryColor}"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -157,10 +240,10 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="border" Property="Background" Value="{StaticResource AppPanelHoverColor}"/>
+                            <Setter TargetName="border" Property="Background" Value="{DynamicResource AppPanelHoverColor}"/>
                         </Trigger>
                         <Trigger Property="IsSelected" Value="True">
-                            <Setter TargetName="border" Property="Background" Value="{StaticResource AppPrimaryColor}"/>
+                            <Setter TargetName="border" Property="Background" Value="{DynamicResource AppPrimaryColor}"/>
                             <Setter TargetName="border" Property="Opacity" Value="0.2"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
@@ -172,7 +255,7 @@
     <!-- GRIDVIEW COLUMN HEADER STYLE -->
     <Style x:Key="GridViewColumnHeaderStyle" TargetType="GridViewColumnHeader">
         <Setter Property="Background" Value="Transparent"/>
-        <Setter Property="Foreground" Value="{StaticResource AppTextTertiaryColor}"/>
+        <Setter Property="Foreground" Value="{DynamicResource AppTextTertiaryColor}"/>
         <Setter Property="FontSize" Value="12"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="Padding" Value="8,12"/>
@@ -182,7 +265,7 @@
                 <ControlTemplate TargetType="GridViewColumnHeader">
                     <Border Background="{TemplateBinding Background}"
                             BorderThickness="0,0,0,1"
-                            BorderBrush="{StaticResource AppDividerColor}"
+                            BorderBrush="{DynamicResource AppDividerColor}"
                             Padding="{TemplateBinding Padding}">
                         <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                         VerticalAlignment="Center"/>
@@ -204,7 +287,7 @@
                                 <Thumb>
                                     <Thumb.Style>
                                         <Style TargetType="Thumb">
-                                            <Setter Property="Background" Value="{StaticResource AppBorderColor}"/>
+                                            <Setter Property="Background" Value="{DynamicResource AppBorderColor}"/>
                                             <Setter Property="Template">
                                                 <Setter.Value>
                                                     <ControlTemplate TargetType="Thumb">
@@ -217,7 +300,7 @@
                                             </Setter>
                                             <Style.Triggers>
                                                 <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter Property="Background" Value="{StaticResource AppBorderLightColor}"/>
+                                                    <Setter Property="Background" Value="{DynamicResource AppBorderLightColor}"/>
                                                 </Trigger>
                                             </Style.Triggers>
                                         </Style>
@@ -235,7 +318,7 @@
     <!-- EXPANDER STYLE -->
     <Style x:Key="ExpanderHeaderStyle" TargetType="ToggleButton">
         <Setter Property="Background" Value="Transparent"/>
-        <Setter Property="Foreground" Value="{StaticResource AppTextSecondaryColor}"/>
+        <Setter Property="Foreground" Value="{DynamicResource AppTextSecondaryColor}"/>
         <Setter Property="FontSize" Value="14"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="HorizontalAlignment" Value="Stretch"/>
@@ -287,7 +370,7 @@
                             </Trigger.ExitActions>
                         </Trigger>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter Property="Foreground" Value="{StaticResource AppPrimaryColor}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource AppPrimaryColor}"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -298,7 +381,7 @@
 
     <Style TargetType="Expander">
         <Setter Property="Background" Value="Transparent"/>
-        <Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
+        <Setter Property="Foreground" Value="{DynamicResource AppTextColor}"/>
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="Template">
             <Setter.Value>
@@ -332,7 +415,7 @@
 
     <!-- CONTEXT MENU ITEM STYLE -->
     <Style x:Key="ContextMenuItemStyle" TargetType="MenuItem">
-        <Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
+        <Setter Property="Foreground" Value="{DynamicResource AppTextColor}"/>
         <Setter Property="FontSize" Value="13"/>
         <Setter Property="Padding" Value="10,8"/>
         <Setter Property="Margin" Value="2"/>
@@ -347,7 +430,7 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsHighlighted" Value="True">
-                            <Setter TargetName="border" Property="Background" Value="{StaticResource AppPrimaryColor}"/>
+                            <Setter TargetName="border" Property="Background" Value="{DynamicResource AppPrimaryColor}"/>
                             <Setter Property="Foreground" Value="White"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">

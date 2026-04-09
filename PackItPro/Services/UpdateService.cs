@@ -12,23 +12,40 @@ using System.Threading.Tasks;
 
 namespace PackItPro.Services
 {
+    /// <summary>
+    /// Checks GitHub for new releases and downloads update assets.
+    /// Downloads both <c>PackItPro.exe</c> and <c>StubInstaller.exe</c> so
+    /// both binaries are always in sync after an update.
+    /// </summary>
     public class UpdateService
     {
+        // ── Constants ─────────────────────────────────────────────────────────
+
         private const string RepoOwner = "Alexsandrgardaphadze";
         private const string RepoName = "PackItPro";
         private const string ApiUrl = $"https://api.github.com/repos/{RepoOwner}/{RepoName}/releases?per_page=30";
         private const string ReleasesUrl = $"https://github.com/{RepoOwner}/{RepoName}/releases/latest";
 
-        // Name of the asset we look for in each GitHub release.
-        // Must match exactly what build.ps1 / CI uploads as the release asset.
-        private const string PrimaryAssetName = "PackItPro.exe";
+        /// <summary>Primary executable asset name expected in every release.</summary>
+        private const string MainExeName = "PackItPro.exe";
 
-        private const int DownloadBufferSize = 81920; // 80 KB chunks
+        /// <summary>
+        /// Stub asset name expected alongside the main exe.
+        /// If absent from a release, the stub is skipped gracefully — it won't
+        /// block the update, but the existing stub is left on disk as-is.
+        /// </summary>
+        private const string StubExeName = "StubInstaller.exe";
+
+        private const int DownloadBufferSize = 81_920; // 80 KB chunks
 
         private readonly HttpClient _http;
 
-        // ---- Version --------------------------------------------------------
+        // ── Version ───────────────────────────────────────────────────────────
 
+        /// <summary>
+        /// Current application version read from the assembly manifest.
+        /// Formatted as <c>vMAJOR.MINOR.BUILD</c>.
+        /// </summary>
         public static string CurrentVersion
         {
             get
@@ -45,11 +62,11 @@ namespace PackItPro.Services
                 _http.DefaultRequestHeaders.Add("User-Agent", $"PackItPro/{CurrentVersion}");
         }
 
-        // ---- Check ----------------------------------------------------------
+        // ── Check ─────────────────────────────────────────────────────────────
 
         /// <summary>
         /// Queries GitHub for the latest stable release.
-        /// Never throws -- all errors are captured in the returned result.
+        /// Never throws — all errors are captured in the returned result.
         /// </summary>
         public async Task<UpdateCheckResult> CheckAsync(CancellationToken ct = default)
         {
@@ -71,6 +88,11 @@ namespace PackItPro.Services
 
                 bool isNewer = IsNewerVersion(stable.TagName!, CurrentVersion);
 
+                // Resolve download URLs for both assets.
+                ResolveDownloadUrls(stable,
+                    out string? mainUrl,
+                    out string? stubUrl);
+
                 return new UpdateCheckResult
                 {
                     Success = true,
@@ -80,7 +102,8 @@ namespace PackItPro.Services
                     ReleaseUrl = stable.HtmlUrl ?? ReleasesUrl,
                     ReleaseNotes = stable.Body,
                     PublishedAt = stable.PublishedAt,
-                    DownloadUrl = ResolveDownloadUrl(stable),
+                    DownloadUrl = mainUrl,
+                    StubDownloadUrl = stubUrl,
                 };
             }
             catch (OperationCanceledException) { throw; }
@@ -99,104 +122,185 @@ namespace PackItPro.Services
             }
         }
 
-        // ---- Download -------------------------------------------------------
+        // ── Download ──────────────────────────────────────────────────────────
 
         /// <summary>
-        /// Downloads the new PackItPro.exe to a temp file on the same drive as
-        /// the currently running exe. Reports progress and supports cancellation.
-        ///
-        /// On success, DownloadResult.TempFilePath holds the path of the downloaded
-        /// file. The caller hands this path to UpdaterLauncher.LaunchAndExit().
-        ///
-        /// On failure or cancellation, any partial temp file is deleted.
-        /// Never throws (cancellation is re-thrown as OperationCanceledException).
+        /// Downloads <c>PackItPro.exe</c> and, when available, <c>StubInstaller.exe</c>
+        /// to temp files on the same drive as the running executable.
+        /// Progress is reported as the combined byte count across both downloads.
+        /// On cancellation or failure all partial temp files are deleted.
         /// </summary>
-        public async Task<DownloadResult> DownloadUpdateAsync(
-            string downloadUrl,
+        /// <param name="result">Check result that contains the download URLs.</param>
+        /// <param name="progress">Optional progress reporter (0–100 % combined).</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>
+        /// A <see cref="DualDownloadResult"/> containing temp paths for both assets.
+        /// <see cref="DualDownloadResult.StubTempPath"/> is <c>null</c> when the stub
+        /// asset is absent from the release.
+        /// </returns>
+        public async Task<DualDownloadResult> DownloadUpdateAsync(
+            UpdateCheckResult result,
             IProgress<DownloadProgress>? progress = null,
             CancellationToken ct = default)
         {
-            if (string.IsNullOrWhiteSpace(downloadUrl))
-                return DownloadResult.Fail(
+            if (string.IsNullOrWhiteSpace(result.DownloadUrl))
+                return DualDownloadResult.Fail(
                     "No download URL is available for this release.\n\n" +
                     "The release may not have a PackItPro.exe asset attached.\n" +
                     "You can download it manually from the GitHub Releases page.");
 
-            // Place the temp file next to the running exe so that the later
-            // rename stays on the same drive (cross-drive rename = copy+delete,
-            // which can fail on locked files).
-            // Environment.ProcessPath is the correct API for single-file apps (.NET 6+).
-            // Assembly.GetExecutingAssembly().Location always returns "" in a single-file
-            // publish and triggers a compiler warning. Never use it for path resolution.
-            string currentExe = Environment.ProcessPath ?? string.Empty;
-            string currentDir = !string.IsNullOrEmpty(currentExe)
-                ? (Path.GetDirectoryName(currentExe) ?? AppContext.BaseDirectory)
-                : AppContext.BaseDirectory;
-            string tempPath = Path.Combine(
-                currentDir, $"PackItPro_update_{Guid.NewGuid():N}.tmp");
+            string dir = ResolveDownloadDirectory();
+
+            string mainTemp = Path.Combine(dir, $"PackItPro_update_{Guid.NewGuid():N}.tmp");
+            string? stubTemp = null;
 
             try
             {
-                using var response = await _http.GetAsync(
-                    downloadUrl,
-                    HttpCompletionOption.ResponseHeadersRead,
-                    ct);
+                // ── Determine total size for combined progress ─────────────────
+                long? mainTotal = await GetContentLengthAsync(result.DownloadUrl, ct);
+                long? stubTotal = !string.IsNullOrWhiteSpace(result.StubDownloadUrl)
+                    ? await GetContentLengthAsync(result.StubDownloadUrl, ct)
+                    : null;
 
-                response.EnsureSuccessStatusCode();
+                long? grandTotal = (mainTotal.HasValue && stubTotal.HasValue)
+                    ? mainTotal.Value + stubTotal.Value
+                    : null;
 
-                long? totalBytes = response.Content.Headers.ContentLength;
-
-                using var src = await response.Content.ReadAsStreamAsync(ct);
-                using var dst = new FileStream(
-                    tempPath, FileMode.Create, FileAccess.Write,
-                    FileShare.None, DownloadBufferSize, useAsync: true);
-
-                var buffer = new byte[DownloadBufferSize];
                 long downloaded = 0;
-                int read;
 
-                while ((read = await src.ReadAsync(buffer, ct)) > 0)
+                // ── Download PackItPro.exe ─────────────────────────────────────
+                await DownloadFileAsync(result.DownloadUrl, mainTemp,
+                    bytes =>
+                    {
+                        downloaded += bytes;
+                        progress?.Report(new DownloadProgress(
+                            downloaded, grandTotal,
+                            grandTotal > 0 ? (int)(downloaded * 100 / grandTotal!.Value) : -1));
+                    }, ct);
+
+                // ── Download StubInstaller.exe (best-effort) ──────────────────
+                if (!string.IsNullOrWhiteSpace(result.StubDownloadUrl))
                 {
-                    await dst.WriteAsync(buffer.AsMemory(0, read), ct);
-                    downloaded += read;
-
-                    progress?.Report(new DownloadProgress(
-                        BytesReceived: downloaded,
-                        TotalBytes: totalBytes,
-                        Percent: totalBytes > 0
-                            ? (int)(downloaded * 100 / totalBytes.Value)
-                            : -1));
+                    stubTemp = Path.Combine(dir, $"StubInstaller_update_{Guid.NewGuid():N}.tmp");
+                    await DownloadFileAsync(result.StubDownloadUrl, stubTemp,
+                        bytes =>
+                        {
+                            downloaded += bytes;
+                            progress?.Report(new DownloadProgress(
+                                downloaded, grandTotal,
+                                grandTotal > 0 ? (int)(downloaded * 100 / grandTotal!.Value) : -1));
+                        }, ct);
                 }
 
-                await dst.FlushAsync(ct);
-                return DownloadResult.Ok(tempPath, downloaded);
+                return DualDownloadResult.Ok(mainTemp, stubTemp, downloaded);
             }
             catch (OperationCanceledException)
             {
-                TryDelete(tempPath);
+                TryDelete(mainTemp);
+                TryDelete(stubTemp);
                 throw;
             }
             catch (Exception ex)
             {
-                TryDelete(tempPath);
-                return DownloadResult.Fail($"Download failed: {ex.Message}");
+                TryDelete(mainTemp);
+                TryDelete(stubTemp);
+                return DualDownloadResult.Fail($"Download failed: {ex.Message}");
             }
         }
 
-        // ---- Helpers --------------------------------------------------------
+        // ── Private helpers ───────────────────────────────────────────────────
 
-        private static string? ResolveDownloadUrl(GitHubRelease release)
+        /// <summary>
+        /// Streams a single URL to <paramref name="destPath"/>, reporting byte
+        /// counts via <paramref name="onBytes"/> as chunks arrive.
+        /// </summary>
+        private async Task DownloadFileAsync(
+            string url,
+            string destPath,
+            Action<int> onBytes,
+            CancellationToken ct)
         {
-            if (release.Assets == null || release.Assets.Count == 0)
-                return null;
+            using var response = await _http.GetAsync(
+                url, HttpCompletionOption.ResponseHeadersRead, ct);
+            response.EnsureSuccessStatusCode();
 
-            // Prefer exact name match, fall back to first .exe asset
-            return (release.Assets
+            using var src = await response.Content.ReadAsStreamAsync(ct);
+            using var dst = new FileStream(
+                destPath, FileMode.Create, FileAccess.Write,
+                FileShare.None, DownloadBufferSize, useAsync: true);
+
+            var buffer = new byte[DownloadBufferSize];
+            int read;
+            while ((read = await src.ReadAsync(buffer, ct)) > 0)
+            {
+                await dst.WriteAsync(buffer.AsMemory(0, read), ct);
+                onBytes(read);
+            }
+
+            await dst.FlushAsync(ct);
+        }
+
+        /// <summary>
+        /// Issues a HEAD request to read <c>Content-Length</c> without downloading.
+        /// Returns <c>null</c> if the server omits the header or the request fails.
+        /// </summary>
+        private async Task<long?> GetContentLengthAsync(string url, CancellationToken ct)
+        {
+            try
+            {
+                using var req = new HttpRequestMessage(HttpMethod.Head, url);
+                using var resp = await _http.SendAsync(req, ct);
+                return resp.Content.Headers.ContentLength;
+            }
+            catch { return null; }
+        }
+
+        /// <summary>
+        /// Returns the directory that temp files should be written to.
+        /// Placing temp files on the same drive as the running exe keeps the
+        /// later <c>Move-Item</c> in the updater script atomic.
+        /// </summary>
+        private static string ResolveDownloadDirectory()
+        {
+            string? exe = Environment.ProcessPath;
+            if (!string.IsNullOrEmpty(exe))
+            {
+                string? dir = Path.GetDirectoryName(exe);
+                if (!string.IsNullOrEmpty(dir)) return dir;
+            }
+            return AppContext.BaseDirectory;
+        }
+
+        /// <summary>
+        /// Populates <paramref name="mainUrl"/> and <paramref name="stubUrl"/> by
+        /// scanning the release assets for the expected file names.
+        /// Falls back to the first <c>.exe</c> asset for the main exe when the
+        /// exact name is not found.
+        /// </summary>
+        private static void ResolveDownloadUrls(
+            GitHubRelease release,
+            out string? mainUrl,
+            out string? stubUrl)
+        {
+            mainUrl = null;
+            stubUrl = null;
+
+            if (release.Assets == null || release.Assets.Count == 0) return;
+
+            // Main exe: prefer exact name, fall back to first .exe
+            mainUrl = (release.Assets
                     .FirstOrDefault(a => string.Equals(
-                        a.Name, PrimaryAssetName, StringComparison.OrdinalIgnoreCase))
+                        a.Name, MainExeName, StringComparison.OrdinalIgnoreCase))
                 ?? release.Assets
-                    .FirstOrDefault(a => a.Name?.EndsWith(
-                        ".exe", StringComparison.OrdinalIgnoreCase) == true))
+                    .FirstOrDefault(a =>
+                        a.Name?.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) == true
+                        && !string.Equals(a.Name, StubExeName, StringComparison.OrdinalIgnoreCase)))
+                ?.BrowserDownloadUrl;
+
+            // Stub exe: exact name only — we don't want to accidentally pick the wrong file
+            stubUrl = release.Assets
+                .FirstOrDefault(a => string.Equals(
+                    a.Name, StubExeName, StringComparison.OrdinalIgnoreCase))
                 ?.BrowserDownloadUrl;
         }
 
@@ -213,14 +317,16 @@ namespace PackItPro.Services
             return Version.TryParse(clean, out var v) ? v : null;
         }
 
-        private static void TryDelete(string path)
+        private static void TryDelete(string? path)
         {
+            if (path == null) return;
             try { if (File.Exists(path)) File.Delete(path); } catch { }
         }
     }
 
-    // ---- Result / progress types --------------------------------------------
+    // ── Result / progress types ───────────────────────────────────────────────
 
+    /// <summary>Result of a GitHub release check.</summary>
     public class UpdateCheckResult
     {
         public bool Success { get; init; }
@@ -229,52 +335,49 @@ namespace PackItPro.Services
         public string? CurrentVersion { get; init; }
         public string? ReleaseUrl { get; init; }
         public string? ReleaseNotes { get; init; }
-        public string? DownloadUrl { get; init; }  // direct asset URL
+        /// <summary>Direct download URL for <c>PackItPro.exe</c>.</summary>
+        public string? DownloadUrl { get; init; }
+        /// <summary>Direct download URL for <c>StubInstaller.exe</c>; null when absent.</summary>
+        public string? StubDownloadUrl { get; init; }
         public DateTimeOffset? PublishedAt { get; init; }
         public string? ErrorMessage { get; init; }
         public bool NoReleasesPublished { get; init; }
 
         public static UpdateCheckResult Error(string message) => new()
-        {
-            Success = false,
-            ErrorMessage = message,
-        };
+        { Success = false, ErrorMessage = message };
 
         public static UpdateCheckResult NoReleasesYet() => new()
-        {
-            Success = true,
-            UpdateAvailable = false,
-            NoReleasesPublished = true,
-        };
+        { Success = true, UpdateAvailable = false, NoReleasesPublished = true };
     }
 
-    public class DownloadResult
+    /// <summary>
+    /// Result of <see cref="UpdateService.DownloadUpdateAsync"/>.
+    /// Both assets are represented: <see cref="StubTempPath"/> is null when
+    /// the release did not include a <c>StubInstaller.exe</c> asset.
+    /// </summary>
+    public class DualDownloadResult
     {
         public bool Success { get; init; }
-        public string? TempFilePath { get; init; }
+        /// <summary>Temp path of the downloaded <c>PackItPro.exe</c>.</summary>
+        public string? MainTempPath { get; init; }
+        /// <summary>Temp path of the downloaded <c>StubInstaller.exe</c>, or null.</summary>
+        public string? StubTempPath { get; init; }
         public long BytesWritten { get; init; }
         public string? ErrorMessage { get; init; }
 
-        public static DownloadResult Ok(string path, long bytes) => new()
-        {
-            Success = true,
-            TempFilePath = path,
-            BytesWritten = bytes,
-        };
+        public static DualDownloadResult Ok(string mainPath, string? stubPath, long bytes) => new()
+        { Success = true, MainTempPath = mainPath, StubTempPath = stubPath, BytesWritten = bytes };
 
-        public static DownloadResult Fail(string message) => new()
-        {
-            Success = false,
-            ErrorMessage = message,
-        };
+        public static DualDownloadResult Fail(string message) => new()
+        { Success = false, ErrorMessage = message };
     }
 
-    /// <param name="BytesReceived">Bytes downloaded so far.</param>
-    /// <param name="TotalBytes">Content-Length from server; null if not sent.</param>
-    /// <param name="Percent">0-100 when TotalBytes is known; -1 for indeterminate.</param>
+    /// <param name="BytesReceived">Bytes downloaded so far (across all assets).</param>
+    /// <param name="TotalBytes">Combined Content-Length; null when unknown.</param>
+    /// <param name="Percent">0–100 when total is known; -1 for indeterminate.</param>
     public record DownloadProgress(long BytesReceived, long? TotalBytes, int Percent);
 
-    // ---- GitHub API models --------------------------------------------------
+    // ── GitHub API models ─────────────────────────────────────────────────────
 
     internal class GitHubRelease
     {

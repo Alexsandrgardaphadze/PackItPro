@@ -55,6 +55,7 @@ namespace PackItPro.ViewModels
         public SettingsViewModel Settings { get; }
         public SummaryViewModel Summary { get; }
         public StatusViewModel Status { get; }
+        public ShortcutListViewModel Shortcuts { get; }
 
         #endregion
 
@@ -107,6 +108,16 @@ namespace PackItPro.ViewModels
         public ICommand CheckUpdatesCommand => _helpHandler?.CheckUpdatesCommand ?? NullCommand;
         public ICommand AboutCommand => _helpHandler?.AboutCommand ?? NullCommand;
 
+        // Theme
+        public ICommand ToggleThemeCommand { get; }
+        public ICommand SetThemeDarkCommand { get; }
+        public ICommand SetThemeLightCommand { get; }
+        public ICommand OpenThemesFolderCommand { get; }
+
+        // Shortcuts
+        public ICommand AddShortcutCommand { get; }
+        public ICommand ManageShortcutsCommand { get; }
+
         // Application
         public ICommand ExitCommand => _applicationHandler?.ExitCommand ?? NullCommand;
 
@@ -129,6 +140,17 @@ namespace PackItPro.ViewModels
             Summary = new SummaryViewModel(FileList, Settings);
             Status = new StatusViewModel();
             Error = new ErrorViewModel();
+            Shortcuts = new ShortcutListViewModel();
+
+            // Initialize theme commands
+            ToggleThemeCommand = new RelayCommand(_ => ThemeService.Toggle());
+            SetThemeDarkCommand = new RelayCommand(_ => ThemeService.Apply(AppTheme.Dark));
+            SetThemeLightCommand = new RelayCommand(_ => ThemeService.Apply(AppTheme.Light));
+            OpenThemesFolderCommand = new RelayCommand(_ => ThemeService.OpenThemesFolder());
+
+            // Initialize shortcut commands
+            AddShortcutCommand = new RelayCommand(_ => Shortcuts.AddBlank());
+            ManageShortcutsCommand = new RelayCommand(_ => ShowShortcutsWindow());
 
             _logService.Info("MainViewModel constructed");
         }
@@ -151,6 +173,10 @@ namespace PackItPro.ViewModels
 
                 await Settings.LoadSettingsAsync();
                 _logService.Info("Settings loaded");
+
+                // Apply the saved theme preference
+                ThemeService.ApplyFromSettings(Settings.ThemeName);
+                _logService.Info($"Theme: {Settings.ThemeName}");
 
                 _virusTotalClient = new VirusTotalClient(_cacheFilePath, Settings.VirusTotalApiKey);
                 await _virusTotalClient.LoadCacheAsync(_logService);
@@ -181,7 +207,7 @@ namespace PackItPro.ViewModels
 
         private void InitializeHandlers()
         {
-            _packagingHandler = new PackagingCommandHandler(FileList, Settings, Status, Error, _logService);
+            _packagingHandler = new PackagingCommandHandler(FileList, Settings, Status, Error, _logService, Shortcuts);
 
             // FIX #2/#3: Pass _trustStore so the handler can skip trusted files
             //            before making any VirusTotal API call.
@@ -196,6 +222,23 @@ namespace PackItPro.ViewModels
             _applicationHandler = new ApplicationHandler(Settings);
             _markTrustHandler = new MarkTrustCommandHandler(_trustStore!, _logService);
             _logService.Info("All handlers initialized");
+        }
+
+        private void ShowShortcutsWindow()
+        {
+            try
+            {
+                var window = new PackItPro.Views.ShortcutsManagerWindow(Shortcuts)
+                {
+                    Owner = System.Windows.Application.Current?.MainWindow
+                };
+                window.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                _logService.Error("Failed to open shortcuts manager", ex);
+                Error.ShowError("Could not open Shortcuts Manager. See logs for details.");
+            }
         }
 
         private void NotifyAllCommandsAvailable()
@@ -221,6 +264,12 @@ namespace PackItPro.ViewModels
             OnPropertyChanged(nameof(ReportIssueCommand));
             OnPropertyChanged(nameof(CheckUpdatesCommand));
             OnPropertyChanged(nameof(AboutCommand));
+            OnPropertyChanged(nameof(ToggleThemeCommand));
+            OnPropertyChanged(nameof(SetThemeDarkCommand));
+            OnPropertyChanged(nameof(SetThemeLightCommand));
+            OnPropertyChanged(nameof(OpenThemesFolderCommand));
+            OnPropertyChanged(nameof(AddShortcutCommand));
+            OnPropertyChanged(nameof(ManageShortcutsCommand));
             OnPropertyChanged(nameof(ExitCommand));
             _logService.Info("All command bindings refreshed");
         }

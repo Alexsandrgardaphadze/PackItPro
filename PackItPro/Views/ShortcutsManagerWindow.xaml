@@ -1,0 +1,507 @@
+<!-- PackItPro/Views/ShortcutsManagerWindow.xaml
+     Standalone window for managing shortcuts — opened from Shortcuts > Manage Shortcuts
+     in the menu. DataContext = ShortcutListViewModel (same VM as ShortcutsPanel).
+-->
+<Window x:Class="PackItPro.Views.ShortcutsManagerWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:vm="clr-namespace:PackItPro.ViewModels"
+    mc:Ignorable="d"
+    Title="Manage Shortcuts"
+    Height="680" Width="900"
+    WindowStartupLocation="CenterOwner"
+    ResizeMode="CanResize"
+    MinHeight="400" MinWidth="700"
+    Background="{DynamicResource AppBackgroundColor}"
+    UseLayoutRounding="True">
+
+<Window.Resources>
+    <!-- Modern Win11-like TextBox Style -->
+    <Style x:Key="ModernTextBox" TargetType="TextBox">
+        <Setter Property="Height" Value="36"/>
+        <Setter Property="Padding" Value="10,4"/>
+        <Setter Property="FontFamily" Value="Segoe UI"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Foreground" Value="{DynamicResource AppTextColor}"/>
+        <Setter Property="Background" Value="{DynamicResource AppCardColor}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource AppBorderColor}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TextBox">
+                    <Border x:Name="Border"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="6">
+                        <ScrollViewer x:Name="PART_ContentHost"
+                                      Margin="0"/>
+                    </Border>
+
+                    <ControlTemplate.Triggers>
+
+                        <!-- Focus -->
+                        <Trigger Property="IsFocused" Value="True">
+                            <Setter TargetName="Border" Property="BorderBrush"
+                                    Value="{DynamicResource AppPrimaryColor}"/>
+                            <Setter TargetName="Border" Property="BorderThickness"
+                                    Value="2"/>
+                        </Trigger>
+
+                        <!-- Hover -->
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Border" Property="BorderBrush"
+                                    Value="{DynamicResource AppPrimaryColor}"/>
+                        </Trigger>
+
+                        <!-- Disabled -->
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.6"/>
+                        </Trigger>
+
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+</Window.Resources>
+
+<Grid Margin="20" Background="{DynamicResource AppBackgroundColor}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <!-- Header -->
+            <RowDefinition Height="*"/>
+            <!-- Content -->
+            <RowDefinition Height="Auto"/>
+            <!-- Footer -->
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Grid Grid.Row="0" Margin="0,0,0,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                <TextBlock Text="Windows Shortcuts"
+                           FontSize="20" FontWeight="SemiBold"
+                           Foreground="{DynamicResource AppTextColor}"
+                           FontFamily="Segoe UI"/>
+                <TextBlock FontSize="12" FontFamily="Segoe UI"
+                           Foreground="{DynamicResource AppTextTertiaryColor}"
+                           TextWrapping="Wrap" Margin="0,3,0,0">
+                    <Run Text="Shortcuts (.lnk files) that "/>
+                    <Run Text="StubInstaller" FontWeight="SemiBold" Foreground="{DynamicResource AppPrimaryColor}"/>
+                    <Run Text=" creates on the end-user's machine after all installers finish."/>
+                </TextBlock>
+
+                <!-- 3-step how-it-works card -->
+                <Border Background="{DynamicResource AppCardColor}"
+                        BorderBrush="{DynamicResource AppBorderColor}"
+                        BorderThickness="1" CornerRadius="6"
+                        Padding="12,8" Margin="0,10,0,0">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="20"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="20"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Step 1 -->
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="1 · You define"
+                                       FontSize="11" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource AppPrimaryColor}"
+                                       FontFamily="Segoe UI"/>
+                            <TextBlock Text="Name, target .exe path, location (Desktop / Start Menu / Startup)"
+                                       FontSize="11" FontFamily="Segoe UI"
+                                       Foreground="{DynamicResource AppTextTertiaryColor}"
+                                       TextWrapping="Wrap" Margin="0,2,0,0"/>
+                        </StackPanel>
+
+                        <TextBlock Grid.Column="1" Text="→" FontSize="14"
+                                   VerticalAlignment="Center" HorizontalAlignment="Center"
+                                   Foreground="{DynamicResource AppTextQuaternaryColor}"/>
+
+                        <!-- Step 2 -->
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="2 · PackItPro saves"
+                                       FontSize="11" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource AppPrimaryColor}"
+                                       FontFamily="Segoe UI"/>
+                            <TextBlock Text="Definitions are stored in packitmeta.json inside the package"
+                                       FontSize="11" FontFamily="Segoe UI"
+                                       Foreground="{DynamicResource AppTextTertiaryColor}"
+                                       TextWrapping="Wrap" Margin="0,2,0,0"/>
+                        </StackPanel>
+
+                        <TextBlock Grid.Column="3" Text="→" FontSize="14"
+                                   VerticalAlignment="Center" HorizontalAlignment="Center"
+                                   Foreground="{DynamicResource AppTextQuaternaryColor}"/>
+
+                        <!-- Step 3 -->
+                        <StackPanel Grid.Column="4">
+                            <TextBlock Text="3 · StubInstaller creates"
+                                       FontSize="11" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource AppPrimaryColor}"
+                                       FontFamily="Segoe UI"/>
+                            <TextBlock Text=".lnk files appear in the chosen location on the end-user's PC"
+                                       FontSize="11" FontFamily="Segoe UI"
+                                       Foreground="{DynamicResource AppTextTertiaryColor}"
+                                       TextWrapping="Wrap" Margin="0,2,0,0"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </StackPanel>
+
+            <Button Grid.Column="1"
+                    Command="{Binding AddShortcutCommand}"
+                    Height="34" Padding="16,0"
+                    Style="{StaticResource Win11Button}"
+                    VerticalAlignment="Center"
+                    ToolTip="Add a new shortcut">
+                <TextBlock>
+                    <Run Text="+ Add"/>
+                </TextBlock>
+            </Button>
+        </Grid>
+
+        <Border Grid.Row="0" Height="1"
+                Background="{DynamicResource AppDividerColor}"
+                VerticalAlignment="Bottom" Margin="0,0,0,-8"/>
+
+        <!-- Content -->
+        <ScrollViewer Grid.Row="1"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      Margin="0,8,0,0">
+            <StackPanel>
+
+                <!-- Empty state -->
+                <TextBlock Text="No shortcuts defined. Click '+ Add' to create one."
+                           Foreground="{DynamicResource AppTextTertiaryColor}"
+                           FontSize="13" FontFamily="Segoe UI"
+                           TextWrapping="Wrap"
+                           HorizontalAlignment="Center"
+                           Margin="20,40,20,40">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasShortcuts}" Value="False">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+
+                <!-- Shortcut list -->
+                <ItemsControl ItemsSource="{Binding Items}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type vm:ShortcutViewModel}">
+                            <Border Background="{DynamicResource AppCardColor}"
+                                    BorderBrush="{DynamicResource AppBorderColor}"
+                                    BorderThickness="1"
+                                    CornerRadius="8"
+                                    Padding="16"
+                                    Margin="0,0,0,12">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <!-- Name label -->
+                                        <RowDefinition Height="Auto"/>
+                                        <!-- Name + Location + Remove -->
+                                        <RowDefinition Height="8"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <!-- Target path label -->
+                                        <RowDefinition Height="Auto"/>
+                                        <!-- Target path + Browse -->
+                                        <RowDefinition Height="8"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <!-- Arguments label -->
+                                        <RowDefinition Height="Auto"/>
+                                        <!-- Arguments -->
+                                        <RowDefinition Height="8"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <!-- Description label -->
+                                        <RowDefinition Height="Auto"/>
+                                        <!-- Description -->
+                                        <RowDefinition Height="8"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <!-- Validation error -->
+                                    </Grid.RowDefinitions>
+
+                                    <!-- Row 0: Name label -->
+                                    <Grid Grid.Row="0" Margin="0,0,0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0"
+                                                   Text="Shortcut Name"
+                                                   FontSize="11" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource AppTextColor}"
+                                                   FontFamily="Segoe UI"/>
+                                        <TextBlock Grid.Column="1"
+                                                   Text="*"
+                                                   Foreground="{DynamicResource AppStatusErrorColor}"
+                                                   FontWeight="Bold"
+                                                   FontSize="12"
+                                                   Margin="4,0,0,0"/>
+                                    </Grid>
+
+                                    <!-- Row 1: Name, Location, Remove -->
+                                    <Grid Grid.Row="1">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="8"/>
+                                            <ColumnDefinition Width="140"/>
+                                            <ColumnDefinition Width="8"/>
+                                            <ColumnDefinition Width="36"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <TextBox Grid.Column="0"
+                                                 Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
+                                                 Style="{StaticResource ModernTextBox}"
+                                                 ToolTip="Shortcut display name shown on Desktop / Start Menu"/>
+
+
+                                        <!-- Location -->
+                                        <ComboBox Grid.Column="2"
+                                                  SelectedItem="{Binding Location, Mode=TwoWay}"
+                                                  Height="36"
+                                                  Style="{StaticResource ComprehensiveComboBoxStyle}"
+                                                  VerticalContentAlignment="Center"
+                                                  FontFamily="Segoe UI" FontSize="12"
+                                                  ToolTip="Where the shortcut will be placed">
+                                            <ComboBox.ItemContainerStyle>
+                                                <Style TargetType="ComboBoxItem">
+                                                    <Setter Property="Foreground" Value="{DynamicResource AppTextColor}"/>
+                                                    <Setter Property="Background" Value="Transparent"/>
+                                                    <Setter Property="Padding"    Value="10,6"/>
+                                                    <Setter Property="FontFamily" Value="Segoe UI"/>
+                                                    <Setter Property="FontSize"   Value="12"/>
+                                                    <Style.Triggers>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter Property="Background" Value="{DynamicResource AppHoverOverlayColor}"/>
+                                                        </Trigger>
+                                                        <Trigger Property="IsSelected" Value="True">
+                                                            <Setter Property="Background" Value="{DynamicResource AppPrimaryColor}"/>
+                                                            <Setter Property="Foreground" Value="{DynamicResource AppTextColor}"/>
+                                                        </Trigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </ComboBox.ItemContainerStyle>
+                                            <ComboBoxItem Content="🖥  Desktop"/>
+                                            <ComboBoxItem Content="📋  Start Menu"/>
+                                            <ComboBoxItem Content="🚀  Startup"/>
+                                        </ComboBox>
+
+                                        <!-- Remove -->
+                                        <Button Grid.Column="4"
+                                                Content="✕"
+                                                Command="{Binding RemoveCommand}"
+                                                Width="36" Height="36"
+                                                FontSize="12"
+                                                ToolTip="Remove this shortcut"
+                                                Cursor="Hand">
+                                            <Button.Style>
+                                                <Style TargetType="Button">
+                                                    <Setter Property="Background"      Value="Transparent"/>
+                                                    <Setter Property="Foreground"      Value="{DynamicResource AppTextTertiaryColor}"/>
+                                                    <Setter Property="BorderThickness" Value="0"/>
+                                                    <Setter Property="Template">
+                                                        <Setter.Value>
+                                                            <ControlTemplate TargetType="Button">
+                                                                <Border Background="{TemplateBinding Background}"
+                                                                        CornerRadius="6"
+                                                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                                                        BorderThickness="{TemplateBinding BorderThickness}">
+                                                                    <ContentPresenter HorizontalAlignment="Center"
+                                                                                      VerticalAlignment="Center"/>
+                                                                </Border>
+                                                            </ControlTemplate>
+                                                        </Setter.Value>
+                                                    </Setter>
+                                                    <Style.Triggers>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter Property="Background" Value="{DynamicResource AppErrorSubtleBg}"/>
+                                                            <Setter Property="Foreground" Value="{DynamicResource AppStatusErrorColor}"/>
+                                                        </Trigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                        </Button>
+                                    </Grid>
+
+                                    <!-- Row 3: Target path label -->
+                                    <Grid Grid.Row="3" Margin="0,0,0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0"
+                                                   Text="Target Path (Executable)"
+                                                   FontSize="11" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource AppTextColor}"
+                                                   FontFamily="Segoe UI"/>
+                                        <TextBlock Grid.Column="1"
+                                                   Text="*"
+                                                   Foreground="{DynamicResource AppStatusErrorColor}"
+                                                   FontWeight="Bold"
+                                                   FontSize="12"
+                                                   Margin="4,0,0,0"/>
+                                    </Grid>
+
+                                    <!-- Row 4: Target Path + Browse -->
+                                    <Grid Grid.Row="4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="8"/>
+                                            <ColumnDefinition Width="36"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox Grid.Column="0"
+                                                 Text="{Binding TargetPath, UpdateSourceTrigger=PropertyChanged}"
+                                                 Style="{StaticResource ModernTextBox}"
+                                                 FontFamily="Consolas"
+                                                 FontSize="12"
+                                                 ToolTip="Full path to the target executable. Supports %ProgramFiles%, %AppData%, etc."/>
+
+
+                                        <!-- Browse button -->
+                                        <Button Grid.Column="2"
+                                                Content="…"
+                                                Click="BrowseTargetPath_Click"
+                                                Height="36" Width="36"
+                                                FontSize="13"
+                                                ToolTip="Browse for executable"
+                                                Cursor="Hand">
+                                            <Button.Style>
+                                                <Style TargetType="Button">
+                                                    <Setter Property="Background"      Value="{DynamicResource AppCardColor}"/>
+                                                    <Setter Property="Foreground"      Value="{DynamicResource AppTextColor}"/>
+                                                    <Setter Property="BorderBrush"     Value="{DynamicResource AppBorderColor}"/>
+                                                    <Setter Property="BorderThickness" Value="1"/>
+                                                    <Setter Property="Template">
+                                                        <Setter.Value>
+                                                            <ControlTemplate TargetType="Button">
+                                                                <Border Background="{TemplateBinding Background}"
+                                                                        CornerRadius="6"
+                                                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                                                        BorderThickness="{TemplateBinding BorderThickness}">
+                                                                    <ContentPresenter HorizontalAlignment="Center"
+                                                                                      VerticalAlignment="Center"/>
+                                                                </Border>
+                                                            </ControlTemplate>
+                                                        </Setter.Value>
+                                                    </Setter>
+                                                    <Style.Triggers>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter Property="Background" Value="{DynamicResource AppHoverOverlayColor}"/>
+                                                            <Setter Property="BorderBrush" Value="{DynamicResource AppPrimaryColor}"/>
+                                                        </Trigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                        </Button>
+                                    </Grid>
+
+                                    <!-- Row 6: Arguments label -->
+                                    <TextBlock Grid.Row="6"
+                                               Text="Arguments (Optional)"
+                                               FontSize="11" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource AppTextColor}"
+                                               FontFamily="Segoe UI"
+                                               Margin="0,0,0,4"/>
+
+                                    <!-- Row 7: Arguments -->
+                                    <TextBox Grid.Row="7"
+                                             Text="{Binding Arguments, UpdateSourceTrigger=PropertyChanged}"
+                                             Style="{StaticResource ModernTextBox}"
+                                             FontFamily="Consolas"
+                                             FontSize="12"
+                                             ToolTip="Optional: command-line arguments passed to the target executable"/>
+
+
+                                    <!-- Row 9: Description label -->
+                                    <TextBlock Grid.Row="9"
+                                               Text="Description (Optional)"
+                                               FontSize="11" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource AppTextColor}"
+                                               FontFamily="Segoe UI"
+                                               Margin="0,0,0,4"/>
+
+                                    <!-- Row 10: Description -->
+                                    <TextBox Grid.Row="10"
+                                             Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}"
+                                             Style="{StaticResource ModernTextBox}"
+                                             FontFamily="Consolas"
+                                             FontSize="12"
+                                             ToolTip="Optional: description shown in the shortcut's Properties dialog"/>
+
+
+                                    <!-- Row 12: Validation error — visible when non-empty -->
+                                    <TextBlock Grid.Row="12"
+                                               Text="{Binding ValidationError}"
+                                               FontSize="10" FontFamily="Segoe UI"
+                                               Foreground="{DynamicResource AppStatusErrorColor}"
+                                               TextWrapping="Wrap"
+                                               Margin="0,4,0,0">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <!-- Default: Visible — collapsed only when error is empty/null -->
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding ValidationError}" Value="">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding ValidationError}" Value="{x:Null}">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Footer -->
+        <Border Grid.Row="2" Height="1"
+                Background="{DynamicResource AppDividerColor}"
+                Margin="0,12,0,12"/>
+
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Grid.Column="0"
+                       Text="Changes are saved automatically."
+                       FontSize="11"
+                       Foreground="{DynamicResource AppTextTertiaryColor}"
+                       VerticalAlignment="Center"
+                       FontFamily="Segoe UI"/>
+
+            <Button Grid.Column="1"
+                    Content="Close"
+                    Command="{Binding CloseCommand}"
+                    Height="36" Padding="20,0"
+                    Style="{StaticResource Win11Button}"
+                    IsDefault="True"/>
+        </Grid>
+    </Grid>
+</Window>

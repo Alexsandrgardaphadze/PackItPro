@@ -10,6 +10,7 @@ namespace PackItPro.Views
     public partial class StatusPanel : UserControl
     {
         private Storyboard? _spinAnimation;
+        private Storyboard? _progressStoryboard;
         private bool _isSpinning;
 
         public StatusPanel()
@@ -22,7 +23,8 @@ namespace PackItPro.Views
         private void OnLoaded(object sender, RoutedEventArgs e)
         {
             _spinAnimation = (Storyboard)Resources["SpinAnimation"];
-            // Sync state in case IsBusy was already true when we loaded
+            _progressStoryboard = (Storyboard)Resources["ProgressSmoothStoryboard"];
+
             if (DataContext is StatusViewModel vm)
                 ApplySpinnerState(vm.IsBusy);
         }
@@ -35,7 +37,6 @@ namespace PackItPro.Views
             if (e.NewValue is StatusViewModel newVm)
             {
                 newVm.PropertyChanged += OnStatusPropertyChanged;
-                // Sync immediately (DataContext can be set before or after Loaded)
                 if (_spinAnimation != null)
                     ApplySpinnerState(newVm.IsBusy);
             }
@@ -43,17 +44,24 @@ namespace PackItPro.Views
 
         private void OnStatusPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName != nameof(StatusViewModel.IsBusy)) return;
-            if (sender is StatusViewModel vm)
+            if (sender is not StatusViewModel vm) return;
+
+            switch (e.PropertyName)
             {
-                // PropertyChanged can fire from a background thread (e.g. scan task)
-                Dispatcher.InvokeAsync(() => ApplySpinnerState(vm.IsBusy));
+                case nameof(StatusViewModel.IsBusy):
+                    Dispatcher.InvokeAsync(() => ApplySpinnerState(vm.IsBusy));
+                    break;
+
+                case nameof(StatusViewModel.ProgressPercentage):
+                    // Animate the progress bar to the new value smoothly.
+                    // Must run on the UI thread.
+                    Dispatcher.InvokeAsync(() => AnimateProgress(vm.ProgressPercentage));
+                    break;
             }
         }
 
         private void ApplySpinnerState(bool isBusy)
         {
-            // _spinAnimation may be null if called before Loaded fires
             if (_spinAnimation == null) return;
 
             if (isBusy && !_isSpinning)
@@ -65,6 +73,23 @@ namespace PackItPro.Views
             {
                 _spinAnimation.Stop();
                 _isSpinning = false;
+            }
+        }
+
+        /// <summary>
+        /// Smoothly animates the ProgressBar to <paramref name="target"/> over 250 ms.
+        /// Uses the storyboard defined in XAML so the animation is GPU-composited.
+        /// </summary>
+        private void AnimateProgress(double target)
+        {
+            if (_progressStoryboard == null) return;
+
+            // Get the DoubleAnimation from the storyboard and set its To value.
+            if (_progressStoryboard.Children[0] is DoubleAnimation anim)
+            {
+                anim.From = ProgressBar.Value;
+                anim.To = target;
+                _progressStoryboard.Begin(this, isControllable: true);
             }
         }
     }

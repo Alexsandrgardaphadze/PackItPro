@@ -34,13 +34,43 @@ namespace PackItPro.ViewModels
         public string OutputLocation
         {
             get => SettingsModel.OutputLocation;
-            set { SettingsModel.OutputLocation = value; OnPropertyChanged(); }
+            set
+            {
+                SettingsModel.OutputLocation = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(OutputPreview));
+            }
         }
 
         public string OutputFileName
         {
             get => SettingsModel.OutputFileName;
-            set { SettingsModel.OutputFileName = value; OnPropertyChanged(); }
+            set
+            {
+                SettingsModel.OutputFileName = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(OutputPreview));
+            }
+        }
+
+        /// <summary>
+        /// Preview of the output file path shown under the Output Location field.
+        /// Updates whenever OutputLocation or OutputFileName changes.
+        /// </summary>
+        public string OutputPreview
+        {
+            get
+            {
+                try
+                {
+                    var dir = string.IsNullOrWhiteSpace(OutputLocation)
+                        ? Environment.GetFolderPath(Environment.SpecialFolder.Desktop)
+                        : OutputLocation;
+                    var name = string.IsNullOrWhiteSpace(OutputFileName) ? "Package" : OutputFileName;
+                    return Path.Combine(dir, name + ".exe");
+                }
+                catch { return ""; }
+            }
         }
 
         public bool OnlyScanExecutables
@@ -95,6 +125,30 @@ namespace PackItPro.ViewModels
             set { SettingsModel.ScanOnAdd = value; OnPropertyChanged(); }
         }
 
+        public bool UseLightTheme
+        {
+            get => SettingsModel.UseLightTheme;
+            set
+            {
+                SettingsModel.UseLightTheme = value;
+                OnPropertyChanged();
+                ThemeService.Apply(value ? AppTheme.Light : AppTheme.Dark);
+                _ = SaveSettingsAsync();
+            }
+        }
+
+        public string ThemeName
+        {
+            get => SettingsModel.ThemeName;
+            set
+            {
+                SettingsModel.ThemeName = value;
+                OnPropertyChanged();
+                ThemeService.Apply(value);
+                _ = SaveSettingsAsync();
+            }
+        }
+
         public SettingsViewModel(string settingsFilePath)
         {
             SettingsModel = new AppSettings();
@@ -122,9 +176,14 @@ namespace PackItPro.ViewModels
                         SettingsModel.ScanWithVirusTotal = loadedSettings.ScanWithVirusTotal;
                         SettingsModel.CompressionLevel = loadedSettings.CompressionLevel;
                         SettingsModel.ScanOnAdd = loadedSettings.ScanOnAdd;   // NEW
+                        SettingsModel.UseLightTheme = loadedSettings.UseLightTheme;
+                        SettingsModel.ThemeName = loadedSettings.ThemeName;
 
                         if (loadedSettings.TrustedEngines?.Count > 0)
                             SettingsModel.TrustedEngines = loadedSettings.TrustedEngines;
+
+                        if (loadedSettings.RecentPackages?.Count > 0)
+                            SettingsModel.RecentPackages = loadedSettings.RecentPackages;
 
                         await MigrateLegacyApiKeyIfNeededAsync(json, cancellationToken);
                     }

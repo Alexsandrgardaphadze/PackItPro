@@ -1,19 +1,24 @@
-﻿<!-- PackItPro/App.xaml-->
-    <Application x:Class="PackItPro.App"
+﻿<!-- PackItPro/App.xaml -->
+<Application x:Class="PackItPro.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="/Themes/Colors.xaml" />
+                <!--
+                        Color dictionary — swapped at runtime by ThemeService.Apply().
+                        MUST stay at index 0. ThemeService replaces merged[0] directly.
+                        Start with dark (default). App.xaml.cs calls
+                        ThemeService.ApplyFromSettings() after loading user prefs.
+                -->
+                <ResourceDictionary Source="/Themes/ColorsDark.xaml" />
                 <ResourceDictionary Source="/Themes/Converters.xaml" />
                 <ResourceDictionary Source="/Themes/FluentIcons.xaml" />
                 <ResourceDictionary Source="/Themes/Controls.xaml" />
                 <ResourceDictionary Source="/Themes/Styles.xaml" />
                 <ResourceDictionary Source="/Themes/FallbackResources.xaml" />
             </ResourceDictionary.MergedDictionaries>
-            <!-- Do NOT define converters again here -->
         </ResourceDictionary>
     </Application.Resources>
 </Application>

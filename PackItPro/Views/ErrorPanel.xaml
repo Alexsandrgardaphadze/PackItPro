@@ -27,7 +27,7 @@
     </UserControl.Resources>
 
     <Border x:Name="ErrorBorder"
-            Background="{StaticResource AppStatusErrorColor}"
+            Background="{DynamicResource AppStatusErrorColor}"
             CornerRadius="10"
             Padding="18,14"
             Margin="0,0,0,12"
@@ -56,7 +56,7 @@
             <!-- Icon with background circle -->
             <Border Grid.Column="0"
                     Width="36" Height="36"
-                    Background="#40FFFFFF"
+                    Background="{DynamicResource AppGlassBackground}"
                     CornerRadius="18"
                     VerticalAlignment="Center"
                     Margin="0,0,14,0">

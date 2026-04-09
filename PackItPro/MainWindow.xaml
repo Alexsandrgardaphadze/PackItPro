@@ -9,7 +9,7 @@
         mc:Ignorable="d"
         Title="PackItPro - Secure Package Builder"
         Height="650" Width="1050"
-        Background="{StaticResource AppBackgroundColor}"
+        Background="{DynamicResource AppBackgroundColor}"
         WindowStartupLocation="CenterScreen"
         ResizeMode="CanResize"
         MinWidth="900" MinHeight="600"
@@ -22,7 +22,48 @@
         <vm:MainViewModel />
     </Window.DataContext>
 
-    <Grid Margin="10">
+    <!--
+        Keyboard shortcuts
+        ──────────────────
+        Ctrl+O   Browse / Add files
+        Ctrl+K   Pack now
+        Ctrl+S   Scan files
+        Ctrl+T   Toggle dark/light theme
+
+        NOTE: Delete is intentionally NOT a global shortcut.
+        It is handled locally in FileListPanel.KeyDown only when the
+        ListView (not a TextBox child) has keyboard focus — this prevents
+        the key from eating characters while the user types in Custom Args.
+
+        Alt+A (Add shortcut) is also NOT a global window shortcut — the
+        shortcut panel's Add button has it as an accelerator label only.
+        Wiring it globally would fire while the user types "A" in any field.
+    -->
+    <Window.InputBindings>
+        <KeyBinding Key="O" Modifiers="Ctrl" Command="{Binding BrowseFilesCommand}"/>
+        <KeyBinding Key="K" Modifiers="Ctrl" Command="{Binding PackCommand}"/>
+        <KeyBinding Key="S" Modifiers="Ctrl" Command="{Binding ScanFilesCommand}"/>
+        <KeyBinding Key="T" Modifiers="Ctrl" Command="{Binding ToggleThemeCommand}"/>
+    </Window.InputBindings>
+
+    <!-- Entrance fade — entire window fades in over 220ms on Loaded -->
+    <Window.Triggers>
+        <EventTrigger RoutedEvent="Loaded">
+            <BeginStoryboard>
+                <Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="RootGrid"
+                                     Storyboard.TargetProperty="Opacity"
+                                     From="0" To="1" Duration="0:0:0.22">
+                        <DoubleAnimation.EasingFunction>
+                            <CubicEase EasingMode="EaseOut"/>
+                        </DoubleAnimation.EasingFunction>
+                    </DoubleAnimation>
+                </Storyboard>
+            </BeginStoryboard>
+        </EventTrigger>
+    </Window.Triggers>
+
+    <Grid x:Name="RootGrid" Margin="10" Opacity="0">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <!-- Menu Bar -->
@@ -32,77 +73,272 @@
             <!-- Status Panel -->
         </Grid.RowDefinitions>
 
-        <!-- ══ MENU BAR ════════════════════════════════════════════════════════
-             DockPanel:
-               LEFT  — the four Menu items (File / Settings / Tools / Help)
-               RIGHT — a compact status strip (file count · VT badge · version)
-             The strip is purely informational and doesn't need commands.
-        -->
+        <!-- ══ MENU BAR ═══════════════════════════════════════════════════════ -->
         <Border Grid.Row="0"
-                Background="{StaticResource AppPanelColor}"
+                Background="{DynamicResource AppPanelColor}"
                 CornerRadius="8"
                 Margin="0,0,0,12"
                 Padding="4,0"
-                BorderBrush="{StaticResource AppBorderColor}"
+                BorderBrush="{DynamicResource AppBorderColor}"
                 BorderThickness="1">
 
             <DockPanel LastChildFill="False">
 
-                <!-- ── Left: navigation menu ────────────────────────────── -->
+                <!-- Left: menu items -->
                 <Menu DockPanel.Dock="Left"
                       Background="Transparent"
                       Padding="0,4,0,4"
                       VerticalAlignment="Center">
 
+                    <!-- FILE ──────────────────────────────────────────────── -->
                     <MenuItem Header="File" Style="{StaticResource MenuItemStyle}">
-                        <MenuItem Header="Add Files..."           Command="{Binding BrowseFilesCommand}"         Style="{StaticResource SubMenuItemStyle}"/>
-                        <MenuItem Header="Clear All Files"        Command="{Binding ClearAllFilesCommand}"       Style="{StaticResource SubMenuItemStyle}"/>
-                        <Separator Background="{StaticResource AppBorderColor}"/>
-                        <MenuItem Header="Export Logs..."         Command="{Binding ExportLogsCommand}"          Style="{StaticResource SubMenuItemStyle}"/>
-                        <Separator Background="{StaticResource AppBorderColor}"/>
-                        <MenuItem Header="Exit"                   Command="{Binding ExitCommand}"                Style="{StaticResource SubMenuItemStyle}"/>
+                        <MenuItem Header="Add Files…"
+                                  Command="{Binding BrowseFilesCommand}"
+                                  InputGestureText="Ctrl+O"
+                                  Style="{StaticResource SubMenuItemStyle}">
+                            <MenuItem.Icon>
+                                <Viewbox Width="14" Height="14">
+                                    <Canvas Width="20" Height="20">
+                                        <Path Data="{StaticResource Icon.DocumentAdd}"
+                                              Fill="{DynamicResource AppTextTertiaryColor}"/>
+                                    </Canvas>
+                                </Viewbox>
+                            </MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem Header="Clear All Files"
+                                  Command="{Binding ClearAllFilesCommand}"
+                                  Style="{StaticResource SubMenuItemStyle}">
+                            <MenuItem.Icon>
+                                <Viewbox Width="14" Height="14">
+                                    <Canvas Width="20" Height="20">
+                                        <Path Data="{StaticResource Icon.Delete}"
+                                              Fill="{DynamicResource AppTextTertiaryColor}"/>
+                                    </Canvas>
+                                </Viewbox>
+                            </MenuItem.Icon>
+                        </MenuItem>
+                        <Separator Background="{DynamicResource AppBorderColor}"/>
+                        <MenuItem Header="Export Logs…"
+                                  Command="{Binding ExportLogsCommand}"
+                                  Style="{StaticResource SubMenuItemStyle}">
+                            <MenuItem.Icon>
+                                <Viewbox Width="14" Height="14">
+                                    <Canvas Width="20" Height="20">
+                                        <Path Data="{StaticResource Icon.Document}"
+                                              Fill="{DynamicResource AppTextTertiaryColor}"/>
+                                    </Canvas>
+                                </Viewbox>
+                            </MenuItem.Icon>
+                        </MenuItem>
+                        <Separator Background="{DynamicResource AppBorderColor}"/>
+                        <MenuItem Header="Exit"
+                                  Command="{Binding ExitCommand}"
+                                  Style="{StaticResource SubMenuItemStyle}">
+                            <MenuItem.Icon>
+                                <Viewbox Width="14" Height="14">
+                                    <Canvas Width="20" Height="20">
+                                        <Path Data="{StaticResource Icon.DismissCircle}"
+                                              Fill="{DynamicResource AppTextTertiaryColor}"/>
+                                    </Canvas>
+                                </Viewbox>
+                            </MenuItem.Icon>
+                        </MenuItem>
                     </MenuItem>
 
+                    <!-- SETTINGS ──────────────────────────────────────────── -->
                     <MenuItem Header="Settings" Style="{StaticResource MenuItemStyle}">
-                        <MenuItem Header="Output Location..."         Command="{Binding SetOutputLocationCommand}"   Style="{StaticResource SubMenuItemStyle}"/>
-                        <MenuItem Header="VirusTotal API Key..."      Command="{Binding SetVirusApiKeyCommand}"      Style="{StaticResource SubMenuItemStyle}"/>
-                        <MenuItem Header="Delete VirusTotal API Key"  Command="{Binding DeleteVirusApiKeyCommand}"   Style="{StaticResource SubMenuItemStyle}"/>
-                        <MenuItem Header="PackItPro Settings..."      Command="{Binding PackItProSettingsCommand}"   Style="{StaticResource SubMenuItemStyle}"/>
+                        <MenuItem Header="Output Location…"
+                                  Command="{Binding SetOutputLocationCommand}"
+                                  Style="{StaticResource SubMenuItemStyle}">
+                            <MenuItem.Icon>
+                                <Viewbox Width="14" Height="14">
+                                    <Canvas Width="20" Height="20">
+                                        <Path Data="{StaticResource Icon.Folder}"
+                                              Fill="{DynamicResource AppTextTertiaryColor}"/>
+                                    </Canvas>
+                                </Viewbox>
+                            </MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem Header="VirusTotal API Key…"
+                                  Command="{Binding SetVirusApiKeyCommand}"
+                                  Style="{StaticResource SubMenuItemStyle}"/>
+                        <MenuItem Header="Delete VirusTotal API Key"
+                                  Command="{Binding DeleteVirusApiKeyCommand}"
+                                  Style="{StaticResource SubMenuItemStyle}"/>
+                        <Separator Background="{DynamicResource AppBorderColor}"/>
+                        <MenuItem Header="PackItPro Settings…"
+                                  Command="{Binding PackItProSettingsCommand}"
+                                  Style="{StaticResource SubMenuItemStyle}"/>
+                        <Separator Background="{DynamicResource AppBorderColor}"/>
+                        <MenuItem Header="Appearance" Style="{StaticResource SubMenuHeaderStyle}">
+                            <MenuItem Header="Dark Theme"
+                                      Command="{Binding SetThemeDarkCommand}"
+                                      Style="{StaticResource SubMenuItemStyle}"/>
+                            <MenuItem Header="Light Theme"
+                                      Command="{Binding SetThemeLightCommand}"
+                                      Style="{StaticResource SubMenuItemStyle}"/>
+                            <Separator Background="{DynamicResource AppBorderColor}"/>
+                            <MenuItem Header="Open Themes Folder…"
+                                      Command="{Binding OpenThemesFolderCommand}"
+                                      Style="{StaticResource SubMenuItemStyle}"/>
+                        </MenuItem>
                     </MenuItem>
 
+                    <!-- TOOLS ─────────────────────────────────────────────── -->
                     <MenuItem Header="Tools" Style="{StaticResource MenuItemStyle}">
-                        <MenuItem Header="Test Package..."   Command="{Binding TestPackageCommand}"   Style="{StaticResource SubMenuItemStyle}"/>
-                        <MenuItem Header="View Cache..."     Command="{Binding ViewCacheCommand}"     Style="{StaticResource SubMenuItemStyle}"/>
-                        <MenuItem Header="Clear Cache"       Command="{Binding ClearCacheCommand}"    Style="{StaticResource SubMenuItemStyle}"/>
-                        <Separator Background="{StaticResource AppBorderColor}"/>
-                        <MenuItem Header="Export List..."    Command="{Binding ExportListCommand}"    Style="{StaticResource SubMenuItemStyle}"/>
+                        <MenuItem Header="Pack Now"
+                                  Command="{Binding PackCommand}"
+                                  InputGestureText="Ctrl+K"
+                                  Style="{StaticResource SubMenuItemStyle}">
+                            <MenuItem.Icon>
+                                <Viewbox Width="14" Height="14">
+                                    <Canvas Width="20" Height="20">
+                                        <Path Data="{StaticResource Icon.Archive}"
+                                              Fill="{DynamicResource AppPrimaryColor}"/>
+                                    </Canvas>
+                                </Viewbox>
+                            </MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem Header="Scan Files"
+                                  Command="{Binding ScanFilesCommand}"
+                                  InputGestureText="Ctrl+S"
+                                  Style="{StaticResource SubMenuItemStyle}">
+                            <MenuItem.Icon>
+                                <Viewbox Width="14" Height="14">
+                                    <Canvas Width="20" Height="20">
+                                        <Path Data="{StaticResource Icon.Shield}"
+                                              Fill="{DynamicResource AppTextTertiaryColor}"/>
+                                    </Canvas>
+                                </Viewbox>
+                            </MenuItem.Icon>
+                        </MenuItem>
+                        <Separator Background="{DynamicResource AppBorderColor}"/>
+                        <MenuItem Header="Test Package…"
+                                  Command="{Binding TestPackageCommand}"
+                                  Style="{StaticResource SubMenuItemStyle}"/>
+                        <MenuItem Header="View Cache…"
+                                  Command="{Binding ViewCacheCommand}"
+                                  Style="{StaticResource SubMenuItemStyle}"/>
+                        <MenuItem Header="Clear Cache"
+                                  Command="{Binding ClearCacheCommand}"
+                                  Style="{StaticResource SubMenuItemStyle}"/>
+                        <Separator Background="{DynamicResource AppBorderColor}"/>
+                        <MenuItem Header="Export List…"
+                                  Command="{Binding ExportListCommand}"
+                                  Style="{StaticResource SubMenuItemStyle}"/>
+                        <Separator Background="{DynamicResource AppBorderColor}"/>
+                        <!-- Shortcuts submenu ─────────────────────────────── -->
+                        <MenuItem Header="Shortcuts" Style="{StaticResource SubMenuHeaderStyle}">
+                            <MenuItem.Icon>
+                                <Viewbox Width="14" Height="14">
+                                    <Canvas Width="20" Height="20">
+                                        <Path Data="{StaticResource Icon.OpenExternal}"
+                                              Fill="{DynamicResource AppTextTertiaryColor}"/>
+                                    </Canvas>
+                                </Viewbox>
+                            </MenuItem.Icon>
+                            <MenuItem Header="Manage Shortcuts…"
+                                      Command="{Binding ManageShortcutsCommand}"
+                                      Style="{StaticResource SubMenuItemStyle}"
+                                      ToolTip="Add Desktop / Start Menu shortcuts that StubInstaller creates after installation"/>
+                            <Separator Background="{DynamicResource AppBorderColor}"/>
+                            <MenuItem Header="Add Shortcut"
+                                      Command="{Binding AddShortcutCommand}"
+                                      Style="{StaticResource SubMenuItemStyle}"
+                                      ToolTip="Quickly add a new shortcut entry"/>
+                        </MenuItem>
                     </MenuItem>
 
+                    <!-- HELP ──────────────────────────────────────────────── -->
                     <MenuItem Header="Help" Style="{StaticResource MenuItemStyle}">
-                        <MenuItem Header="Documentation"      Command="{Binding DocumentationCommand}"  Style="{StaticResource SubMenuItemStyle}"/>
-                        <MenuItem Header="GitHub Repository"  Command="{Binding GitHubCommand}"         Style="{StaticResource SubMenuItemStyle}"/>
-                        <MenuItem Header="Report Issue"       Command="{Binding ReportIssueCommand}"    Style="{StaticResource SubMenuItemStyle}"/>
-                        <Separator Background="{StaticResource AppBorderColor}"/>
-                        <MenuItem Header="Check for Updates"  Command="{Binding CheckUpdatesCommand}"   Style="{StaticResource SubMenuItemStyle}"/>
-                        <Separator Background="{StaticResource AppBorderColor}"/>
-                        <MenuItem Header="About PackItPro"    Command="{Binding AboutCommand}"          Style="{StaticResource SubMenuItemStyle}"/>
+                        <MenuItem Header="Documentation"
+                                  Command="{Binding DocumentationCommand}"
+                                  Style="{StaticResource SubMenuItemStyle}"/>
+                        <MenuItem Header="GitHub Repository"
+                                  Command="{Binding GitHubCommand}"
+                                  Style="{StaticResource SubMenuItemStyle}"/>
+                        <MenuItem Header="Report Issue"
+                                  Command="{Binding ReportIssueCommand}"
+                                  Style="{StaticResource SubMenuItemStyle}"/>
+                        <Separator Background="{DynamicResource AppBorderColor}"/>
+                        <MenuItem Header="Check for Updates"
+                                  Command="{Binding CheckUpdatesCommand}"
+                                  Style="{StaticResource SubMenuItemStyle}"/>
+                        <Separator Background="{DynamicResource AppBorderColor}"/>
+                        <MenuItem Header="About PackItPro"
+                                  Command="{Binding AboutCommand}"
+                                  Style="{StaticResource SubMenuItemStyle}"/>
                     </MenuItem>
                 </Menu>
 
-                <!-- ── Right: version label ─────────────────────────────── -->
+                <!-- Right: file count badge + theme pill + version -->
                 <StackPanel DockPanel.Dock="Right"
                             Orientation="Horizontal"
                             VerticalAlignment="Center"
                             Margin="0,0,8,0">
 
-                    <!-- Thin divider -->
-                    <Border Width="1" Background="{StaticResource AppDividerColor}"
+
+                    <!-- Pill theme toggle — Ctrl+T -->
+                    <Button Command="{Binding ToggleThemeCommand}"
+                            Width="58" Height="26"
+                            VerticalAlignment="Center"
+                            Margin="0,0,8,0"
+                            ToolTip="Toggle Light / Dark  (Ctrl+T)"
+                            Cursor="Hand"
+                            FocusVisualStyle="{x:Null}">
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <Setter Property="Background"      Value="{DynamicResource AppCardColor}"/>
+                                <Setter Property="BorderBrush"     Value="{DynamicResource AppBorderColor}"/>
+                                <Setter Property="BorderThickness" Value="1"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border x:Name="pill"
+                                                    Background="{TemplateBinding Background}"
+                                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                                    CornerRadius="13"
+                                                    RenderTransformOrigin="0.5,0.5">
+                                                <Border.RenderTransform>
+                                                    <ScaleTransform ScaleX="1" ScaleY="1"/>
+                                                </Border.RenderTransform>
+                                                <StackPanel Orientation="Horizontal"
+                                                            HorizontalAlignment="Center"
+                                                            VerticalAlignment="Center"
+                                                            Margin="5,0">
+                                                    <TextBlock Text="🌙" FontSize="11"
+                                                               VerticalAlignment="Center" Margin="0,0,3,0"/>
+                                                    <Border Width="1" Background="{DynamicResource AppBorderColor}"
+                                                            Margin="0,3"/>
+                                                    <TextBlock Text="☀️" FontSize="11"
+                                                               VerticalAlignment="Center" Margin="3,0,0,0"/>
+                                                </StackPanel>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="pill" Property="Background"
+                                                            Value="{DynamicResource AppHoverOverlayColor}"/>
+                                                    <Setter TargetName="pill" Property="BorderBrush"
+                                                            Value="{DynamicResource AppPrimaryColor}"/>
+                                                </Trigger>
+                                                <Trigger Property="IsPressed" Value="True">
+                                                    <Setter TargetName="pill" Property="Opacity" Value="0.75"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+
+                    <Border Width="1" Background="{DynamicResource AppDividerColor}"
                             Margin="0,6,8,6" VerticalAlignment="Stretch"/>
 
-                    <!-- Version label -->
                     <TextBlock Text="{Binding AppVersion}"
                                FontFamily="Consolas" FontSize="11"
-                               Foreground="{StaticResource AppTextTertiaryColor}"
+                               Foreground="{DynamicResource AppTextTertiaryColor}"
                                VerticalAlignment="Center"
                                Margin="0,0,4,0"/>
                 </StackPanel>
@@ -119,10 +355,13 @@
 
             <views:FileListPanel Grid.Column="0" DataContext="{Binding FileList}"/>
 
-            <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <ScrollViewer Grid.Column="1"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
                 <StackPanel>
-                    <views:PackSettingsPanel DataContext="{Binding Settings}" Margin="0,0,0,10"/>
-                    <views:SummaryPanel DataContext="{Binding Summary}"/>
+
+                    <views:PackSettingsPanel DataContext="{Binding Settings}"   Margin="0,0,0,10"/>
+                    <views:SummaryPanel     DataContext="{Binding Summary}"/>
                 </StackPanel>
             </ScrollViewer>
         </Grid>

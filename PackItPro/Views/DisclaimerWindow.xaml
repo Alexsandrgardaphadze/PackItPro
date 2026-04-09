@@ -6,7 +6,7 @@
         MinHeight="500" MinWidth="460"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
-        Background="{StaticResource AppBackgroundColor}"
+        Background="{DynamicResource AppBackgroundColor}"
         ShowInTaskbar="False">
 
     <Grid Margin="20">
@@ -26,10 +26,10 @@
             <TextBlock Text="Packaging Disclaimer"
                        FontSize="17" FontWeight="SemiBold"
                        FontFamily="Segoe UI"
-                       Foreground="{StaticResource AppTextColor}"/>
+                       Foreground="{DynamicResource AppTextColor}"/>
             <TextBlock Text="Please read before proceeding."
                        FontSize="12" FontFamily="Segoe UI"
-                       Foreground="{StaticResource AppTextTertiaryColor}"
+                       Foreground="{DynamicResource AppTextTertiaryColor}"
                        Margin="0,4,0,0"/>
         </StackPanel>
 
@@ -41,18 +41,18 @@
             <StackPanel>
 
                 <!-- 1. Responsibility -->
-                <Border Background="{StaticResource AppCardColor}"
-                        BorderBrush="{StaticResource AppBorderColor}"
+                <Border Background="{DynamicResource AppCardColor}"
+                        BorderBrush="{DynamicResource AppBorderColor}"
                         BorderThickness="1" CornerRadius="8"
                         Padding="14,12" Margin="0,0,0,8">
                     <StackPanel>
                         <TextBlock Text="YOUR RESPONSIBILITY"
                                    FontSize="9" FontWeight="SemiBold"
                                    FontFamily="Segoe UI"
-                                   Foreground="{StaticResource AppTextTertiaryColor}"
+                                   Foreground="{DynamicResource AppTextTertiaryColor}"
                                    Margin="0,0,0,6"/>
                         <TextBlock FontSize="12" FontFamily="Segoe UI"
-                                   Foreground="{StaticResource AppTextSecondaryColor}"
+                                   Foreground="{DynamicResource AppTextSecondaryColor}"
                                    TextWrapping="Wrap" LineHeight="18">
                             You are solely responsible for the content of any package you create.
                             PackItPro bundles files as-is and does not inspect, modify, or validate
@@ -62,18 +62,18 @@
                 </Border>
 
                 <!-- 2. Legal / distribution -->
-                <Border Background="{StaticResource AppCardColor}"
-                        BorderBrush="{StaticResource AppBorderColor}"
+                <Border Background="{DynamicResource AppCardColor}"
+                        BorderBrush="{DynamicResource AppBorderColor}"
                         BorderThickness="1" CornerRadius="8"
                         Padding="14,12" Margin="0,0,0,8">
                     <StackPanel>
                         <TextBlock Text="LEGAL USE ONLY"
                                    FontSize="9" FontWeight="SemiBold"
                                    FontFamily="Segoe UI"
-                                   Foreground="{StaticResource AppTextTertiaryColor}"
+                                   Foreground="{DynamicResource AppTextTertiaryColor}"
                                    Margin="0,0,0,6"/>
                         <TextBlock FontSize="12" FontFamily="Segoe UI"
-                                   Foreground="{StaticResource AppTextSecondaryColor}"
+                                   Foreground="{DynamicResource AppTextSecondaryColor}"
                                    TextWrapping="Wrap" LineHeight="18">
                             You confirm that you have the legal right to distribute every file
                             included in this package. Distributing malware, unlicensed software,
@@ -84,18 +84,18 @@
                 </Border>
 
                 <!-- 3. VirusTotal limitation -->
-                <Border Background="{StaticResource AppCardColor}"
-                        BorderBrush="{StaticResource AppBorderColor}"
+                <Border Background="{DynamicResource AppCardColor}"
+                        BorderBrush="{DynamicResource AppBorderColor}"
                         BorderThickness="1" CornerRadius="8"
                         Padding="14,12" Margin="0,0,0,8">
                     <StackPanel>
                         <TextBlock Text="SCANNING LIMITATIONS"
                                    FontSize="9" FontWeight="SemiBold"
                                    FontFamily="Segoe UI"
-                                   Foreground="{StaticResource AppTextTertiaryColor}"
+                                   Foreground="{DynamicResource AppTextTertiaryColor}"
                                    Margin="0,0,0,6"/>
                         <TextBlock FontSize="12" FontFamily="Segoe UI"
-                                   Foreground="{StaticResource AppTextSecondaryColor}"
+                                   Foreground="{DynamicResource AppTextSecondaryColor}"
                                    TextWrapping="Wrap" LineHeight="18">
                             VirusTotal scanning reduces risk but does not guarantee safety.
                             A clean result does not mean a file is safe — only that it was not
@@ -107,8 +107,8 @@
 
                 <!-- 4. Unscanned files warning — shown only when relevant -->
                 <Border x:Name="UnscannedWarningBorder"
-                        Background="#2a2010"
-                        BorderBrush="#6b5a20"
+                        Background="{DynamicResource AppWarningSubtleBg}"
+                        BorderBrush="{DynamicResource AppWarningSubtleBorder}"
                         BorderThickness="1" CornerRadius="8"
                         Padding="14,12" Margin="0,0,0,8"
                         Visibility="Collapsed">
@@ -116,10 +116,10 @@
                         <TextBlock Text="&#x26A0;  UNSCANNED FILES"
                                    FontSize="9" FontWeight="SemiBold"
                                    FontFamily="Segoe UI"
-                                   Foreground="#d4a017"
+                                   Foreground="{DynamicResource AppStatusWarningColor}"
                                    Margin="0,0,0,6"/>
                         <TextBlock FontSize="12" FontFamily="Segoe UI"
-                                   Foreground="{StaticResource AppTextSecondaryColor}"
+                                   Foreground="{DynamicResource AppTextSecondaryColor}"
                                    TextWrapping="Wrap" LineHeight="18">
                             One or more files in your list have not been scanned.
                             Consider running a VirusTotal scan before packaging.
@@ -129,8 +129,8 @@
 
                 <!-- 5. Admin privilege warning — shown only when relevant -->
                 <Border x:Name="AdminWarningBorder"
-                        Background="#2a1a10"
-                        BorderBrush="#6b3a20"
+                        Background="{DynamicResource AppWarningSubtleBg}"
+                        BorderBrush="{DynamicResource AppWarningSubtleBorder}"
                         BorderThickness="1" CornerRadius="8"
                         Padding="14,12" Margin="0,0,0,8"
                         Visibility="Collapsed">
@@ -138,10 +138,10 @@
                         <TextBlock Text="&#x26A0;  ADMINISTRATOR PRIVILEGES"
                                    FontSize="9" FontWeight="SemiBold"
                                    FontFamily="Segoe UI"
-                                   Foreground="#e07840"
+                                   Foreground="{DynamicResource AppStatusWarningColor}"
                                    Margin="0,0,0,6"/>
                         <TextBlock FontSize="12" FontFamily="Segoe UI"
-                                   Foreground="{StaticResource AppTextSecondaryColor}"
+                                   Foreground="{DynamicResource AppTextSecondaryColor}"
                                    TextWrapping="Wrap" LineHeight="18">
                             This package is configured to request administrator privileges on
                             the target machine. Only proceed if elevated permissions are genuinely
@@ -152,8 +152,8 @@
 
                 <!-- 6. Infected files — shown only when relevant -->
                 <Border x:Name="InfectedWarningBorder"
-                        Background="#2a1010"
-                        BorderBrush="#6b2020"
+                        Background="{DynamicResource AppErrorSubtleBg}"
+                        BorderBrush="{DynamicResource AppErrorSubtleBorder}"
                         BorderThickness="1" CornerRadius="8"
                         Padding="14,12" Margin="0,0,0,8"
                         Visibility="Collapsed">
@@ -161,10 +161,10 @@
                         <TextBlock Text="&#x26A0;  INFECTED FILES DETECTED"
                                    FontSize="9" FontWeight="SemiBold"
                                    FontFamily="Segoe UI"
-                                   Foreground="{StaticResource AppStatusErrorColor}"
+                                   Foreground="{DynamicResource AppStatusErrorColor}"
                                    Margin="0,0,0,6"/>
                         <TextBlock FontSize="12" FontFamily="Segoe UI"
-                                   Foreground="{StaticResource AppTextSecondaryColor}"
+                                   Foreground="{DynamicResource AppTextSecondaryColor}"
                                    TextWrapping="Wrap" LineHeight="18">
                             One or more files in your list were flagged by VirusTotal.
                             Packaging infected files is strongly discouraged. Remove or
@@ -178,13 +178,13 @@
 
         <!-- Acknowledgement row - no checkbox needed since disclaimer always shows -->
         <Border Grid.Row="2"
-                Background="{StaticResource AppCardColor}"
-                BorderBrush="{StaticResource AppBorderColor}"
+                Background="{DynamicResource AppCardColor}"
+                BorderBrush="{DynamicResource AppBorderColor}"
                 BorderThickness="1" CornerRadius="6"
                 Padding="12,8" Margin="0,0,0,14">
             <TextBlock Text="By clicking Accept &amp; Continue you confirm you have read and understood the above."
                        FontFamily="Segoe UI" FontSize="11"
-                       Foreground="{StaticResource AppTextTertiaryColor}"
+                       Foreground="{DynamicResource AppTextTertiaryColor}"
                        TextWrapping="Wrap"/>
         </Border>
 
@@ -203,9 +203,9 @@
                     Click="Cancel_Click">
                 <Button.Style>
                     <Style TargetType="Button">
-                        <Setter Property="Background" Value="{StaticResource AppPanelHoverColor}"/>
-                        <Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
-                        <Setter Property="BorderBrush" Value="{StaticResource AppBorderColor}"/>
+                        <Setter Property="Background" Value="{DynamicResource AppPanelHoverColor}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource AppTextColor}"/>
+                        <Setter Property="BorderBrush" Value="{DynamicResource AppBorderColor}"/>
                         <Setter Property="BorderThickness" Value="1"/>
                         <Setter Property="FontFamily" Value="Segoe UI"/>
                         <Setter Property="FontSize" Value="13"/>
@@ -225,7 +225,7 @@
                         </Setter>
                         <Style.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="{StaticResource AppBorderColor}"/>
+                                <Setter Property="Background" Value="{DynamicResource AppBorderColor}"/>
                             </Trigger>
                         </Style.Triggers>
                     </Style>

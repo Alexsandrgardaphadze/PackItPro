@@ -20,18 +20,23 @@ namespace PackItPro.Services
     /// Writes structured log entries to a file and Debug output simultaneously.
     /// Thread-safe. Disables itself on persistent write failure (e.g. full disk)
     /// rather than retrying indefinitely.
+    /// Automatically rotates logs when they exceed 5 MB.
     /// </summary>
     public class FileLogService : ILogService
     {
         private readonly string _logPath;
         private readonly object _lock = new();
         private bool _disabled = false; // FIX: one-time fallback on IO failure
+        private const long MaxLogSizeBytes = 5_242_880; // 5 MB
 
         public string LogPath => _logPath;
 
         public FileLogService(string logPath)
         {
             _logPath = logPath;
+
+            // P1 FIX: Rotate log if it's grown too large
+            RotateIfNeeded();
 
             // FIX: Only write the header if the file is new/empty.
             // Multiple packaging operations in one session must NOT produce
@@ -44,6 +49,43 @@ namespace PackItPro.Services
                     $"PackItPro Log — {DateTime.Now:dd-MM-yyyy HH:mm:ss}\n" +
                     $"Machine: {Environment.MachineName} | User: {Environment.UserName}\n" +
                     "========================================\n");
+            }
+        }
+
+        /// <summary>
+        /// Rotates the current log file if it exceeds the size limit.
+        /// Keeps up to 3 backup files: packitpro.log.1, .log.2, .log.3
+        /// </summary>
+        private void RotateIfNeeded()
+        {
+            if (!File.Exists(_logPath)) return;
+            if (new FileInfo(_logPath).Length < MaxLogSizeBytes) return;
+
+            lock (_lock)
+            {
+                try
+                {
+                    // Shift existing backups (remove .3, move .2→.3, .1→.2)
+                    for (int i = 2; i >= 1; i--)
+                    {
+                        string oldBackup = $"{_logPath}.{i}";
+                        string newBackup = $"{_logPath}.{i + 1}";
+                        if (File.Exists(oldBackup))
+                            File.Delete(newBackup); // Remove .3 before moving .2→.3
+                        if (File.Exists(oldBackup))
+                            File.Move(oldBackup, newBackup, overwrite: true);
+                    }
+
+                    // Move current log to .1
+                    string backup1 = $"{_logPath}.1";
+                    if (File.Exists(backup1))
+                        File.Delete(backup1);
+                    File.Move(_logPath, backup1, overwrite: true);
+                }
+                catch
+                {
+                    // Rotation failure is non-fatal — continue without rotation
+                }
             }
         }
 

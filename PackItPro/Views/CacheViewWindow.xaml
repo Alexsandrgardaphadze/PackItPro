@@ -5,7 +5,7 @@
         Height="340" Width="480"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
-        Background="{StaticResource AppBackgroundColor}"
+        Background="{DynamicResource AppBackgroundColor}"
         ShowInTaskbar="False">
 
     <Grid Margin="12">
@@ -15,8 +15,8 @@
         </Grid.RowDefinitions>
 
         <Border Grid.Row="0"
-                Background="{StaticResource AppPanelColor}"
-                BorderBrush="{StaticResource AppBorderColor}"
+                Background="{DynamicResource AppPanelColor}"
+                BorderBrush="{DynamicResource AppBorderColor}"
                 BorderThickness="1"
                 CornerRadius="10"
                 Padding="22,18">
@@ -27,7 +27,7 @@
                     <TextBlock Text="🛡️" FontSize="18" Margin="0,0,8,0" VerticalAlignment="Center"/>
                     <TextBlock Text="VirusTotal Scan Cache"
                                FontSize="16" FontWeight="SemiBold"
-                               Foreground="{StaticResource AppTextColor}"
+                               Foreground="{DynamicResource AppTextColor}"
                                FontFamily="Segoe UI" VerticalAlignment="Center"/>
                 </StackPanel>
 
@@ -42,53 +42,53 @@
                     </Grid.ColumnDefinitions>
 
                     <!-- Entries -->
-                    <Border Grid.Column="0" Background="{StaticResource AppCardColor}"
+                    <Border Grid.Column="0" Background="{DynamicResource AppCardColor}"
                             CornerRadius="8" Padding="12"
-                            BorderBrush="{StaticResource AppBorderColor}" BorderThickness="1">
+                            BorderBrush="{DynamicResource AppBorderColor}" BorderThickness="1">
                         <StackPanel>
                             <TextBlock Text="ENTRIES" FontSize="9" FontWeight="SemiBold"
-                                       Foreground="{StaticResource AppTextTertiaryColor}"
+                                       Foreground="{DynamicResource AppTextTertiaryColor}"
                                        FontFamily="Segoe UI" Margin="0,0,0,4"/>
                             <TextBlock x:Name="EntryCountText" Text="—"
                                        FontSize="22" FontWeight="Bold"
                                        FontFamily="Consolas"
-                                       Foreground="{StaticResource AppTextColor}"/>
+                                       Foreground="{DynamicResource AppTextColor}"/>
                             <TextBlock Text="cached files" FontSize="10"
-                                       Foreground="{StaticResource AppTextTertiaryColor}"
+                                       Foreground="{DynamicResource AppTextTertiaryColor}"
                                        FontFamily="Segoe UI"/>
                         </StackPanel>
                     </Border>
 
                     <!-- Cache size -->
-                    <Border Grid.Column="2" Background="{StaticResource AppCardColor}"
+                    <Border Grid.Column="2" Background="{DynamicResource AppCardColor}"
                             CornerRadius="8" Padding="12"
-                            BorderBrush="{StaticResource AppBorderColor}" BorderThickness="1">
+                            BorderBrush="{DynamicResource AppBorderColor}" BorderThickness="1">
                         <StackPanel>
                             <TextBlock Text="SIZE" FontSize="9" FontWeight="SemiBold"
-                                       Foreground="{StaticResource AppTextTertiaryColor}"
+                                       Foreground="{DynamicResource AppTextTertiaryColor}"
                                        FontFamily="Segoe UI" Margin="0,0,0,4"/>
                             <TextBlock x:Name="CacheSizeText" Text="—"
                                        FontSize="22" FontWeight="Bold"
                                        FontFamily="Consolas"
-                                       Foreground="{StaticResource AppTextColor}"/>
+                                       Foreground="{DynamicResource AppTextColor}"/>
                             <TextBlock Text="on disk" FontSize="10"
-                                       Foreground="{StaticResource AppTextTertiaryColor}"
+                                       Foreground="{DynamicResource AppTextTertiaryColor}"
                                        FontFamily="Segoe UI"/>
                         </StackPanel>
                     </Border>
 
                     <!-- Last modified -->
-                    <Border Grid.Column="4" Background="{StaticResource AppCardColor}"
+                    <Border Grid.Column="4" Background="{DynamicResource AppCardColor}"
                             CornerRadius="8" Padding="12"
-                            BorderBrush="{StaticResource AppBorderColor}" BorderThickness="1">
+                            BorderBrush="{DynamicResource AppBorderColor}" BorderThickness="1">
                         <StackPanel>
                             <TextBlock Text="UPDATED" FontSize="9" FontWeight="SemiBold"
-                                       Foreground="{StaticResource AppTextTertiaryColor}"
+                                       Foreground="{DynamicResource AppTextTertiaryColor}"
                                        FontFamily="Segoe UI" Margin="0,0,0,4"/>
                             <TextBlock x:Name="LastModText" Text="—"
                                        FontSize="13" FontWeight="SemiBold"
                                        FontFamily="Segoe UI"
-                                       Foreground="{StaticResource AppTextColor}"
+                                       Foreground="{DynamicResource AppTextColor}"
                                        TextWrapping="Wrap"/>
                         </StackPanel>
                     </Border>
@@ -96,14 +96,14 @@
 
                 <!-- File path -->
                 <TextBlock Text="Cache location" FontSize="10" FontWeight="SemiBold"
-                           Foreground="{StaticResource AppTextTertiaryColor}"
+                           Foreground="{DynamicResource AppTextTertiaryColor}"
                            FontFamily="Segoe UI" Margin="0,0,0,4"/>
-                <Border Background="{StaticResource AppCardColor}"
+                <Border Background="{DynamicResource AppCardColor}"
                         CornerRadius="6" Padding="10,8"
-                        BorderBrush="{StaticResource AppBorderColor}" BorderThickness="1">
+                        BorderBrush="{DynamicResource AppBorderColor}" BorderThickness="1">
                     <TextBlock x:Name="CachePathText"
                                FontFamily="Consolas" FontSize="11"
-                               Foreground="{StaticResource AppTextSecondaryColor}"
+                               Foreground="{DynamicResource AppTextSecondaryColor}"
                                TextWrapping="Wrap"/>
                 </Border>
 
@@ -122,9 +122,9 @@
                     Click="OpenNotepad_Click">
                 <Button.Style>
                     <Style TargetType="Button">
-                        <Setter Property="Background" Value="{StaticResource AppPanelHoverColor}"/>
-                        <Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
-                        <Setter Property="BorderBrush" Value="{StaticResource AppBorderColor}"/>
+                        <Setter Property="Background" Value="{DynamicResource AppPanelHoverColor}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource AppTextColor}"/>
+                        <Setter Property="BorderBrush" Value="{DynamicResource AppBorderColor}"/>
                         <Setter Property="BorderThickness" Value="1"/>
                         <Setter Property="FontFamily" Value="Segoe UI"/>
                         <Setter Property="Cursor" Value="Hand"/>
@@ -142,7 +142,7 @@
                         </Setter>
                         <Style.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="{StaticResource AppBorderColor}"/>
+                                <Setter Property="Background" Value="{DynamicResource AppBorderColor}"/>
                             </Trigger>
                         </Style.Triggers>
                     </Style>

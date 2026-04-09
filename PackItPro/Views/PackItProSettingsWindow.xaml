@@ -5,7 +5,7 @@
         Height="680" Width="500"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
-        Background="{StaticResource AppBackgroundColor}"
+        Background="{DynamicResource AppBackgroundColor}"
         ShowInTaskbar="False">
 
     <Grid Margin="12">
@@ -15,8 +15,8 @@
         </Grid.RowDefinitions>
 
         <Border Grid.Row="0"
-                Background="{StaticResource AppPanelColor}"
-                BorderBrush="{StaticResource AppBorderColor}"
+                Background="{DynamicResource AppPanelColor}"
+                BorderBrush="{DynamicResource AppBorderColor}"
                 BorderThickness="1"
                 CornerRadius="10"
                 Padding="22,18">
@@ -29,7 +29,7 @@
                         <TextBlock Text="⚙️" FontSize="18" Margin="0,0,8,0" VerticalAlignment="Center"/>
                         <TextBlock Text="Advanced Settings"
                                    FontSize="16" FontWeight="SemiBold"
-                                   Foreground="{StaticResource AppTextColor}"
+                                   Foreground="{DynamicResource AppTextColor}"
                                    FontFamily="Segoe UI"
                                    VerticalAlignment="Center"/>
                     </StackPanel>
@@ -37,7 +37,7 @@
                     <!-- ── Output ───────────────────────────── -->
                     <TextBlock Text="OUTPUT"
                                FontSize="10" FontWeight="SemiBold"
-                               Foreground="{StaticResource AppTextTertiaryColor}"
+                               Foreground="{DynamicResource AppTextTertiaryColor}"
                                FontFamily="Segoe UI"
                                Margin="0,0,0,8"
                               />
@@ -48,7 +48,7 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0" Text="Output location"
-                                   FontSize="13" Foreground="{StaticResource AppTextSecondaryColor}"
+                                   FontSize="13" Foreground="{DynamicResource AppTextSecondaryColor}"
                                    FontFamily="Segoe UI" VerticalAlignment="Center"/>
                         <TextBox Grid.Column="1" x:Name="OutputLocationBox"
                                  Height="32" FontFamily="Segoe UI" FontSize="12"
@@ -63,7 +63,7 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0" Text="Default file name"
-                                   FontSize="13" Foreground="{StaticResource AppTextSecondaryColor}"
+                                   FontSize="13" Foreground="{DynamicResource AppTextSecondaryColor}"
                                    FontFamily="Segoe UI" VerticalAlignment="Center"/>
                         <TextBox Grid.Column="1" x:Name="OutputFileNameBox"
                                  Height="32" FontFamily="Segoe UI" FontSize="12"
@@ -71,12 +71,12 @@
                     </Grid>
 
                     <!-- Divider -->
-                    <Border Height="1" Background="{StaticResource AppDividerColor}" Margin="0,12,0,12"/>
+                    <Border Height="1" Background="{DynamicResource AppDividerColor}" Margin="0,12,0,12"/>
 
                     <!-- ── Security ─────────────────────────── -->
                     <TextBlock Text="SECURITY"
                                FontSize="10" FontWeight="SemiBold"
-                               Foreground="{StaticResource AppTextTertiaryColor}"
+                               Foreground="{DynamicResource AppTextTertiaryColor}"
                                FontFamily="Segoe UI"
                                Margin="0,0,0,8"
                               />
@@ -87,7 +87,7 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0" Text="Min detections to flag"
-                                   FontSize="13" Foreground="{StaticResource AppTextSecondaryColor}"
+                                   FontSize="13" Foreground="{DynamicResource AppTextSecondaryColor}"
                                    FontFamily="Segoe UI" VerticalAlignment="Center"
                                    ToolTip="Number of VirusTotal engines that must flag a file before it's marked Infected"/>
                         <TextBox Grid.Column="1" x:Name="MinDetectionsBox"
@@ -102,11 +102,11 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0" VerticalAlignment="Center">
                             <TextBlock Text="Scan on add"
-                                       FontSize="13" Foreground="{StaticResource AppTextSecondaryColor}"
+                                       FontSize="13" Foreground="{DynamicResource AppTextSecondaryColor}"
                                        FontFamily="Segoe UI"
                                        ToolTip="Automatically scan files with VirusTotal when added to the list"/>
                             <TextBlock Text="Requires API key"
-                                       FontSize="10" Foreground="{StaticResource AppTextTertiaryColor}"
+                                       FontSize="10" Foreground="{DynamicResource AppTextTertiaryColor}"
                                        FontFamily="Segoe UI"/>
                         </StackPanel>
                         <CheckBox Grid.Column="1" x:Name="ScanOnAddBox"
@@ -115,12 +115,12 @@
                     </Grid>
 
                     <!-- Divider -->
-                    <Border Height="1" Background="{StaticResource AppDividerColor}" Margin="0,12,0,12"/>
+                    <Border Height="1" Background="{DynamicResource AppDividerColor}" Margin="0,12,0,12"/>
 
                     <!-- ── Package ──────────────────────────── -->
                     <TextBlock Text="PACKAGE"
                                FontSize="10" FontWeight="SemiBold"
-                               Foreground="{StaticResource AppTextTertiaryColor}"
+                               Foreground="{DynamicResource AppTextTertiaryColor}"
                                FontFamily="Segoe UI"
                                Margin="0,0,0,8"
                               />
@@ -131,7 +131,7 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0" Text="Max files in list"
-                                   FontSize="13" Foreground="{StaticResource AppTextSecondaryColor}"
+                                   FontSize="13" Foreground="{DynamicResource AppTextSecondaryColor}"
                                    FontFamily="Segoe UI" VerticalAlignment="Center"
                                    ToolTip="Maximum number of files that can be added to a single package (1–50)"/>
                         <TextBox Grid.Column="1" x:Name="MaxFilesBox"
@@ -140,12 +140,12 @@
                     </Grid>
 
                     <!-- Divider -->
-                    <Border Height="1" Background="{StaticResource AppDividerColor}" Margin="0,12,0,12"/>
+                    <Border Height="1" Background="{DynamicResource AppDividerColor}" Margin="0,12,0,12"/>
 
                     <!-- ── Trusted Hashes ───────────────────────── -->
                     <TextBlock Text="TRUSTED FALSE POSITIVES"
                                FontSize="10" FontWeight="SemiBold"
-                               Foreground="{StaticResource AppTextTertiaryColor}"
+                               Foreground="{DynamicResource AppTextTertiaryColor}"
                                FontFamily="Segoe UI"
                                Margin="0,0,0,8"/>
 
@@ -153,7 +153,7 @@
                     <TextBlock x:Name="NoTrustedText"
                                Text="No trusted hashes — files marked as false positives will appear here."
                                FontSize="12" FontFamily="Segoe UI"
-                               Foreground="{StaticResource AppTextTertiaryColor}"
+                               Foreground="{DynamicResource AppTextTertiaryColor}"
                                TextWrapping="Wrap"
                                Margin="0,0,0,8"
                                Visibility="Visible"/>
@@ -162,8 +162,8 @@
                     <ListView x:Name="TrustedHashList"
                               MaxHeight="160"
                               Visibility="Collapsed"
-                              Background="{StaticResource AppCardColor}"
-                              BorderBrush="{StaticResource AppBorderColor}"
+                              Background="{DynamicResource AppCardColor}"
+                              BorderBrush="{DynamicResource AppBorderColor}"
                               BorderThickness="1"
                               Margin="0,0,0,8"
                               ScrollViewer.HorizontalScrollBarVisibility="Disabled">
@@ -178,7 +178,7 @@
                         <ListView.ItemTemplate>
                             <DataTemplate>
                                 <Border Padding="10,7"
-                                        BorderBrush="{StaticResource AppDividerColor}"
+                                        BorderBrush="{DynamicResource AppDividerColor}"
                                         BorderThickness="0,0,0,1">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
@@ -188,10 +188,10 @@
                                         <StackPanel Grid.Column="0" VerticalAlignment="Center">
                                             <TextBlock Text="{Binding FileName}"
                                                        FontSize="12" FontFamily="Segoe UI"
-                                                       Foreground="{StaticResource AppTextColor}"
+                                                       Foreground="{DynamicResource AppTextColor}"
                                                        TextTrimming="CharacterEllipsis"/>
                                             <TextBlock FontSize="10" FontFamily="Consolas"
-                                                       Foreground="{StaticResource AppTextTertiaryColor}"
+                                                       Foreground="{DynamicResource AppTextTertiaryColor}"
                                                        Margin="0,2,0,0">
                                                 <Run Text="{Binding ShortHash}"/>
                                                 <Run Text=" · "/>
@@ -205,9 +205,9 @@
                                                 VerticalAlignment="Center"
                                                 Tag="{Binding Hash}"
                                                 Click="RemoveTrust_Click"
-                                                Foreground="{StaticResource AppStatusErrorColor}"
+                                                Foreground="{DynamicResource AppStatusErrorColor}"
                                                 Background="Transparent"
-                                                BorderBrush="{StaticResource AppStatusErrorColor}"
+                                                BorderBrush="{DynamicResource AppStatusErrorColor}"
                                                 BorderThickness="1"
                                                 Cursor="Hand">
                                             <Button.Template>
@@ -234,17 +234,17 @@
                     </ListView>
 
                     <!-- Divider -->
-                    <Border Background="{StaticResource AppCardColor}"
+                    <Border Background="{DynamicResource AppCardColor}"
                             CornerRadius="6" Padding="12" BorderThickness="1"
-                            BorderBrush="{StaticResource AppBorderColor}">
+                            BorderBrush="{DynamicResource AppBorderColor}">
                         <StackPanel>
                             <TextBlock Text="Settings file location"
                                        FontSize="10" FontWeight="SemiBold"
-                                       Foreground="{StaticResource AppTextTertiaryColor}"
+                                       Foreground="{DynamicResource AppTextTertiaryColor}"
                                        FontFamily="Segoe UI" Margin="0,0,0,4"/>
                             <TextBlock x:Name="SettingsPathText"
                                        FontSize="11" FontFamily="Consolas"
-                                       Foreground="{StaticResource AppTextSecondaryColor}"
+                                       Foreground="{DynamicResource AppTextSecondaryColor}"
                                        TextWrapping="Wrap"/>
                             <Button Content="Open in Notepad"
                                     Height="28" HorizontalAlignment="Left"
@@ -270,9 +270,9 @@
                     Click="CancelButton_Click">
                 <Button.Style>
                     <Style TargetType="Button">
-                        <Setter Property="Background" Value="{StaticResource AppPanelHoverColor}"/>
-                        <Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
-                        <Setter Property="BorderBrush" Value="{StaticResource AppBorderColor}"/>
+                        <Setter Property="Background" Value="{DynamicResource AppPanelHoverColor}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource AppTextColor}"/>
+                        <Setter Property="BorderBrush" Value="{DynamicResource AppBorderColor}"/>
                         <Setter Property="BorderThickness" Value="1"/>
                         <Setter Property="FontFamily" Value="Segoe UI"/>
                         <Setter Property="FontSize" Value="13"/>
@@ -292,7 +292,7 @@
                         </Setter>
                         <Style.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="{StaticResource AppBorderColor}"/>
+                                <Setter Property="Background" Value="{DynamicResource AppBorderColor}"/>
                             </Trigger>
                         </Style.Triggers>
                     </Style>

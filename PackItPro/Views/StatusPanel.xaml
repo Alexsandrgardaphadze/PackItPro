@@ -1,379 +1,283 @@
 ﻿<!-- Views/StatusPanel.xaml -->
-
 <UserControl x:Class="PackItPro.Views.StatusPanel"
-
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:po="http://schemas.microsoft.com/winfx/2006/xaml/presentation/options"
-
              mc:Ignorable="d"
-
              d:DesignHeight="70" d:DesignWidth="800">
-
-
 
     <UserControl.Resources>
 
-        <!-- Spinner storyboard — code-behind calls Begin() / Stop() -->
-
+        <!-- Spinner rotation storyboard — code-behind calls Begin() / Stop() -->
         <Storyboard x:Key="SpinAnimation" RepeatBehavior="Forever">
-
             <DoubleAnimation
-
                 Storyboard.TargetName="SpinnerRotation"
-
                 Storyboard.TargetProperty="Angle"
-
                 From="0" To="360"
-
                 Duration="0:0:0.9"/>
+        </Storyboard>
 
+        <!--
+            Smooth progress: when ProgressPercentage changes we animate
+            the proxy double rather than jumping. The ProgressBar binds to
+            AnimatedProgress via a one-way binding updated by the animation.
+            Because this lives in UserControl.Resources it gets one instance
+            per StatusPanel — no shared-state issues.
+        -->
+        <Storyboard x:Key="ProgressSmoothStoryboard">
+            <DoubleAnimation
+                Storyboard.TargetName="ProgressBar"
+                Storyboard.TargetProperty="Value"
+                Duration="0:0:0.25"
+                EasingFunction="{x:Null}"/>
         </Storyboard>
 
     </UserControl.Resources>
 
-
-
     <Grid>
-
         <Grid.ColumnDefinitions>
-
             <ColumnDefinition Width="Auto"/>
-
-            <!-- Icon -->
-
+            <!-- Icon circle -->
             <ColumnDefinition Width="*"/>
-
             <!-- Message + progress -->
-
             <ColumnDefinition Width="Auto"/>
-
             <!-- Percentage -->
-
             <ColumnDefinition Width="Auto"/>
-
-            <!-- Button -->
-
+            <!-- Pack Now button -->
         </Grid.ColumnDefinitions>
 
-
-
         <!-- ── Status Icon ────────────────────────────────────────────────────
-
-             Three layers stacked. Visibility driven by DataTrigger styles.
-
+             Circle background uses AppCardColor so it adapts to both themes.
+             In dark mode: subtle dark panel. In light mode: white card.
         -->
-
         <Border Grid.Column="0"
-
                 Width="36" Height="36"
-
-                Background="#1f1f33"
-
+                Background="{DynamicResource AppCardColor}"
+                BorderBrush="{DynamicResource AppBorderColor}"
+                BorderThickness="1"
                 CornerRadius="18"
-
                 Margin="0,0,14,0"
-
                 VerticalAlignment="Center">
-
             <Grid>
 
-
-
-                <!-- ① Spinner — shown only while IsBusy -->
-
+                <!-- ① Spinner — shown only while IsBusy
+                     Arc stroke uses DynamicResource so it picks up theme accent.
+                     GPU-composited: RenderTransform on parent Grid keeps it off
+                     the layout system during animation.
+                -->
                 <Grid Width="22" Height="22"
-
                       HorizontalAlignment="Center"
-
                       VerticalAlignment="Center"
-
                       RenderTransformOrigin="0.5,0.5">
-
                     <Grid.Style>
-
                         <Style TargetType="Grid">
-
                             <Setter Property="Visibility" Value="Collapsed"/>
-
                             <Style.Triggers>
-
                                 <DataTrigger Binding="{Binding IsBusy}" Value="True">
-
                                     <Setter Property="Visibility" Value="Visible"/>
-
                                 </DataTrigger>
-
                             </Style.Triggers>
-
                         </Style>
-
                     </Grid.Style>
-
                     <Grid.RenderTransform>
-
                         <RotateTransform x:Name="SpinnerRotation" Angle="0"/>
-
                     </Grid.RenderTransform>
 
-                    <!--
-
-                        Symmetric 270° open arc drawn with ArcSegment so the gap
-
-                        is always at the same position relative to the geometry centre.
-
-                        The arc sweeps from the 12-o'clock position clockwise 270°,
-
-                        leaving a 90° gap at top-right. RenderTransformOrigin="0.5,0.5"
-
-                        on the parent Grid makes the RotateTransform spin around the
-
-                        visual centre correctly.
-
-                    -->
-
+                    <!-- Track arc — subtle background ring, theme-aware -->
                     <Path StrokeThickness="2"
-
-                          StrokeStartLineCap="Round"
-
-                          StrokeEndLineCap="Round"
-
                           Fill="Transparent"
-
-                          Stroke="{StaticResource AppPrimaryColor}"
-
+                          Stroke="{DynamicResource AppBorderLightColor}"
                           HorizontalAlignment="Center"
-
                           VerticalAlignment="Center">
-
                         <Path.Data>
-
-                            <PathGeometry>
-
-                                <PathFigure StartPoint="11,2" IsClosed="False">
-
-                                    <!-- Large arc: radius 9, sweep 270° clockwise -->
-
-                                    <ArcSegment Point="2,11"
-
-                                                Size="9,9"
-
-                                                SweepDirection="Clockwise"
-
-                                                IsLargeArc="True"/>
-
-                                </PathFigure>
-
-                            </PathGeometry>
-
+                            <EllipseGeometry Center="11,11" RadiusX="9" RadiusY="9"/>
                         </Path.Data>
-
                     </Path>
 
+                    <!-- Spinning arc — accent color, always readable in both themes -->
+                    <Path StrokeThickness="2.5"
+                          StrokeStartLineCap="Round"
+                          StrokeEndLineCap="Round"
+                          Fill="Transparent"
+                          Stroke="{DynamicResource AppPrimaryColor}"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center">
+                        <Path.Data>
+                            <PathGeometry>
+                                <PathFigure StartPoint="11,2" IsClosed="False">
+                                    <!-- 270° sweep, leaving a 90° gap -->
+                                    <ArcSegment Point="2,11"
+                                                Size="9,9"
+                                                SweepDirection="Clockwise"
+                                                IsLargeArc="True"/>
+                                </PathFigure>
+                            </PathGeometry>
+                        </Path.Data>
+                    </Path>
                 </Grid>
 
-
-
-                <!-- ② Success checkmark — shown when IsSuccess=true AND IsBusy=false -->
-
+                <!-- ② Success checkmark -->
                 <Viewbox Width="22" Height="22"
-
                          HorizontalAlignment="Center"
-
                          VerticalAlignment="Center">
-
                     <Viewbox.Style>
-
                         <Style TargetType="Viewbox">
-
                             <Setter Property="Visibility" Value="Collapsed"/>
-
                             <Style.Triggers>
-
                                 <DataTrigger Binding="{Binding IsSuccess}" Value="True">
-
                                     <Setter Property="Visibility" Value="Visible"/>
-
                                 </DataTrigger>
-
                                 <DataTrigger Binding="{Binding IsBusy}" Value="True">
-
                                     <Setter Property="Visibility" Value="Collapsed"/>
-
                                 </DataTrigger>
-
                             </Style.Triggers>
-
                         </Style>
-
                     </Viewbox.Style>
-
                     <Canvas Width="20" Height="20">
-
                         <Path Data="M10 2a8 8 0 1 1 0 16A8 8 0 0 1 10 2Zm3.36 5.65a.5.5 0 0 0-.64-.06l-.07.06L9 11.3 7.35 9.65l-.07-.06a.5.5 0 0 0-.7.7l.06.07 2 2 .07.06a.5.5 0 0 0 .57 0l.07-.06 4-4 .06-.07a.5.5 0 0 0-.06-.64Z"
-
-                              Fill="{StaticResource AppStatusCleanColor}"/>
-
+                              Fill="{DynamicResource AppStatusCleanColor}"/>
                     </Canvas>
-
                 </Viewbox>
 
-
-
-                <!-- ③ Idle checkmark — shown when NOT busy AND NOT success (default) -->
-
+                <!-- ③ Idle icon — dim checkmark when not busy, not success -->
                 <Viewbox Width="22" Height="22"
-
                          HorizontalAlignment="Center"
-
                          VerticalAlignment="Center">
-
                     <Viewbox.Style>
-
                         <Style TargetType="Viewbox">
-
                             <Setter Property="Visibility" Value="Visible"/>
-
                             <Style.Triggers>
-
-                                <DataTrigger Binding="{Binding IsBusy}" Value="True">
-
+                                <DataTrigger Binding="{Binding IsBusy}"    Value="True">
                                     <Setter Property="Visibility" Value="Collapsed"/>
-
                                 </DataTrigger>
-
                                 <DataTrigger Binding="{Binding IsSuccess}" Value="True">
-
                                     <Setter Property="Visibility" Value="Collapsed"/>
-
                                 </DataTrigger>
-
                             </Style.Triggers>
-
                         </Style>
-
                     </Viewbox.Style>
-
                     <Canvas Width="20" Height="20">
-
                         <Path Data="M10 2a8 8 0 1 1 0 16A8 8 0 0 1 10 2Zm3.36 5.65a.5.5 0 0 0-.64-.06l-.07.06L9 11.3 7.35 9.65l-.07-.06a.5.5 0 0 0-.7.7l.06.07 2 2 .07.06a.5.5 0 0 0 .57 0l.07-.06 4-4 .06-.07a.5.5 0 0 0-.06-.64Z"
-
-                              Fill="{StaticResource AppStatusCleanColor}"
-
-                              Opacity="0.35"/>
-
+                              Fill="{DynamicResource AppTextTertiaryColor}"
+                              Opacity="0.5"/>
                     </Canvas>
-
                 </Viewbox>
-
-
 
             </Grid>
-
         </Border>
 
-
-
         <!-- ── Message + Progress Bar ──────────────────────────────────────── -->
-
         <StackPanel Grid.Column="1" VerticalAlignment="Center">
-
             <TextBlock Text="{Binding Message}"
-
-                       Foreground="{StaticResource AppTextColor}"
-
+                       Foreground="{DynamicResource AppTextColor}"
                        FontFamily="Segoe UI"
-
                        FontSize="13"
-
                        FontWeight="Medium"
+                       Margin="0,0,0,4"
+                       AutomationProperties.LiveSetting="Polite"
+                       AutomationProperties.Name="Status message"/>
 
-                       Margin="0,0,0,4"/>
-
-
-
-            <ProgressBar Height="4"
-
+            <!--
+                Smooth progress bar. Value is set from code-behind via the
+                ProgressSmoothStoryboard so transitions animate rather than jump.
+                x:Name is required so the storyboard can target it.
+            -->
+            <ProgressBar x:Name="ProgressBar"
+                         Height="4"
                          Minimum="0"
-
                          Maximum="100"
-
-                         Value="{Binding ProgressPercentage}"
-
-                         Foreground="{StaticResource AppPrimaryColor}"
-
-                         Background="{StaticResource AppBorderColor}"
-
+                         Foreground="{DynamicResource AppPrimaryColor}"
+                         Background="{DynamicResource AppBorderColor}"
                          Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}"
-
                          Style="{StaticResource RoundedProgressBarStyle}"/>
-
         </StackPanel>
 
-
-
-        <!-- Progress percentage (IsBusy only) -->
-
+        <!-- Progress percentage -->
         <TextBlock Grid.Column="2"
-
                    Text="{Binding ProgressPercentage, StringFormat={}{0:F0}%}"
-
-                   Foreground="{StaticResource AppTextTertiaryColor}"
-
+                   Foreground="{DynamicResource AppTextTertiaryColor}"
                    FontFamily="Consolas"
-
                    FontSize="12"
-
                    FontWeight="SemiBold"
-
                    VerticalAlignment="Center"
-
                    Margin="12,0"
-
                    Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}"/>
 
+        <!-- Pack Now button group: scan warning dot + button -->
+        <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
 
+            <!--
+                B2: Scan-before-pack amber indicator.
+                Visible when files exist but ALL are still Pending (none scanned).
+                Bound via FileList on the Window DataContext.
+                Uses the InverseBoolToVisibility converter on HasScannedFiles.
+                HasScannedFiles = CleanCount + InfectedCount + FailedCount + TrustedCount > 0.
+                Since we may not have HasScannedFiles yet, we approximate with
+                HasFiles AND InfectedCount==0 AND CleanCount==0.
+            -->
+            <Border Width="8" Height="8" CornerRadius="4"
+                    Background="{DynamicResource AppStatusWarningColor}"
+                    VerticalAlignment="Center" Margin="0,0,8,0"
+                    ToolTip="Consider scanning files with VirusTotal before packaging (Ctrl+S)">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers>
+                            <!--
+                                Show when files exist AND none have been scanned yet.
+                                CleanCount = 0 AND InfectedCount = 0 AND HasFiles = True
+                                means every file is still Pending.
+                            -->
+                            <MultiDataTrigger>
+                                <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding RelativeSource={RelativeSource AncestorType=Window},
+                                               Path=DataContext.FileList.HasFiles}" Value="True"/>
+                                    <Condition Binding="{Binding RelativeSource={RelativeSource AncestorType=Window},
+                                               Path=DataContext.FileList.CleanCount,
+                                               Converter={StaticResource IsZeroConverter}}" Value="True"/>
+                                    <Condition Binding="{Binding RelativeSource={RelativeSource AncestorType=Window},
+                                               Path=DataContext.FileList.InfectedCount,
+                                               Converter={StaticResource IsZeroConverter}}" Value="True"/>
+                                </MultiDataTrigger.Conditions>
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </MultiDataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+            </Border>
 
-        <!-- Pack Now button -->
-
-        <Button Grid.Column="3"
-
-                Content="Pack Now"
-
-                Command="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=DataContext.PackCommand}"
-
-                Style="{StaticResource Win11Button}"
-
-                Height="40"
-
-                FontSize="13"
-
-                FontWeight="SemiBold"
-
-                IsEnabled="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=DataContext.FileList.HasFiles}"
-
-                MinWidth="120"
-
-                Padding="20,0"
-
-                Cursor="Hand">
-
-            <Button.Effect>
-
-                <DropShadowEffect Color="#4f46e5" Opacity="0.4" BlurRadius="15" ShadowDepth="0" po:Freeze="True"/>
-
-            </Button.Effect>
-
-        </Button>
-
-
+            <!--
+                B1: Pack Now button with disabled-state tooltip.
+                When no files are loaded IsEnabled=False shows "Add files first".
+            -->
+            <Button Content="Pack Now"
+                    Command="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=DataContext.PackCommand}"
+                    Height="40"
+                    FontSize="13"
+                    FontWeight="SemiBold"
+                    IsEnabled="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=DataContext.FileList.HasFiles}"
+                    MinWidth="120"
+                    Padding="20,0"
+                    Cursor="Hand"
+                    AutomationProperties.Name="Pack Now"
+                    AutomationProperties.HelpText="Create the installer package from the files in the list">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource Win11Button}">
+                        <Setter Property="ToolTip" Value="Create installer package (Ctrl+K)"/>
+                        <Style.Triggers>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="ToolTip" Value="Add files to the list first (Ctrl+O)"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+                <Button.Effect>
+                    <DropShadowEffect Color="#4f46e5" Opacity="0.4" BlurRadius="15" ShadowDepth="0" po:Freeze="True"/>
+                </Button.Effect>
+            </Button>
+        </StackPanel>
 
     </Grid>
-
 </UserControl>
-

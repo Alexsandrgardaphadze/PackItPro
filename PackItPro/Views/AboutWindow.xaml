@@ -6,12 +6,12 @@
         SizeToContent="Height"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
-        Background="{StaticResource AppBackgroundColor}"
+        Background="{DynamicResource AppBackgroundColor}"
         ShowInTaskbar="False">
 
     <Grid Margin="12">
-        <Border Background="{StaticResource AppPanelColor}"
-                BorderBrush="{StaticResource AppBorderColor}"
+        <Border Background="{DynamicResource AppPanelColor}"
+                BorderBrush="{DynamicResource AppBorderColor}"
                 BorderThickness="1"
                 CornerRadius="10"
                 Padding="28,24">
@@ -21,7 +21,7 @@
                 <StackPanel HorizontalAlignment="Center" Margin="0,0,0,20">
                     <Border Width="64" Height="64"
                             CornerRadius="16"
-                            Background="{StaticResource AppPrimaryColor}"
+                            Background="{DynamicResource AppPrimaryColor}"
                             HorizontalAlignment="Center"
                             Margin="0,0,0,14">
                         <TextBlock Text="📦"
@@ -31,25 +31,25 @@
                     </Border>
                     <TextBlock Text="PackItPro"
                                FontSize="22" FontWeight="Bold"
-                               Foreground="{StaticResource AppTextColor}"
+                               Foreground="{DynamicResource AppTextColor}"
                                FontFamily="Segoe UI"
                                HorizontalAlignment="Center"/>
                     <TextBlock x:Name="VersionText"
                                Text="v0.6.6"
                                FontSize="12"
-                               Foreground="{StaticResource AppTextTertiaryColor}"
+                               Foreground="{DynamicResource AppTextTertiaryColor}"
                                FontFamily="Segoe UI"
                                HorizontalAlignment="Center"
                                Margin="0,3,0,0"/>
                 </StackPanel>
 
                 <!-- Divider -->
-                <Border Height="1" Background="{StaticResource AppDividerColor}" Margin="0,0,0,18"/>
+                <Border Height="1" Background="{DynamicResource AppDividerColor}" Margin="0,0,0,18"/>
 
                 <!-- Description -->
                 <TextBlock Text="A secure package builder for bundling multiple applications into a single self-extracting installer."
                            FontSize="13"
-                           Foreground="{StaticResource AppTextSecondaryColor}"
+                           Foreground="{DynamicResource AppTextSecondaryColor}"
                            FontFamily="Segoe UI"
                            TextWrapping="Wrap"
                            TextAlignment="Center"
@@ -57,9 +57,9 @@
                            Margin="0,0,0,18"/>
 
                 <!-- Info rows -->
-                <Border Background="{StaticResource AppCardColor}"
+                <Border Background="{DynamicResource AppCardColor}"
                         CornerRadius="8" Padding="14,12"
-                        BorderBrush="{StaticResource AppBorderColor}"
+                        BorderBrush="{DynamicResource AppBorderColor}"
                         BorderThickness="1"
                         Margin="0,0,0,18">
                     <StackPanel>
@@ -69,10 +69,10 @@
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <TextBlock Grid.Column="0" Text="Author"
-                                       FontSize="12" Foreground="{StaticResource AppTextTertiaryColor}"
+                                       FontSize="12" Foreground="{DynamicResource AppTextTertiaryColor}"
                                        FontFamily="Segoe UI"/>
                             <TextBlock Grid.Column="1" Text="ZenQuant"
-                                       FontSize="12" Foreground="{StaticResource AppTextColor}"
+                                       FontSize="12" Foreground="{DynamicResource AppTextColor}"
                                        FontFamily="Segoe UI" FontWeight="SemiBold"/>
                         </Grid>
                         <Grid Margin="0,0,0,8">
@@ -81,10 +81,10 @@
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <TextBlock Grid.Column="0" Text="License"
-                                       FontSize="12" Foreground="{StaticResource AppTextTertiaryColor}"
+                                       FontSize="12" Foreground="{DynamicResource AppTextTertiaryColor}"
                                        FontFamily="Segoe UI"/>
                             <TextBlock Grid.Column="1" Text="© 2026 — All rights reserved"
-                                       FontSize="12" Foreground="{StaticResource AppTextColor}"
+                                       FontSize="12" Foreground="{DynamicResource AppTextColor}"
                                        FontFamily="Segoe UI"/>
                         </Grid>
                         <Grid>
@@ -93,10 +93,10 @@
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <TextBlock Grid.Column="0" Text="Platform"
-                                       FontSize="12" Foreground="{StaticResource AppTextTertiaryColor}"
+                                       FontSize="12" Foreground="{DynamicResource AppTextTertiaryColor}"
                                        FontFamily="Segoe UI"/>
                             <TextBlock Grid.Column="1" Text=".NET 8 · WPF · Windows"
-                                       FontSize="12" Foreground="{StaticResource AppTextColor}"
+                                       FontSize="12" Foreground="{DynamicResource AppTextColor}"
                                        FontFamily="Segoe UI"/>
                         </Grid>
                     </StackPanel>
@@ -110,9 +110,9 @@
                         Margin="0,0,0,10">
                     <Button.Style>
                         <Style TargetType="Button">
-                            <Setter Property="Background" Value="{StaticResource AppPanelHoverColor}"/>
-                            <Setter Property="Foreground" Value="{StaticResource AppTextColor}"/>
-                            <Setter Property="BorderBrush" Value="{StaticResource AppBorderColor}"/>
+                            <Setter Property="Background" Value="{DynamicResource AppPanelHoverColor}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource AppTextColor}"/>
+                            <Setter Property="BorderBrush" Value="{DynamicResource AppBorderColor}"/>
                             <Setter Property="BorderThickness" Value="1"/>
                             <Setter Property="FontFamily" Value="Segoe UI"/>
                             <Setter Property="FontSize" Value="13"/>
@@ -130,7 +130,7 @@
                             </Setter>
                             <Style.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter Property="Background" Value="{StaticResource AppBorderColor}"/>
+                                    <Setter Property="Background" Value="{DynamicResource AppBorderColor}"/>
                                 </Trigger>
                             </Style.Triggers>
                         </Style>

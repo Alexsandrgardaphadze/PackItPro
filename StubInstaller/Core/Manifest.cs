@@ -73,6 +73,9 @@ namespace StubInstaller
         [JsonPropertyName("silentArgs")]
         public string[]? SilentArgs { get; set; }
 
+        [JsonPropertyName("customArgs")]
+        public string? CustomArgs { get; set; }
+
         [JsonPropertyName("requiresAdmin")]
         public bool RequiresAdmin { get; set; } = false;
 

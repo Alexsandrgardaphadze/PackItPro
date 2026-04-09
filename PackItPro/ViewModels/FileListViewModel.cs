@@ -12,6 +12,10 @@ using System.Windows.Input;
 
 namespace PackItPro.ViewModels
 {
+    /// <summary>
+    /// Manages the list of installer files to be packaged.
+    /// Provides validation, sorting, duplicate detection, and file size calculation.
+    /// </summary>
     public class FileListViewModel : INotifyPropertyChanged, IDisposable
     {
         private readonly ObservableCollection<FileItemViewModel> _items = new();
@@ -20,9 +24,19 @@ namespace PackItPro.ViewModels
         private long _cachedTotalSize = -1;
         private bool _disposed;
 
+        /// <summary>The observable collection of files in the list.</summary>
         public ObservableCollection<FileItemViewModel> Items => _items;
+
+        /// <summary>
+        /// Total number of files in the list.
+        /// Used to enforce <see cref="AppSettings.MaxFilesInList"/> and show progress.
+        /// </summary>
         public int Count => _items.Count;
 
+        /// <summary>
+        /// Combined size in bytes of all files in the list.
+        /// Cached and invalidated when items are added/removed.
+        /// </summary>
         public long TotalSize
         {
             get
@@ -44,16 +58,40 @@ namespace PackItPro.ViewModels
             }
         }
 
+        /// <summary>Count of files marked as clean (no threats detected).</summary>
         public int CleanCount => _items.Count(f => f.Status == FileStatusEnum.Clean);
+
+        /// <summary>Count of files flagged as infected by VirusTotal.</summary>
         public int InfectedCount => _items.Count(f => f.Status == FileStatusEnum.Infected);
+
+        /// <summary>Count of files that failed VirusTotal scanning.</summary>
         public int FailedCount => _items.Count(f => f.Status == FileStatusEnum.ScanFailed);
+
+        /// <summary>Count of files that were skipped (non-executable when OnlyScanExecutables is true).</summary>
         public int SkippedCount => _items.Count(f => f.Status == FileStatusEnum.Skipped);
+
+        /// <summary>Count of files marked as trusted by the user (false positives).</summary>
         public int TrustedCount => _items.Count(f => f.Status == FileStatusEnum.Trusted);
+
+        /// <summary>
+        /// True when at least one file has been added to the list.
+        /// Used to enable/disable the "Pack Now" button and show/hide empty state.
+        /// </summary>
         public bool HasFiles => _items.Any();
+
+        /// <summary>
+        /// True when at least one file is marked as infected.
+        /// Used to show warning banner in the disclaimer and prevent accidental packing of threats.
+        /// </summary>
         public bool HasInfectedFiles => _items.Any(f => f.Status == FileStatusEnum.Infected);
 
+        /// <summary>Opens a file browser to add installer files to the list.</summary>
         public ICommand AddFilesCommand { get; }
+
+        /// <summary>Removes all files from the list after user confirmation.</summary>
         public ICommand ClearAllFilesCommand { get; }
+
+        /// <summary>Removes the selected file from the list.</summary>
         public ICommand RemoveFileCommand { get; }
 
         public FileListViewModel(AppSettings settings, HashSet<string> executableExtensions)
@@ -76,13 +114,71 @@ namespace PackItPro.ViewModels
 
         public void ClearAll() => _items.Clear();
 
+        private string _sortColumn = "";
+        private bool _sortAscending = true;
+
+        /// <summary>
+        /// Sorts the file list by the specified column.
+        /// Toggling the same column reverses the sort order.
+        /// Valid columns: "FileName", "Size", "Status", "InstallOrder".
+        /// </summary>
+        /// <param name="column">The column name to sort by.</param>
+        public void SortBy(string column)
+        {
+            if (_sortColumn == column)
+                _sortAscending = !_sortAscending;
+            else
+            {
+                _sortColumn = column;
+                _sortAscending = true;
+            }
+
+            var sorted = _sortAscending
+                ? column switch
+                {
+                    "FileName" => _items.OrderBy(f => f.FileName).ToList(),
+                    "Size" => _items.OrderBy(f => f.FilePath != null
+                                  ? new FileInfo(f.FilePath).Length : 0).ToList(),
+                    "Status" => _items.OrderBy(f => f.Status.ToString()).ToList(),
+                    _ => _items.OrderBy(f => f.InstallOrder).ToList(),
+                }
+                : column switch
+                {
+                    "FileName" => _items.OrderByDescending(f => f.FileName).ToList(),
+                    "Size" => _items.OrderByDescending(f => f.FilePath != null
+                                  ? new FileInfo(f.FilePath).Length : 0).ToList(),
+                    "Status" => _items.OrderByDescending(f => f.Status.ToString()).ToList(),
+                    _ => _items.OrderByDescending(f => f.InstallOrder).ToList(),
+                };
+
+            for (int i = 0; i < sorted.Count; i++)
+            {
+                int current = _items.IndexOf(sorted[i]);
+                if (current != i) _items.Move(current, i);
+            }
+
+            // Re-assign InstallOrder after sort
+            for (int i = 0; i < _items.Count; i++)
+                _items[i].InstallOrder = i;
+        }
+
         public class AddFilesResult
         {
+            /// <summary>Number of files successfully added to the list.</summary>
             public int SuccessCount { get; set; }
+
+            /// <summary>Number of files rejected (duplicate, invalid type, etc.).</summary>
             public int SkippedCount { get; set; }
+
+            /// <summary>List of reasons why files were skipped.</summary>
             public List<string> SkipReasons { get; } = new();
         }
 
+        /// <summary>
+        /// Validates and adds files to the list, respecting the file limit and filtering invalid types.
+        /// </summary>
+        /// <param name="paths">Array of file paths to validate and add.</param>
+        /// <param name="result">Output parameter containing success/skip counts and reasons.</param>
         public void AddFilesWithValidation(string[] paths, out AddFilesResult result)
         {
             result = new AddFilesResult();
@@ -164,7 +260,7 @@ namespace PackItPro.ViewModels
                     Status = FileStatusEnum.Pending,
                     Positives = 0,
                     TotalScans = 0,
-                    InstallOrder = 0
+                    InstallOrder = _items.Count
                 };
                 fileItem.RemoveCommand = new RelayCommand(_ => ExecuteRemoveFile(fileItem));
                 _items.Add(fileItem);
