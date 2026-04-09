@@ -170,7 +170,7 @@
                                   Command="{Binding PackItProSettingsCommand}"
                                   Style="{StaticResource SubMenuItemStyle}"/>
                         <Separator Background="{DynamicResource AppBorderColor}"/>
-                        <MenuItem Header="Appearance" Style="{StaticResource SubMenuItemStyle}">
+                        <MenuItem Header="Appearance" Style="{StaticResource SubMenuHeaderStyle}">
                             <MenuItem Header="Dark Theme"
                                       Command="{Binding SetThemeDarkCommand}"
                                       Style="{StaticResource SubMenuItemStyle}"/>
@@ -228,7 +228,7 @@
                                   Style="{StaticResource SubMenuItemStyle}"/>
                         <Separator Background="{DynamicResource AppBorderColor}"/>
                         <!-- Shortcuts submenu ─────────────────────────────── -->
-                        <MenuItem Header="Shortcuts" Style="{StaticResource SubMenuItemStyle}">
+                        <MenuItem Header="Shortcuts" Style="{StaticResource SubMenuHeaderStyle}">
                             <MenuItem.Icon>
                                 <Viewbox Width="14" Height="14">
                                     <Canvas Width="20" Height="20">

@@ -90,8 +90,8 @@
                         </Trigger>
                         <!-- Submenu-open state: stronger accent so active menu is obvious -->
                         <Trigger Property="IsSubmenuOpen" Value="True">
-                            <Setter TargetName="border" Property="Background" Value="#224f46e5"/>
-                            <Setter Property="Foreground" Value="White"/>
+                            <Setter TargetName="border" Property="Background" Value="{DynamicResource AppHoverOverlayColor}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource AppPrimaryColor}"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -130,6 +130,89 @@
                         <Trigger Property="IsHighlighted" Value="True">
                             <Setter TargetName="border" Property="Background" Value="{DynamicResource AppPrimaryColor}"/>
                             <Setter Property="Foreground" Value="White"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+
+    <!--
+        SubMenuHeaderStyle — for MenuItem items that have child MenuItems (flyout submenus).
+        Includes PART_Popup so the submenu flyout actually opens.
+        Use SubMenuItemStyle for leaf items (Commands), this style for flyout parents.
+    -->
+    <Style x:Key="SubMenuHeaderStyle" TargetType="MenuItem">
+        <Setter Property="Foreground"  Value="{DynamicResource AppTextColor}"/>
+        <Setter Property="FontSize"    Value="13"/>
+        <Setter Property="Padding"     Value="10,8"/>
+        <Setter Property="Margin"      Value="2"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="MenuItem">
+                    <Border x:Name="border" Background="Transparent" CornerRadius="6">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Optional icon slot -->
+                            <ContentPresenter Grid.Column="0"
+                                              ContentSource="Icon"
+                                              Width="18" Height="18"
+                                              Margin="8,0,4,0"
+                                              VerticalAlignment="Center"
+                                              HorizontalAlignment="Center"/>
+
+                            <!-- Header text -->
+                            <ContentPresenter Grid.Column="1"
+                                              ContentSource="Header"
+                                              Margin="{TemplateBinding Padding}"
+                                              VerticalAlignment="Center"/>
+
+                            <TextBlock Grid.Column="2"
+                                       Text="›"
+                                       FontSize="15"
+                                       Foreground="{DynamicResource AppTextTertiaryColor}"
+                                       VerticalAlignment="Center"
+                                       Margin="4,0,10,0"/>
+
+                            <Popup x:Name="PART_Popup"
+                                   Placement="Right"
+                                   IsOpen="{TemplateBinding IsSubmenuOpen}"
+                                   AllowsTransparency="True"
+                                   Focusable="False"
+                                   PopupAnimation="Fade">
+                                <Border Background="{DynamicResource AppCardColor}"
+                                        BorderBrush="{DynamicResource AppBorderColor}"
+                                        BorderThickness="1"
+                                        CornerRadius="8"
+                                        Padding="4"
+                                        Margin="4,0,0,0">
+                                    <Border.Effect>
+                                        <DropShadowEffect Color="Black" Opacity="0.3"
+                                                          BlurRadius="14" ShadowDepth="3"/>
+                                    </Border.Effect>
+                                    <ItemsPresenter/>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsHighlighted" Value="True">
+                            <Setter TargetName="border" Property="Background"
+                                    Value="{DynamicResource AppHoverOverlayColor}"/>
+                            <Setter Property="Foreground"
+                                    Value="{DynamicResource AppPrimaryColor}"/>
+                        </Trigger>
+                        <Trigger Property="IsSubmenuOpen" Value="True">
+                            <Setter TargetName="border" Property="Background"
+                                    Value="{DynamicResource AppHoverOverlayColor}"/>
+                            <Setter Property="Foreground"
+                                    Value="{DynamicResource AppPrimaryColor}"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
