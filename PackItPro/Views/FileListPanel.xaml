@@ -330,6 +330,7 @@
                                         <TextBox Text="{Binding CustomArgs, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
                                                  Style="{StaticResource NotesTextBoxStyle}"
                                                  MaxLength="120"
+                                                 Padding="10,4"
                                                  ToolTip="Override auto-detected silent args (e.g. /S /D=C:\MyApp)"
                                                  SpellCheck.IsEnabled="False"/>
                                     </Grid>
